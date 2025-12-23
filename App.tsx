@@ -385,7 +385,7 @@ const App: React.FC = () => {
             <h1 className="font-bold text-lg hidden md:block">Taichi Theme Generator</h1>
           </div>
 
-          {/* Mobile: Generate + Palette Buttons */}
+          {/* Mobile: Generate + Palette + Options Buttons */}
           <div className="md:hidden flex items-center gap-2">
             <button 
               onClick={() => generateNewTheme(mode)}
@@ -405,6 +405,15 @@ const App: React.FC = () => {
               title="Color Palette"
             >
               <Palette size={18} />
+            </button>
+
+            <button 
+              onClick={() => setShowOptions(!showOptions)} 
+              className={`p-2 rounded-lg transition-colors ${showOptions ? 'bg-current text-white' : 'hover:bg-white/10'}`}
+              style={showOptions ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
+              title="Design Options"
+            >
+              <SlidersHorizontal size={18} />
             </button>
           </div>
 
