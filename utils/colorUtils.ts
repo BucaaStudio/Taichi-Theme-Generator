@@ -437,10 +437,10 @@ export function generateTheme(
     primary: hslToHex(primaryHue, primarySat, lightColorMod), 
     primaryFg: '#ffffff', 
     
-    // Secondary: affected by contrast - lighter at low contrast, more distinct at high contrast
+    // Secondary: distinct color for UI elements in light mode
     secondary: mode === 'monochrome' 
-      ? hslToHex(secondaryHue, 10, Math.max(lightBgL - 5, 85)) 
-      : hslToHex(secondaryHue, secondarySat, Math.max(lightBgL - 5, 85)),
+      ? hslToHex(secondaryHue, 10, Math.min(lightColorMod + 20, 80)) 
+      : hslToHex(secondaryHue, secondarySat, Math.min(lightColorMod + 10, 75)),
       
     secondaryFg: hslToHex(secondaryHue, 40, lightTextL),
     
@@ -470,8 +470,8 @@ export function generateTheme(
     primary: hslToHex(primaryHue, primarySat, darkColorMod),
     primaryFg: '#ffffff',
     
-    // Secondary: affected by contrast - darker at low contrast, more distinct at high contrast
-    secondary: hslToHex(secondaryHue, secondarySat, Math.min(darkBgL + 10, 30)), 
+    // Secondary: brighter for better readability in dark mode
+    secondary: hslToHex(secondaryHue, secondarySat, Math.max(darkColorMod - 10, 40)), 
     secondaryFg: hslToHex(secondaryHue, 40, darkTextL),
     
     accent: hslToHex(accentHue, accentSat, darkColorMod + 5),

@@ -106,11 +106,11 @@ const HeroBanner: React.FC<{
 
         {/* Content */}
         <div className="relative z-10 text-center space-y-4 max-w-2xl px-4">
-          <div className={`inline-block px-3 py-1 bg-t-primary text-t-primaryFg text-[10px] font-bold uppercase tracking-[0.2em] shadow-lg rounded-full mb-2`}>
+          <div className={`inline-block px-3 py-1 bg-t-secondary text-t-secondaryFg text-[10px] font-bold uppercase tracking-[0.2em] shadow-lg rounded-full mb-2`}>
             Premium Experience
           </div>
           <h2 className="text-3xl sm:text-5xl lg:text-7xl font-black text-t-text leading-[1.05] tracking-tight drop-shadow-xl transition-all duration-500 group-hover:scale-[1.01]">
-            Design that speaks <span className="text-t-primary font-serif italic">louder</span> than words.
+            Design your <span className="text-t-primary font-serif italic">vision</span> in <span className="text-t-secondary font-serif italic">color</span>.
           </h2>
           <p className="text-t-text font-medium text-sm sm:text-lg max-w-lg mx-auto leading-relaxed drop-shadow-md">
             Elevate your interface with harmonious palettes and perfectly balanced typography.
@@ -240,7 +240,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
         </h1>
         <p className="text-xl text-t-muted max-w-lg leading-relaxed">
           Create beautiful light and dark theme color schemes instantly. 
-          This palette generator uses semantic design system tokens like <code className={`bg-t-surface2 text-t-text px-3 py-1 text-base font-medium ${rClassInner}`}>primary</code> and <code className={`bg-t-surface2 text-t-text px-3 py-1 text-base font-medium ${rClassInner}`}>surface</code> to build harmonious dual themes.
+          This palette generator uses semantic design system tokens like <code className={`bg-t-surface2 text-t-text px-3 py-1 text-base font-medium ${rClassInner}`}>primary</code>, <code className={`bg-t-surface2 text-t-text px-3 py-1 text-base font-medium ${rClassInner}`}>secondary</code> and <code className={`bg-t-surface2 text-t-text px-3 py-1 text-base font-medium ${rClassInner}`}>surface</code> to build harmonious dual themes.
         </p>
         <p className="text-sm text-t-muted opacity-75 mt-16">
           Press <code className={`bg-t-surface2 text-t-primary px-2 py-0.5 font-mono font-bold ${rClassInner}`}>Space</code> to generate a new color theme pair.
@@ -379,7 +379,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
           <div className={`bg-t-surface ${bClass} ${rClass} p-6 ${sClass} transition-all duration-300 relative overflow-hidden group hover:${sClassHover} hover:-translate-y-1 ${options.borderWidth > 0 ? 'hover:border-t-primary/30' : ''}`}>
              <div className={`absolute top-0 left-0 w-full h-1 ${primaryBg} group-hover:h-1.5 transition-all`}></div>
              <div className="flex justify-between items-start mb-4">
-               <div className={`p-2 bg-t-primary/10 ${rClassInner} text-t-primary group-hover:bg-t-primary group-hover:text-t-primaryFg transition-colors`}>
+               <div className={`p-2 bg-t-secondary/10 ${rClassInner} text-t-secondary group-hover:bg-t-secondary group-hover:text-t-secondaryFg transition-colors`}>
                  <BarChart2 size={24} />
                </div>
                <span className={`text-xs font-bold text-t-success bg-t-success/10 px-2 py-1 ${rClassInner} border ${options.borderWidth > 0 ? 'border-transparent' : 'border-transparent'} group-hover:border-t-success/20`}>+24.5%</span>
@@ -399,7 +399,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
              <h4 className="text-lg font-bold text-t-text">John Doe</h4>
              <p className="text-t-muted text-sm mb-4">Product Designer</p>
              <div className="flex gap-2">
-               <span className={`px-2 py-1 ${rClassInner} text-xs ${bClass} text-t-text bg-t-surface hover:bg-t-surface2 transition-colors cursor-default`}>UI/UX</span>
+               <span className={`px-2 py-1 ${rClassInner} text-xs ${bClass} text-t-secondary bg-t-secondary/10 border-t-secondary/20 hover:bg-t-secondary hover:text-t-secondaryFg transition-colors cursor-default`}>UI/UX</span>
                <span className={`px-2 py-1 ${rClassInner} text-xs bg-t-accent/10 text-t-accent border ${options.borderWidth > 0 ? 'border-t-accent/20' : 'border-transparent'} hover:bg-t-accent hover:text-t-accentFg transition-colors cursor-default`}>React</span>
              </div>
              <button className={`mt-4 w-full py-2 ${rClassInner} ${bClass} text-t-primary text-sm font-medium transition-all duration-200
@@ -415,8 +415,8 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
       <section className="space-y-4">
          <h3 className="text-sm font-bold uppercase tracking-wider text-t-muted">Feedback</h3>
          <div className="flex flex-col gap-3">
-            <div className={`flex items-center gap-3 p-4 ${rPill} ${sClass} bg-t-primary/10 ${bClass} border-t-primary/20 text-t-text transition-transform hover:scale-[1.01]`}>
-               <Info className="text-t-primary shrink-0" size={20} />
+            <div className={`flex items-center gap-3 p-4 ${rPill} ${sClass} bg-t-secondary/10 ${bClass} border-t-secondary/20 text-t-text transition-transform hover:scale-[1.01]`}>
+               <Info className="text-t-secondary shrink-0" size={20} />
                <div className="flex-1 text-sm"><span className="font-bold">Update Available:</span> A new version of the system is ready.</div>
             </div>
             <div className={`flex items-center gap-3 p-4 ${rPill} ${sClass} bg-t-error/10 ${bClass} border-t-error/20 text-t-text transition-transform hover:scale-[1.01]`}>
