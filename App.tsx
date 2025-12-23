@@ -4,7 +4,7 @@ import {
   Trash2, Undo, Lock, ChevronLeft, ChevronRight, Share, Download,
   Moon, Sun, SlidersHorizontal, ChevronUp, ChevronDown, Shuffle, PanelTopClose, PanelTopOpen, X
 } from 'lucide-react';
-import { ThemeTokens, DualTheme, GenerationMode, ColorFormat, DesignOptions } from './types';
+import { ThemeTokens, DualTheme, GenerationMode, ColorFormat, DesignOptions, LockedColors } from './types';
 import { generateTheme, extractColorFromImage, formatColor } from './utils/colorUtils';
 import PreviewSection from './components/PreviewSection';
 import SwatchStrip from './components/SwatchStrip';
@@ -72,7 +72,13 @@ const App: React.FC = () => {
   const [format, setFormat] = useState<ColorFormat>('hex');
   const [showHistory, setShowHistory] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
-  const [isDarkUI, setIsDarkUI] = useState(false);
+  const [isDarkUI, setIsDarkUI] = useState(() => {
+    // Detect system theme preference
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  });
   const [showSwatches, setShowSwatches] = useState(true);
 
   const [showMobileNotice, setShowMobileNotice] = useState(true);
@@ -86,6 +92,8 @@ const App: React.FC = () => {
     contrastLevel: 3, // Default to Middle (scale 1-5)
     saturationLevel: 2 // Default to Middle (scale 0-4)
   });
+  
+  const [lockedColors, setLockedColors] = useState<LockedColors>({});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -160,6 +168,17 @@ const App: React.FC = () => {
     localStorage.setItem('theme_history', JSON.stringify(history));
   }, [history]);
 
+  // Listen for system theme changes
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      setIsDarkUI(e.matches);
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
   const generateNewTheme = useCallback((
     genMode: GenerationMode, 
     seed?: string, 
@@ -172,11 +191,24 @@ const App: React.FC = () => {
     
     const { light, dark, seed: newSeed } = generateTheme(genMode, seed, sLevel, cLevel);
     
+    // Preserve locked colors from current theme
+    const mergedLight = { ...light };
+    const mergedDark = { ...dark };
+    
+    if (currentTheme) {
+      Object.keys(lockedColors).forEach(key => {
+        if (lockedColors[key as keyof ThemeTokens]) {
+          mergedLight[key as keyof ThemeTokens] = currentTheme.light[key as keyof ThemeTokens];
+          mergedDark[key as keyof ThemeTokens] = currentTheme.dark[key as keyof ThemeTokens];
+        }
+      });
+    }
+    
     const newTheme: DualTheme = {
       id: crypto.randomUUID(),
       timestamp: Date.now(),
-      light,
-      dark,
+      light: mergedLight,
+      dark: mergedDark,
       seed: newSeed,
       mode: genMode
     };
@@ -193,7 +225,7 @@ const App: React.FC = () => {
     // New items are always at index 0
     setHistoryIndex(0);
     setCurrentTheme(newTheme);
-  }, [historyIndex, designOptions.saturationLevel, designOptions.contrastLevel]);
+  }, [historyIndex, designOptions.saturationLevel, designOptions.contrastLevel, lockedColors, currentTheme]);
 
   // Update a single token (manual edit)
   const handleTokenUpdate = useCallback((side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => {
@@ -215,6 +247,15 @@ const App: React.FC = () => {
       return updated;
     });
   }, [currentTheme, historyIndex]);
+
+  // Toggle lock on a color token
+  const toggleColorLock = useCallback((key: keyof ThemeTokens) => {
+    setLockedColors(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  }, []);
+
 
   // Keyboard shortcut
   useEffect(() => {
@@ -656,6 +697,8 @@ const App: React.FC = () => {
            onFormatChange={setFormat}
            isDarkUI={isDarkUI}
            onUpdate={handleTokenUpdate}
+           lockedColors={lockedColors}
+           onToggleLock={toggleColorLock}
         />
         )}
 

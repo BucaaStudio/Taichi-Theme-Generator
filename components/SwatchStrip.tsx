@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ThemeTokens, ColorFormat } from '../types';
+import { ThemeTokens, ColorFormat, LockedColors } from '../types';
 import { formatColor, parseToHex } from '../utils/colorUtils';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Lock, Unlock } from 'lucide-react';
 
 interface SwatchStripProps {
   light: ThemeTokens;
@@ -10,6 +10,8 @@ interface SwatchStripProps {
   onFormatChange: (fmt: ColorFormat) => void;
   isDarkUI: boolean;
   onUpdate: (side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => void;
+  lockedColors: LockedColors;
+  onToggleLock: (key: keyof ThemeTokens) => void;
 }
 
 interface TokenBlockProps {
@@ -19,6 +21,8 @@ interface TokenBlockProps {
   format: ColorFormat;
   isDarkUI: boolean;
   onUpdate: (side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => void;
+  isLocked: boolean;
+  onToggleLock: () => void;
 }
 
 const TokenBlock: React.FC<TokenBlockProps> = ({ 
@@ -27,7 +31,9 @@ const TokenBlock: React.FC<TokenBlockProps> = ({
   darkHex, 
   format, 
   isDarkUI, 
-  onUpdate 
+  onUpdate,
+  isLocked,
+  onToggleLock
 }) => {
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -38,14 +44,21 @@ const TokenBlock: React.FC<TokenBlockProps> = ({
     setTimeout(() => setCopied(null), 1500);
   };
 
-  const labelColor = isDarkUI ? 'text-slate-500' : 'text-gray-400';
-  const blockBorder = isDarkUI ? 'border-slate-700' : 'border-gray-200';
+  const labelColor = 'text-t-muted';
+  const blockBorder = 'border-t-border';
   
   return (
-    <div className={`flex flex-col w-full rounded-xl border ${blockBorder} overflow-hidden transition-colors`}>
+    <div className={`flex flex-col w-full rounded-xl border ${blockBorder} overflow-hidden transition-colors group/token`}>
       {/* Label */}
       <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border-b ${blockBorder} ${labelColor} flex justify-between items-center bg-opacity-50`}>
-        {tokenKey}
+        <span>{tokenKey}</span>
+        <button
+          onClick={onToggleLock}
+          className={`transition-opacity p-0.5 rounded hover:bg-gray-500/20 ${isLocked ? '!opacity-100' : 'opacity-0 group-hover/token:opacity-100'}`}
+          title={isLocked ? 'Unlock color' : 'Lock color'}
+        >
+          {isLocked ? <Lock size={12} /> : <Unlock size={12} />}
+        </button>
       </div>
 
       {/* Light Token */}
@@ -127,15 +140,15 @@ const SwatchRow: React.FC<SwatchRowProps> = ({ hex, format, isDarkUI, onCopy, co
     }
   };
 
-  const bgHover = isDarkUI ? 'hover:bg-slate-800' : 'hover:bg-gray-50';
-  const textColor = isDarkUI ? 'text-slate-300' : 'text-slate-600';
+  const bgHover = 'hover:bg-t-surface2';
+  const textColor = 'text-t-text';
 
   return (
     <div className={`flex items-center p-2 gap-2 ${bgHover} transition-colors group relative`}>
       {/* Clickable Swatch with background pattern */}
       <button 
         onClick={onCopy}
-        className="w-12 h-12 rounded-lg shadow-md border-2 border-gray-300/40 shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition-transform relative overflow-hidden" 
+        className="w-12 h-12 rounded-lg shadow-md border-2 border-t-border shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition-transform relative overflow-hidden" 
         style={{ 
           backgroundColor: hex,
           backgroundImage: `
@@ -162,7 +175,7 @@ const SwatchRow: React.FC<SwatchRowProps> = ({ hex, format, isDarkUI, onCopy, co
           <input 
             type="text" 
             autoFocus
-            className={`w-full text-[10px] font-mono bg-transparent outline-none border-b border-indigo-500 ${textColor}`}
+            className={`w-full text-[10px] font-mono bg-transparent outline-none border-b border-t-primary ${textColor}`}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onBlur={handleBlur}
@@ -171,7 +184,7 @@ const SwatchRow: React.FC<SwatchRowProps> = ({ hex, format, isDarkUI, onCopy, co
         ) : (
           <span 
             onClick={startEditing}
-            className={`text-[10px] font-mono truncate w-full cursor-text hover:text-indigo-500 transition-colors select-none ${textColor}`}
+            className={`text-[10px] font-mono truncate w-full cursor-text hover:text-t-primary transition-colors select-none ${textColor}`}
             title={`Full value: ${fullValue}\nClick to edit`}
           >
             {displayValue}
@@ -182,18 +195,41 @@ const SwatchRow: React.FC<SwatchRowProps> = ({ hex, format, isDarkUI, onCopy, co
   );
 };
 
-const SwatchStrip: React.FC<SwatchStripProps> = ({ light, dark, format, isDarkUI, onUpdate }) => {
+const SwatchStrip: React.FC<SwatchStripProps> = ({ light, dark, format, isDarkUI, onUpdate, lockedColors, onToggleLock }) => {
   // Use theme colors for background
   const themeTokens = isDarkUI ? dark : light;
-  const bg = isDarkUI ? 'border-slate-700' : 'border-gray-200';
   
   // Map token keys we want to display - now 8 colors
   const tokens = ['bg', 'surface', 'text', 'primary', 'secondary', 'accent', 'success', 'error'];
 
+  // CSS Variables for theme colors
+  const styleVars = {
+    '--bg': themeTokens.bg,
+    '--surface': themeTokens.surface,
+    '--surface2': themeTokens.surface2,
+    '--text': themeTokens.text,
+    '--text-muted': themeTokens.textMuted,
+    '--primary': themeTokens.primary,
+    '--primary-fg': themeTokens.primaryFg,
+    '--secondary': themeTokens.secondary,
+    '--secondary-fg': themeTokens.secondaryFg,
+    '--accent': themeTokens.accent,
+    '--accent-fg': themeTokens.accentFg,
+    '--border': themeTokens.border,
+    '--ring': themeTokens.ring,
+    '--success': themeTokens.success,
+    '--success-fg': themeTokens.successFg,
+    '--warn': themeTokens.warn,
+    '--warn-fg': themeTokens.warnFg,
+    '--error': themeTokens.error,
+    '--error-fg': themeTokens.errorFg,
+    backgroundColor: themeTokens.bg
+  } as React.CSSProperties;
+
   return (
     <div 
-      className={`sticky top-0 z-40 backdrop-blur-md border-b p-2 shadow-sm transition-colors duration-300 ${bg}`}
-      style={{ backgroundColor: themeTokens.bg }}
+      className="sticky top-0 z-40 backdrop-blur-md border-b border-t-border p-2 shadow-sm transition-colors duration-300"
+      style={styleVars}
     >
       <div className="max-w-[1920px] mx-auto w-full">
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2 w-full">
@@ -206,6 +242,8 @@ const SwatchStrip: React.FC<SwatchStripProps> = ({ light, dark, format, isDarkUI
               format={format} 
               isDarkUI={isDarkUI} 
               onUpdate={onUpdate}
+              isLocked={!!lockedColors[key as keyof ThemeTokens]}
+              onToggleLock={() => onToggleLock(key as keyof ThemeTokens)}
             />
           ))}
         </div>

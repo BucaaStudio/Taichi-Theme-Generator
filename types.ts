@@ -47,3 +47,5 @@ export interface DesignOptions {
   contrastLevel: number; // 0 - 2
   saturationLevel: number; // 0 - 2
 }
+
+export type LockedColors = Partial<Record<keyof ThemeTokens, boolean>>;

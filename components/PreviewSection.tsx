@@ -240,10 +240,10 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
         </h1>
         <p className="text-xl text-t-muted max-w-lg leading-relaxed">
           Create beautiful light and dark theme color schemes instantly. 
-          This palette generator uses semantic design system tokens like <code className={`bg-t-surface2 text-t-text px-3 py-1 text-base font-medium ${rClassInner}`}>primary</code>, <code className={`bg-t-surface2 text-t-text px-3 py-1 text-base font-medium ${rClassInner}`}>secondary</code> and <code className={`bg-t-surface2 text-t-text px-3 py-1 text-base font-medium ${rClassInner}`}>surface</code> to build harmonious dual themes.
+          This palette generator uses semantic design system tokens like <code className={`bg-t-surface2 text-t-primary px-3 py-1 text-base font-medium ${rClassInner}`}>primary</code>, <code className={`bg-t-surface2 text-t-secondary px-3 py-1 text-base font-medium ${rClassInner}`}>secondary</code> and <code className={`bg-t-surface2 text-t-accent px-3 py-1 text-base font-medium ${rClassInner}`}>accent</code> to build harmonious dual themes.
         </p>
         <p className="text-sm text-t-muted opacity-75 mt-16">
-          Press <code className={`bg-t-surface2 text-t-primary px-2 py-0.5 font-mono font-bold ${rClassInner}`}>Space</code> to generate a new color theme pair.
+          Press <code className={`bg-t-surface2 text-t-accent px-2 py-0.5 font-mono font-bold ${rClassInner}`}>Space</code> to generate a new color theme pair.
         </p>
       </section>
 

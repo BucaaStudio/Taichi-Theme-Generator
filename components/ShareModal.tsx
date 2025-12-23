@@ -95,8 +95,8 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, theme }) 
                 src: "/favicon.svg", 
                 x: undefined,
                 y: undefined,
-                height: 42,
-                width: 42,
+                height: 48,
+                width: 48,
                 excavate: true,
               }} 
             />
