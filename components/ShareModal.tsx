@@ -19,6 +19,16 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, theme }) 
     else setTimeout(() => setMounted(false), 300); // Wait for exit animation
   }, [isOpen]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!mounted && !isOpen) return null;
 
   const handleCopy = () => {
