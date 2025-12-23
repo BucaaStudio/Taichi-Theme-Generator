@@ -48,7 +48,20 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, theme }) 
       >
         {/* Header */}
         <div className="p-6 border-b flex items-center justify-between" style={{ borderColor: theme.border }}>
-          <h2 className="text-xl font-bold">Share Theme</h2>
+          <div className="flex items-center gap-3">
+             <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm" style={{ backgroundColor: theme.primary }}>
+                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" fill="white" stroke="none" />
+                    <path d="M12 2 A10 10 0 0 1 12 22 A5 5 0 0 1 12 12 A5 5 0 0 0 12 2" fill="black" stroke="none"/>
+                    <circle cx="15" cy="7" r="1.8" fill="white" stroke="none" />
+                    <circle cx="9" cy="17" r="1.8" fill="black" stroke="none" />
+                 </svg>
+             </div>
+             <div>
+                <h2 className="text-lg font-bold leading-tight">Share Taichi Theme</h2>
+                <p className="text-xs opacity-60 font-medium">Export & Share Config</p>
+             </div>
+          </div>
           <button 
             onClick={onClose}
             className="p-2 rounded-full hover:bg-black/5 transition-colors"
