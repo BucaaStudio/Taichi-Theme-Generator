@@ -300,11 +300,12 @@ export function generateTheme(
     primary: hslToHex(primaryHue, primarySat, lightColorMod), 
     primaryFg: '#ffffff', 
     
+    // Secondary: affected by contrast - lighter at low contrast, more distinct at high contrast
     secondary: mode === 'monochrome' 
-      ? hslToHex(secondaryHue, 10, 92) 
-      : hslToHex(secondaryHue, secondarySat, 90),
+      ? hslToHex(secondaryHue, 10, Math.max(lightBgL - 5, 85)) 
+      : hslToHex(secondaryHue, secondarySat, Math.max(lightBgL - 5, 85)),
       
-    secondaryFg: hslToHex(secondaryHue, 40, 20),
+    secondaryFg: hslToHex(secondaryHue, 40, lightTextL),
     
     accent: hslToHex(accentHue, accentSat, lightColorMod + 5),
     accentFg: '#ffffff',
@@ -312,12 +313,13 @@ export function generateTheme(
     border: hslToHex(primaryHue, 10, lightBgL - 10),
     ring: hslToHex(primaryHue, 60, 60),
     
-    // Success, warn, error now follow saturation slider
-    success: hslToHex(142, clamp(primarySat, sMin, sMax), 45), // Green hue
+    // Success, warn, error: follow both saturation AND contrast sliders
+    // At low contrast, they blend more with background; at high contrast, they're more distinct
+    success: hslToHex(142, clamp(primarySat, sMin, sMax), Math.max(lightColorMod - 5, 40)), // Green hue
     successFg: '#ffffff',
-    warn: hslToHex(38, clamp(primarySat, sMin, sMax), 50), // Orange hue
+    warn: hslToHex(38, clamp(primarySat, sMin, sMax), Math.max(lightColorMod, 45)), // Orange hue
     warnFg: '#ffffff',
-    error: hslToHex(0, clamp(primarySat, sMin, sMax), 55), // Red hue
+    error: hslToHex(0, clamp(primarySat, sMin, sMax), Math.max(lightColorMod + 5, 50)), // Red hue
     errorFg: '#ffffff'
   };
 
@@ -331,8 +333,9 @@ export function generateTheme(
     primary: hslToHex(primaryHue, primarySat, darkColorMod),
     primaryFg: '#ffffff',
     
-    secondary: hslToHex(secondaryHue, secondarySat, 20), 
-    secondaryFg: hslToHex(secondaryHue, 40, 90),
+    // Secondary: affected by contrast - darker at low contrast, more distinct at high contrast
+    secondary: hslToHex(secondaryHue, secondarySat, Math.min(darkBgL + 10, 30)), 
+    secondaryFg: hslToHex(secondaryHue, 40, darkTextL),
     
     accent: hslToHex(accentHue, accentSat, darkColorMod + 5),
     accentFg: '#ffffff',
@@ -340,12 +343,13 @@ export function generateTheme(
     border: hslToHex(primaryHue, 15, darkBgL + 12),
     ring: hslToHex(primaryHue, 60, 60),
     
-    // Success, warn, error now follow saturation slider
-    success: hslToHex(142, clamp(primarySat, sMin, sMax), 40), // Green hue (darker for dark mode)
+    // Success, warn, error: follow both saturation AND contrast sliders
+    // At low contrast, they blend more with background; at high contrast, they're more distinct
+    success: hslToHex(142, clamp(primarySat, sMin, sMax), Math.max(darkColorMod - 10, 35)), // Green hue
     successFg: '#ffffff',
-    warn: hslToHex(38, clamp(primarySat, sMin, sMax), 45), // Orange hue (darker for dark mode)
+    warn: hslToHex(38, clamp(primarySat, sMin, sMax), Math.max(darkColorMod - 5, 40)), // Orange hue
     warnFg: '#ffffff',
-    error: hslToHex(0, clamp(primarySat, sMin, sMax), 50), // Red hue (darker for dark mode)
+    error: hslToHex(0, clamp(primarySat, sMin, sMax), Math.max(darkColorMod, 45)), // Red hue
     errorFg: '#ffffff'
   };
 

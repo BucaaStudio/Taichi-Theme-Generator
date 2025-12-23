@@ -147,7 +147,7 @@ const SwatchRow: React.FC<SwatchRowProps> = ({ hex, format, isDarkUI, onCopy, co
           <input 
             type="text" 
             autoFocus
-            className={`w-full text-[11px] font-mono bg-transparent outline-none border-b border-indigo-500 ${textColor}`}
+            className={`w-full text-[10px] font-mono bg-transparent outline-none border-b border-indigo-500 ${textColor}`}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onBlur={handleBlur}
@@ -156,7 +156,7 @@ const SwatchRow: React.FC<SwatchRowProps> = ({ hex, format, isDarkUI, onCopy, co
         ) : (
           <span 
             onClick={startEditing}
-            className={`text-[11px] font-mono truncate w-full cursor-text hover:text-indigo-500 transition-colors select-none ${textColor}`}
+            className={`text-[10px] font-mono truncate w-full cursor-text hover:text-indigo-500 transition-colors select-none ${textColor}`}
             title="Click to edit value"
           >
             {displayValue}
@@ -168,13 +168,18 @@ const SwatchRow: React.FC<SwatchRowProps> = ({ hex, format, isDarkUI, onCopy, co
 };
 
 const SwatchStrip: React.FC<SwatchStripProps> = ({ light, dark, format, isDarkUI, onUpdate }) => {
-  const bg = isDarkUI ? 'bg-slate-900/95 border-slate-700' : 'bg-white/95 border-gray-200';
+  // Use theme colors for background
+  const themeTokens = isDarkUI ? dark : light;
+  const bg = isDarkUI ? 'border-slate-700' : 'border-gray-200';
   
   // Map token keys we want to display - now 8 colors
   const tokens = ['bg', 'surface', 'text', 'primary', 'secondary', 'accent', 'success', 'error'];
 
   return (
-    <div className={`sticky top-0 z-40 backdrop-blur-md border-b p-2 shadow-sm transition-colors duration-300 ${bg}`}>
+    <div 
+      className={`sticky top-0 z-40 backdrop-blur-md border-b p-2 shadow-sm transition-colors duration-300 ${bg}`}
+      style={{ backgroundColor: themeTokens.bg }}
+    >
       <div className="max-w-[1920px] mx-auto w-full">
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2 w-full">
           {tokens.map(key => (

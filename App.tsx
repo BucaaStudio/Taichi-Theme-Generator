@@ -155,12 +155,8 @@ const App: React.FC = () => {
         }
       };
       
-      // Also update history to persist this edit
-      setHistory(h => {
-        const newH = [...h];
-        newH[historyIndex] = updated;
-        return newH;
-      });
+      // Don't update history for manual edits - only save generated themes
+      // User can always regenerate if they want to save changes
       
       return updated;
     });
@@ -221,8 +217,7 @@ const App: React.FC = () => {
      };
      
      const exportData = {
-       id: currentTheme.id,
-       timestamp: currentTheme.timestamp,
+       generator: "https://taichi.bucaastudio.com/",
        seed: currentTheme.seed,
        mode: currentTheme.mode,
        format: format,
@@ -552,7 +547,13 @@ const App: React.FC = () => {
                 className="h-6 text-[10px] flex items-center justify-center font-mono"
                 style={{ backgroundColor: shellTheme.surface2, color: shellTheme.textMuted }}
               >
-                {theme.mode.slice(0,4)}
+                {theme.mode === 'random' ? 'Rndm' : 
+                 theme.mode === 'monochrome' ? 'Mono' :
+                 theme.mode === 'analogous' ? 'Anlg' :
+                 theme.mode === 'complementary' ? 'Comp' :
+                 theme.mode === 'split-complementary' ? 'Splt' :
+                 theme.mode === 'triadic' ? 'Tria' :
+                 theme.mode === 'image' ? 'Img' : theme.mode.slice(0,4)}
               </div>
             </button>
           ))}

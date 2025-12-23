@@ -1,7 +1,7 @@
 {
   "name": "taichi-color-generator",
   "private": true,
-  "version": "0.0.0",
+  "version": "25.12.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@bucaastudio/versioned-footer": "^1.0.2",
     "lucide-react": "^0.562.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
