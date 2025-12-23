@@ -37,7 +37,7 @@ export interface DualTheme {
 
 export type GenerationMode = 'random' | 'monochrome' | 'analogous' | 'complementary' | 'split-complementary' | 'triadic' | 'image';
 
-export type ColorFormat = 'hex' | 'rgb' | 'hsl' | 'oklch';
+export type ColorFormat = 'hex' | 'rgb' | 'cmyk' | 'hsl' | 'lab' | 'lch' | 'oklch' | 'display-p3';
 
 export interface DesignOptions {
   borderWidth: number;   // 0 - 3

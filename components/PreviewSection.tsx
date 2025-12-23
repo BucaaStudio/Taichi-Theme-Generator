@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Bell, Check, X, AlertTriangle, Info, Search, Menu, ChevronRight, 
   Settings, User, Lock, Mail, Upload, Home, BarChart2, 
@@ -10,6 +10,70 @@ interface PreviewProps {
   themeName: string; // 'Light' or 'Dark'
   options: DesignOptions;
 }
+
+// Clickable Navigation Tabs Component
+const NavTabsDemo: React.FC<{
+  bClass: string;
+  rClass: string;
+  sClass: string;
+  bBottom: string;
+  rClassInner: string;
+  options: DesignOptions;
+}> = ({ bClass, rClass, sClass, bBottom, rClassInner, options }) => {
+  const [activeTab, setActiveTab] = useState('Dashboard');
+  const tabs = ['Dashboard', 'Team', 'Projects', 'Settings'];
+  
+  return (
+    <div className={`${bClass} ${rClass} ${sClass} overflow-hidden bg-t-surface`}>
+      <div className={`${bBottom} p-4 flex items-center justify-between bg-t-surface2/30`}>
+        <div className="flex gap-4 text-sm font-medium text-t-muted">
+          {tabs.map(tab => (
+            <span
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`cursor-pointer transition-colors pb-4 -mb-4.5 ${
+                activeTab === tab 
+                  ? 'text-t-primary border-b-2 border-t-primary' 
+                  : tab === 'Settings' 
+                    ? 'text-t-accent hover:text-t-accent/80' 
+                    : 'hover:text-t-text'
+              }`}
+            >
+              {tab}
+            </span>
+          ))}
+        </div>
+        <div className={`h-8 w-8 ${rClass} bg-t-accent flex items-center justify-center text-t-accentFg text-xs shadow-sm hover:scale-110 transition-transform cursor-pointer`}>JD</div>
+      </div>
+    </div>
+  );
+};
+
+// Volume Slider Component with working state
+const VolumeSlider: React.FC<{
+  rClass: string;
+  bClass: string;
+  sClass: string;
+}> = ({ rClass, bClass, sClass }) => {
+  const [volume, setVolume] = useState(75);
+  
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between">
+        <label className="text-sm font-medium text-t-text">Volume</label>
+        <span className="text-xs font-mono text-t-primary">{volume}%</span>
+      </div>
+      <input 
+        type="range" 
+        min="0" 
+        max="100" 
+        value={volume}
+        onChange={(e) => setVolume(parseInt(e.target.value))}
+        className={`w-full h-2 bg-t-surface2 ${rClass} ${bClass} ${sClass} appearance-none cursor-pointer accent-t-primary transition-colors`} 
+      />
+    </div>
+  );
+};
 
 const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
   // --- Style Mappers ---
@@ -127,7 +191,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
         </h1>
         <p className="text-xl text-t-muted max-w-lg leading-relaxed">
           A collection of UI components using the generated palette. 
-          Everything here is styled using semantic tokens like <code className={`bg-t-surface2 text-t-text px-2 py-0.5 text-base ${rClassInner}`}>primary</code> and <code className={`bg-t-surface2 text-t-text px-2 py-0.5 text-base ${rClassInner}`}>surface</code>.
+          Everything here is styled using semantic tokens like <code className={`bg-t-surface2 text-t-text px-3 py-1 text-base font-medium ${rClassInner}`}>primary</code> and <code className={`bg-t-surface2 text-t-text px-3 py-1 text-base font-medium ${rClassInner}`}>surface</code>.
         </p>
       </section>
 
@@ -200,7 +264,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
           <div className="space-y-2">
             <label className="text-sm font-medium text-t-text">Email Address</label>
             <div className="relative group">
-              <Mail className="absolute left-3 top-3 text-t-muted transition-colors group-focus-within:text-t-primary" size={18} />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-t-muted transition-colors group-focus-within:text-t-primary" size={18} />
               <input 
                 type="text" 
                 placeholder="you@example.com"
@@ -242,13 +306,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
           </div>
 
           {/* Range Slider */}
-           <div className="space-y-2">
-            <div className="flex justify-between">
-               <label className="text-sm font-medium text-t-text">Volume</label>
-               <span className="text-xs font-mono text-t-primary">75%</span>
-            </div>
-            <input type="range" className={`w-full h-2 bg-t-surface2 ${rClass} ${bClass} ${sClass} appearance-none cursor-pointer accent-t-primary hover:accent-t-accent transition-colors`} />
-          </div>
+          <VolumeSlider rClass={rClass} bClass={bClass} sClass={sClass} />
         </div>
       </section>
 
@@ -282,7 +340,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
              <p className="text-t-muted text-sm mb-4">Product Designer</p>
              <div className="flex gap-2">
                <span className={`px-2 py-1 ${rClassInner} text-xs ${bClass} text-t-text bg-t-surface hover:bg-t-surface2 transition-colors cursor-default`}>UI/UX</span>
-               <span className={`px-2 py-1 ${rClassInner} text-xs ${bClass} text-t-text bg-t-surface hover:bg-t-surface2 transition-colors cursor-default`}>React</span>
+               <span className={`px-2 py-1 ${rClassInner} text-xs bg-t-accent/10 text-t-accent border ${options.borderWidth > 0 ? 'border-t-accent/20' : 'border-transparent'} hover:bg-t-accent hover:text-t-accentFg transition-colors cursor-default`}>React</span>
              </div>
              <button className={`mt-4 w-full py-2 ${rClassInner} ${bClass} text-t-primary text-sm font-medium transition-all duration-200
                hover:bg-t-primary hover:text-t-primaryFg hover:border-transparent
@@ -312,27 +370,17 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
          </div>
       </section>
 
-      {/* Navigation Example */}
+       {/* Navigation Example */}
       <section className="space-y-4">
          <h3 className="text-sm font-bold uppercase tracking-wider text-t-muted">Navigation Structure</h3>
-         <div className={`${bClass} ${rClass} ${sClass} overflow-hidden bg-t-surface`}>
-            <div className={`${bBottom} p-4 flex items-center justify-between bg-t-surface2/30`}>
-               <div className="flex gap-4 text-sm font-medium text-t-muted">
-                 <span className={`text-t-primary border-b-2 border-t-primary pb-4 -mb-4.5 cursor-pointer`}>Dashboard</span>
-                 <span className="hover:text-t-text cursor-pointer transition-colors">Team</span>
-                 <span className="hover:text-t-text cursor-pointer transition-colors">Projects</span>
-                 <span className="hover:text-t-text cursor-pointer transition-colors">Settings</span>
-               </div>
-               <div className={`h-8 w-8 ${rClass} bg-t-accent flex items-center justify-center text-t-accentFg text-xs shadow-sm hover:scale-110 transition-transform cursor-pointer`}>JD</div>
-            </div>
-            <div className="p-6">
-               <div className="flex items-center text-xs text-t-muted mb-6">
-                 <span className="hover:text-t-primary cursor-pointer transition-colors">Home</span> <ChevronRight size={12} className="mx-1"/> 
-                 <span className="hover:text-t-primary cursor-pointer transition-colors">Settings</span> <ChevronRight size={12} className="mx-1"/> 
-                 <span className="text-t-text font-medium">Profile</span>
-               </div>
-               <div className={`h-32 bg-t-surface2 ${rClassInner} animate-pulse`}></div>
-            </div>
+         <NavTabsDemo bClass={bClass} rClass={rClass} sClass={sClass} bBottom={bBottom} rClassInner={rClassInner} options={options} />
+         <div className={`${bClass} ${rClass} ${sClass} bg-t-surface p-6`}>
+           <div className="flex items-center text-xs text-t-muted mb-6">
+             <span className="hover:text-t-primary cursor-pointer transition-colors">Home</span> <ChevronRight size={12} className="mx-1"/> 
+             <span className="hover:text-t-primary cursor-pointer transition-colors">Settings</span> <ChevronRight size={12} className="mx-1"/> 
+             <span className="text-t-text font-medium">Profile</span>
+           </div>
+           <div className={`h-32 bg-t-surface2 ${rClassInner} animate-pulse`}></div>
          </div>
       </section>
 
@@ -375,13 +423,14 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
           </div>
         </div>
         
-        <div className={`flex flex-col md:flex-row justify-between items-center text-xs text-t-muted pt-8 border-t ${options.borderWidth > 0 ? 'border-t-border/50' : 'border-transparent'} gap-4`}>
+        <div className={`${bBottom} mb-4`}></div>
+        <div className={`flex flex-col md:flex-row justify-between items-center text-xs text-t-muted pt-4 gap-4`}>
           <span>
             Taichi Color Generator © 2025 | Bucaa Studio. All Rights Reserved. v{__APP_VERSION__}
           </span>
           <div className="flex gap-6">
               <Twitter size={18} className="cursor-pointer hover:text-t-primary transition-colors" />
-              <Github size={18} className="cursor-pointer hover:text-t-primary transition-colors" />
+              <Github size={18} className="cursor-pointer hover:text-t-accent transition-colors" />
               <Facebook size={18} className="cursor-pointer hover:text-t-primary transition-colors" />
           </div>
         </div>

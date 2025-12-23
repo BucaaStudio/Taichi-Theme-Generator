@@ -21,7 +21,8 @@
   - Saturation levels (0-4): From pure grayscale to maximum saturation
   - Contrast levels (1-5): Fine-tune readability and visual impact
   - Border width, shadow strength, roundness, and gradient controls
-- **Smart Color Formats** - Export in HEX, RGB, HSL, or OKLCH
+- **Smart Color Formats** - Export in HEX, RGB, CMYK, HSL, LAB, LCH, OKLCH, or
+  Display P3
 - **Image Color Extraction** - Generate palettes from uploaded images
 - **History Management** - FIFO history with up to 20 saved themes
 - **Keyboard Shortcuts**
@@ -99,7 +100,8 @@ npm run preview
 
 - Click any color swatch to **copy** the color value
 - Click the color name to **edit** the color manually
-- Switch between **HEX, RGB, HSL, and OKLCH** formats
+- Switch between **HEX, RGB, CMYK, HSL, LAB, LCH, OKLCH, and Display P3**
+  formats
 - View 8 key colors: bg, surface, text, primary, secondary, accent, success,
   error
 

@@ -338,8 +338,12 @@ const App: React.FC = () => {
               >
                 <option value="hex">HEX</option>
                 <option value="rgb">RGB</option>
+                <option value="cmyk">CMYK</option>
                 <option value="hsl">HSL</option>
+                <option value="lab">LAB</option>
+                <option value="lch">LCH</option>
                 <option value="oklch">OKLCH</option>
+                <option value="display-p3">Display P3</option>
               </select>
           </div>
         </div>

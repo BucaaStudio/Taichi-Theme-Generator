@@ -90,8 +90,23 @@ const SwatchRow: React.FC<SwatchRowProps> = ({ hex, format, isDarkUI, onCopy, co
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState('');
   
-  // Format logic
-  const displayValue = formatColor(hex, format);
+  // Format logic - full value with format
+  const fullValue = formatColor(hex, format);
+  
+  // Strip format prefix for display to save space
+  const getDisplayValue = (formatted: string): string => {
+    // Remove format prefix and parentheses for compact display
+    if (formatted.startsWith('rgb(')) return formatted.slice(4, -1);
+    if (formatted.startsWith('cmyk(')) return formatted.slice(5, -1);
+    if (formatted.startsWith('hsl(')) return formatted.slice(4, -1);
+    if (formatted.startsWith('lab(')) return formatted.slice(4, -1);
+    if (formatted.startsWith('lch(')) return formatted.slice(4, -1);
+    if (formatted.startsWith('oklch(')) return formatted.slice(6, -1);
+    if (formatted.startsWith('color(display-p3 ')) return formatted.slice(17, -1);
+    return formatted; // HEX - no prefix to remove
+  };
+  
+  const displayValue = getDisplayValue(fullValue);
 
   const startEditing = () => {
     setInputValue(displayValue);
@@ -132,7 +147,7 @@ const SwatchRow: React.FC<SwatchRowProps> = ({ hex, format, isDarkUI, onCopy, co
           backgroundSize: '8px 8px',
           backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0px'
         }}
-        title="Click to copy color"
+        title={`Click to copy: ${fullValue}`}
       >
         {copied && (
            <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white backdrop-blur-[1px]">
@@ -157,7 +172,7 @@ const SwatchRow: React.FC<SwatchRowProps> = ({ hex, format, isDarkUI, onCopy, co
           <span 
             onClick={startEditing}
             className={`text-[10px] font-mono truncate w-full cursor-text hover:text-indigo-500 transition-colors select-none ${textColor}`}
-            title="Click to edit value"
+            title={`Full value: ${fullValue}\nClick to edit`}
           >
             {displayValue}
           </span>

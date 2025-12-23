@@ -100,18 +100,155 @@ export function hexToOklchRaw(hex: string): string {
     return `${(L * 100).toFixed(1)}% ${C.toFixed(3)} ${h.toFixed(1)}`;
 }
 
+// Convert Hex to LCH (CIE LCH)
+export function hexToLch(hex: string): { l: number; c: number; h: number } {
+    const { r, g, b } = hexToRgb(hex);
+    
+    // Convert to XYZ
+    const linear = (c: number) => {
+        const v = c / 255;
+        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    };
+    const lr = linear(r), lg = linear(g), lb = linear(b);
+    
+    const x = (lr * 0.4124564 + lg * 0.3575761 + lb * 0.1804375) * 100;
+    const y = (lr * 0.2126729 + lg * 0.7151522 + lb * 0.0721750) * 100;
+    const z = (lr * 0.0193339 + lg * 0.1191920 + lb * 0.9503041) * 100;
+    
+    // Convert XYZ to LAB
+    const xn = 95.047, yn = 100.000, zn = 108.883; // D65 illuminant
+    const f = (t: number) => t > 0.008856 ? Math.cbrt(t) : (7.787 * t + 16 / 116);
+    
+    const fx = f(x / xn);
+    const fy = f(y / yn);
+    const fz = f(z / zn);
+    
+    const L = 116 * fy - 16;
+    const a = 500 * (fx - fy);
+    const b_lab = 200 * (fy - fz);
+    
+    // Convert LAB to LCH
+    const C = Math.sqrt(a * a + b_lab * b_lab);
+    let H = Math.atan2(b_lab, a) * 180 / Math.PI;
+    if (H < 0) H += 360;
+    
+    return { l: L, c: C, h: H };
+}
+
+// Convert Hex to LAB (CIE LAB)
+export function hexToLab(hex: string): { l: number; a: number; b: number } {
+    const { r, g, b: b_rgb } = hexToRgb(hex);
+    
+    // Convert to XYZ
+    const linear = (c: number) => {
+        const v = c / 255;
+        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    };
+    const lr = linear(r), lg = linear(g), lb = linear(b_rgb);
+    
+    const x = (lr * 0.4124564 + lg * 0.3575761 + lb * 0.1804375) * 100;
+    const y = (lr * 0.2126729 + lg * 0.7151522 + lb * 0.0721750) * 100;
+    const z = (lr * 0.0193339 + lg * 0.1191920 + lb * 0.9503041) * 100;
+    
+    // Convert XYZ to LAB
+    const xn = 95.047, yn = 100.000, zn = 108.883; // D65 illuminant
+    const f = (t: number) => t > 0.008856 ? Math.cbrt(t) : (7.787 * t + 16 / 116);
+    
+    const fx = f(x / xn);
+    const fy = f(y / yn);
+    const fz = f(z / zn);
+    
+    const L = 116 * fy - 16;
+    const a = 500 * (fx - fy);
+    const b_lab = 200 * (fy - fz);
+    
+    return { l: L, a, b: b_lab };
+}
+
+// Convert Hex to CMYK
+export function hexToCmyk(hex: string): { c: number; m: number; y: number; k: number } {
+    const { r, g, b } = hexToRgb(hex);
+    
+    // Normalize RGB values to 0-1
+    const rNorm = r / 255;
+    const gNorm = g / 255;
+    const bNorm = b / 255;
+    
+    // Calculate K (black)
+    const k = 1 - Math.max(rNorm, gNorm, bNorm);
+    
+    // Calculate CMY
+    const c = k === 1 ? 0 : (1 - rNorm - k) / (1 - k);
+    const m = k === 1 ? 0 : (1 - gNorm - k) / (1 - k);
+    const y = k === 1 ? 0 : (1 - bNorm - k) / (1 - k);
+    
+    return { 
+        c: Math.round(c * 100), 
+        m: Math.round(m * 100), 
+        y: Math.round(y * 100), 
+        k: Math.round(k * 100) 
+    };
+}
+
+// Convert Hex to Display P3
+export function hexToDisplayP3(hex: string): { r: number; g: number; b: number } {
+    const { r: r_srgb, g: g_srgb, b: b_srgb } = hexToRgb(hex);
+    
+    // Convert sRGB to linear RGB
+    const linear = (c: number) => {
+        const v = c / 255;
+        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    };
+    
+    const r_linear = linear(r_srgb);
+    const g_linear = linear(g_srgb);
+    const b_linear = linear(b_srgb);
+    
+    // Convert linear sRGB to linear Display P3 using matrix transformation
+    const r_p3 = r_linear * 0.8224621 + g_linear * 0.1775380 + b_linear * 0.0000000;
+    const g_p3 = r_linear * 0.0331941 + g_linear * 0.9668058 + b_linear * 0.0000000;
+    const b_p3 = r_linear * 0.0170827 + g_linear * 0.0723974 + b_linear * 0.9105199;
+    
+    // Apply Display P3 gamma (same as sRGB)
+    const gamma = (c: number) => {
+        return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+    };
+    
+    return {
+        r: Math.max(0, Math.min(1, gamma(r_p3))),
+        g: Math.max(0, Math.min(1, gamma(g_p3))),
+        b: Math.max(0, Math.min(1, gamma(b_p3)))
+    };
+}
+
 export function formatColor(hex: string, format: ColorFormat): string {
     if (format === 'hex') return hex.toUpperCase();
     if (format === 'rgb') {
         const {r,g,b} = hexToRgb(hex);
         return `rgb(${r}, ${g}, ${b})`;
     }
+    if (format === 'cmyk') {
+        const {c, m, y, k} = hexToCmyk(hex);
+        return `cmyk(${c}%, ${m}%, ${y}%, ${k}%)`;
+    }
     if (format === 'hsl') {
         const {h,s,l} = hexToHsl(hex);
         return `hsl(${h}, ${s}%, ${l}%)`;
     }
+    if (format === 'lab') {
+        const {l, a, b} = hexToLab(hex);
+        return `lab(${l.toFixed(1)}% ${a.toFixed(2)} ${b.toFixed(2)})`;
+    }
+    if (format === 'lch') {
+        const {l, c, h} = hexToLch(hex);
+        return `lch(${l.toFixed(1)}% ${c.toFixed(2)} ${h.toFixed(1)})`;
+    }
     if (format === 'oklch') {
         return `oklch(${hexToOklchRaw(hex)})`;
+    }
+    if (format === 'display-p3') {
+        const {r, g, b} = hexToDisplayP3(hex);
+        return `color(display-p3 ${r.toFixed(4)} ${g.toFixed(4)} ${b.toFixed(4)})`;
     }
     return hex;
 }
