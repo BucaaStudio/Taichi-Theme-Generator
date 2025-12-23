@@ -285,7 +285,7 @@ const App: React.FC = () => {
              <div className="w-8 h-8 rounded-lg shadow-sm flex items-center justify-center" style={{ backgroundColor: shellTheme.primary }}>
                 <TaichiIcon size={24} />
              </div>
-             <h1 className="font-bold text-lg hidden md:block">Taichi Color Generator</h1>
+             <h1 className="font-bold text-lg hidden md:block">Taichi Theme Generator</h1>
           </div>
 
           <div className="hidden md:flex items-center rounded-lg p-0.5 gap-0.5 shrink-0" style={{ backgroundColor: shellTheme.surface2 }}>

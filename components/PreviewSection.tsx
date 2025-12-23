@@ -429,7 +429,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
         <div className={`${bBottom} mb-4`}></div>
         <div className={`flex flex-col md:flex-row justify-between items-center text-xs text-t-muted pt-4 gap-4`}>
           <span>
-            Taichi Color Generator © 2025 | Bucaa Studio. All Rights Reserved. v{__APP_VERSION__}
+            Taichi Theme Generator © 2025 | Bucaa Studio. All Rights Reserved. v{__APP_VERSION__}
           </span>
           <div className="flex gap-6">
               <Twitter size={18} className="cursor-pointer hover:text-t-primary transition-colors" />

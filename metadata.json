@@ -1,5 +1,5 @@
 {
-  "name": "Taichi Color Generator",
-  "description": "A professional split-screen color palette generator that creates and previews matching Light and Dark themes simultaneously with real-time UI design system previews.",
+  "name": "Taichi Theme Generator",
+  "description": "A professional split-screen theme generator that creates and previews matching Light and Dark themes simultaneously with real-time UI design system previews.",
   "requestFramePermissions": []
 }

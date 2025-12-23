@@ -1,4 +1,4 @@
-# Taichi Color Generator
+# Taichi Theme Generator
 
 <div align="center">
   <img src="public/favicon.svg" width="120" height="120" alt="Taichi Logo" />
