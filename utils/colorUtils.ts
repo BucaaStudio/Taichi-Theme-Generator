@@ -58,6 +58,24 @@ function seededRandom(seed: number): number {
   return x - Math.floor(x);
 }
 
+// Find the closest hue to a target from an array of hues (circular distance)
+function findClosestHue(hues: number[], targetHue: number): number {
+  let closest = hues[0];
+  let minDistance = 180; // max possible circular distance
+  
+  for (const hue of hues) {
+    const distance = Math.min(
+      Math.abs(hue - targetHue),
+      360 - Math.abs(hue - targetHue)
+    );
+    if (distance < minDistance) {
+      minDistance = distance;
+      closest = hue;
+    }
+  }
+  return closest;
+}
+
 // --- Conversions ---
 
 // HSL to Hex
@@ -348,17 +366,92 @@ function randomHue(seedVal?: number) {
   return Math.floor(Math.random() * 360); 
 }
 
+// Returns 5 hues for: [primary, secondary, accent, good, bad]
 function getHarmonyHues(baseHue: number, mode: GenerationMode): number[] {
   switch (mode) {
-    case 'monochrome': return [baseHue, baseHue, baseHue];
-    case 'analogous': return [baseHue, (baseHue + 30) % 360, (baseHue - 30 + 360) % 360];
-    case 'complementary': return [baseHue, (baseHue + 180) % 360, baseHue]; 
-    case 'split-complementary': return [baseHue, (baseHue + 150) % 360, (baseHue + 210) % 360];
-    case 'triadic': return [baseHue, (baseHue + 120) % 360, (baseHue + 240) % 360];
-    case 'tetradic': return [baseHue, (baseHue + 90) % 360, (baseHue + 180) % 360];
-    case 'compound': return [baseHue, (baseHue + 180) % 360, (baseHue + 30) % 360];
-    case 'triadic-split': return [baseHue, (baseHue + 120) % 360, (baseHue + 150) % 360];
-    default: return [baseHue, (baseHue + 180) % 360, (baseHue + 90) % 360];
+    // Monochrome: All same hue, contrast comes from lightness
+    case 'monochrome': 
+      return [baseHue, baseHue, baseHue, baseHue, baseHue];
+    
+    // Analogous: 5 colors spread 25° apart (spanning 100°)
+    case 'analogous': 
+      return [
+        baseHue,
+        (baseHue + 25) % 360,
+        (baseHue + 50) % 360,
+        (baseHue - 25 + 360) % 360,
+        (baseHue - 50 + 360) % 360
+      ];
+    
+    // Complementary: Base + complement + neighbors of each
+    case 'complementary': 
+      return [
+        baseHue,
+        (baseHue + 180) % 360,
+        (baseHue + 30) % 360,
+        (baseHue + 210) % 360,
+        (baseHue - 30 + 360) % 360
+      ];
+    
+    // Split-Complementary Extended: Base + split complements + accents
+    case 'split-complementary': 
+      return [
+        baseHue,
+        (baseHue + 150) % 360,
+        (baseHue + 210) % 360,
+        (baseHue + 30) % 360,
+        (baseHue + 180) % 360
+      ];
+    
+    // Triadic Extended: 3 main colors + 2 bridge colors
+    case 'triadic': 
+      return [
+        baseHue,
+        (baseHue + 120) % 360,
+        (baseHue + 240) % 360,
+        (baseHue + 60) % 360,
+        (baseHue + 180) % 360
+      ];
+    
+    // Tetradic/Square: 4 colors at 90° + 1 accent
+    case 'tetradic': 
+      return [
+        baseHue,
+        (baseHue + 90) % 360,
+        (baseHue + 180) % 360,
+        (baseHue + 270) % 360,
+        (baseHue + 45) % 360
+      ];
+    
+    // Compound (Warm-Cool Split): Cool primary + warm analogous opposites
+    case 'compound': 
+      return [
+        baseHue,
+        (baseHue + 165) % 360,
+        (baseHue + 180) % 360,
+        (baseHue + 195) % 360,
+        (baseHue + 30) % 360
+      ];
+    
+    // Triadic-Split: Triadic with one leg split
+    case 'triadic-split': 
+      return [
+        baseHue,
+        (baseHue + 120) % 360,
+        (baseHue + 150) % 360,
+        (baseHue + 240) % 360,
+        (baseHue + 270) % 360
+      ];
+    
+    // Default: Pentadic (5 colors evenly spaced at 72°)
+    default: 
+      return [
+        baseHue,
+        (baseHue + 72) % 360,
+        (baseHue + 144) % 360,
+        (baseHue + 216) % 360,
+        (baseHue + 288) % 360
+      ];
   }
 }
 
@@ -413,7 +506,19 @@ export function generateTheme(
   
   let hues: number[];
   if (mode === 'random') {
-    hues = [baseHue, randomHue(seedVal + 2), randomHue(seedVal + 3)];
+    // Random mode picks a random color harmony for color-theory-based generation
+    const harmonyModes: GenerationMode[] = [
+      'analogous',
+      'complementary', 
+      'split-complementary',
+      'triadic',
+      'tetradic',
+      'compound',
+      'triadic-split'
+    ];
+    const randomHarmonyIndex = Math.floor(seededRandom(seedVal + 10) * harmonyModes.length);
+    const selectedHarmony = harmonyModes[randomHarmonyIndex];
+    hues = getHarmonyHues(baseHue, selectedHarmony);
   } else {
     hues = getHarmonyHues(baseHue, mode);
   }
@@ -421,6 +526,25 @@ export function generateTheme(
   const primaryHue = hues[0];
   const secondaryHue = hues[1];
   const accentHue = hues[2];
+  let goodHue = hues[3];
+  let badHue = hues[4];
+
+  // Prefer colors closer to semantic expectations:
+  // - Good should be closer to green (hue ~120)
+  // - Bad should be closer to red (hue ~0 or 360)
+  const distanceToHue = (hue: number, target: number) => {
+    return Math.min(Math.abs(hue - target), 360 - Math.abs(hue - target));
+  };
+  
+  const goodDistToGreen = distanceToHue(goodHue, 120);
+  const goodDistToRed = distanceToHue(goodHue, 0);
+  const badDistToGreen = distanceToHue(badHue, 120);
+  const badDistToRed = distanceToHue(badHue, 0);
+  
+  // Swap if bad is closer to green than good, or good is closer to red than bad
+  if (badDistToGreen < goodDistToGreen || goodDistToRed < badDistToRed) {
+    [goodHue, badHue] = [badHue, goodHue];
+  }
 
   // Adjust Primary Saturation based on level (-5 to 5)
   // -5: Grayscale (0)
@@ -453,6 +577,8 @@ export function generateTheme(
 
   let secondarySat = mode === 'monochrome' ? clamp(baseSat - 30, 0, sMax - 20) : clamp(baseSat - 10, sMin, sMax);
   let accentSat = mode === 'monochrome' ? clamp(baseSat + 10, sMin, sMax) : clamp(baseSat + 10, sMin, sMax);
+  let goodSat = clamp(baseSat, sMin, sMax);
+  let badSat = clamp(baseSat, sMin, sMax);
 
   // --- Brightness Level Logic (-5 to 5 scale) ---
   // Level -5 (Dim): Compresses toward dark
@@ -576,12 +702,12 @@ export function generateTheme(
     border: hslToHex(primaryHue, 10, applyBrightness(lightBgL - 10, brightnessLevel)),
     ring: hslToHex(primaryHue, 60, applyBrightness(60, brightnessLevel)),
     
-    // Success, warn, error: follow both saturation AND contrast sliders + brightness
-    good: hslToHex(142, clamp(primarySat, sMin, sMax), applyBrightness(Math.max(lightColorMod - 5, 40), brightnessLevel)),
+    // Good, Warn, Bad: Use harmony colors directly from 5-color palette
+    good: hslToHex(goodHue, goodSat, applyBrightness(Math.max(lightColorMod - 5, 40), brightnessLevel)),
     goodFg: '#ffffff',
-    warn: hslToHex(38, clamp(primarySat, sMin, sMax), applyBrightness(Math.max(lightColorMod, 45), brightnessLevel)),
+    warn: hslToHex(accentHue, accentSat, applyBrightness(Math.max(lightColorMod, 45), brightnessLevel)),
     warnFg: '#ffffff',
-    bad: hslToHex(0, clamp(primarySat, sMin, sMax), applyBrightness(Math.max(lightColorMod + 5, 50), brightnessLevel)),
+    bad: hslToHex(badHue, badSat, applyBrightness(Math.max(lightColorMod + 5, 50), brightnessLevel)),
     badFg: '#ffffff'
   };
 
@@ -609,12 +735,12 @@ export function generateTheme(
     border: hslToHex(primaryHue, 15, applyBrightness(darkBgL + 12, brightnessLevel)),
     ring: hslToHex(primaryHue, 60, applyBrightness(60, brightnessLevel)),
     
-    // Success, warn, error: follow both saturation AND contrast sliders + brightness
-    good: hslToHex(142, clamp(primarySat, sMin, sMax), applyBrightness(Math.max(darkColorMod - 10, 35), brightnessLevel)),
+    // Good, Warn, Bad: Use harmony colors directly from 5-color palette
+    good: hslToHex(goodHue, goodSat, applyBrightness(Math.max(darkColorMod - 10, 35), brightnessLevel)),
     goodFg: '#ffffff',
-    warn: hslToHex(38, clamp(primarySat, sMin, sMax), applyBrightness(Math.max(darkColorMod - 5, 40), brightnessLevel)),
+    warn: hslToHex(accentHue, accentSat, applyBrightness(Math.max(darkColorMod - 5, 40), brightnessLevel)),
     warnFg: '#ffffff',
-    bad: hslToHex(0, clamp(primarySat, sMin, sMax), applyBrightness(Math.max(darkColorMod, 45), brightnessLevel)),
+    bad: hslToHex(badHue, badSat, applyBrightness(Math.max(darkColorMod, 45), brightnessLevel)),
     badFg: '#ffffff'
   };
 
