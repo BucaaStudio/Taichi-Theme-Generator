@@ -35,12 +35,42 @@ const getContrastColor = (hex: string): string => {
 const getShortValue = (hex: string, format: ColorFormat): string => {
   const full = formatColor(hex, format);
   // For compact display, extract just the values
+  // For compact display, extract just the values
   if (format === 'hex') return hex.toUpperCase().slice(1); // Remove #
+  
   if (full.startsWith('rgb(')) return full.slice(4, -1).replace(/\s/g, '');
+  
   if (full.startsWith('hsl(')) {
     const match = full.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
     if (match) return `${match[1]} ${match[2]} ${match[3]}`;
   }
+  
+  if (full.startsWith('cmyk(')) {
+     const match = full.match(/cmyk\((\d+)%,\s*(\d+)%,\s*(\d+)%,\s*(\d+)%\)/);
+     if (match) return `${match[1]} ${match[2]} ${match[3]} ${match[4]}`;
+  }
+  
+  // Modern CSS colors (space separated)
+  if (full.startsWith('lab(')) {
+     return full.slice(4, -1).replace(/%/g, ''); // "50.1 20 30"
+  }
+  
+  if (full.startsWith('lch(')) {
+     return full.slice(4, -1).replace(/%/g, '');
+  }
+  
+  if (full.startsWith('oklch(')) {
+     return full.slice(6, -1).replace(/%/g, '');
+  }
+  
+  if (full.startsWith('color(display-p3')) {
+     const parts = full.match(/([\d\.]+)/g);
+     if (parts && parts.length >= 3) {
+        // Return R G B (abbreviated)
+        return `P3 ${parseFloat(parts[0]).toFixed(2)} ${parseFloat(parts[1]).toFixed(2)} ${parseFloat(parts[2]).toFixed(2)}`;
+     }
+  }
+
   return hex.toUpperCase().slice(1);
 };
 
