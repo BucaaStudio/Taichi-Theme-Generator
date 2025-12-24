@@ -460,24 +460,41 @@ export function generateTheme(
   // For simplicity, we'll map to indices or continuous values
   
   // Background Lightness Adjustments
-  // Normal Light Bg = 98 (Paper)
-  // Normal Dark Bg = 8 (Dark Grey)
+  // Normal Light Bg = 96 (Headroom from white)
+  // Normal Dark Bg = 10 (Headroom from black)
+  // Contrast Level (-5 to +5) affects these anchors:
+  // +5: Push to 100 / 0
+  // -5: Pull to 92 / 18
   
-  let lightBgL = 98;
-  let darkBgL = 8;
+  let lightBase = 96; 
+  let darkBase = 10;
+  
+  // Apply Contrast to Base Backgrounds
+  // Positive contrast expels bg outward
+  // Negative contrast pulls bg inward (grayer)
+  if (contrastLevel > 0) {
+      // 0 to 5 -> 96 to 100
+      lightBase = 96 + (contrastLevel * 0.8);
+      // 0 to 5 -> 10 to 0
+      darkBase = 10 - (contrastLevel * 2); 
+  } else {
+      // 0 to -5 -> 96 to 92
+      lightBase = 96 + (contrastLevel * 0.8);
+      // 0 to -5 -> 10 to 18
+      darkBase = 10 - (contrastLevel * 1.6);
+  }
+
+  let lightBgL = lightBase;
+  let darkBgL = darkBase;
   
   if (brightnessLevel < 0) {
-      // Dimming
-      // Light: 98 -> 50
-      // Dark: 8 -> 5
-      lightBgL = 98 - (Math.abs(brightnessLevel) * 9); // down to ~53
-      darkBgL = 8 - (Math.abs(brightnessLevel) * 0.6); // down to ~5
+      // Dimming: Light becomes darker, Dark becomes darker (crushed)
+      lightBgL = lightBase - (Math.abs(brightnessLevel) * 7); 
+      darkBgL = Math.max(0, darkBase - (Math.abs(brightnessLevel) * 1)); 
   } else {
-      // Brightening
-      // Light: 98 -> 100
-      // Dark: 8 -> 40
-      lightBgL = 98 + (brightnessLevel * 0.4); // up to 100
-      darkBgL = 8 + (brightnessLevel * 6); // up to 38
+      // Brightening: Light becomes white, Dark becomes lighter
+      lightBgL = Math.min(100, lightBase + (brightnessLevel * 0.8));
+      darkBgL = darkBase + (brightnessLevel * 5); 
   }
 
   // --- Dynamic Range (Contrast) Logic (-5 to 5) ---
