@@ -429,7 +429,6 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
              <button className={`mt-4 w-full py-2 ${rClassInner} border border-t-primary/30 text-t-primary text-sm font-medium transition-all duration-300
                hover:bg-t-primary hover:text-t-textOnColor hover:border-transparent
                active:scale-95`}>
-               active:scale-95`}>
                View Profile
              </button>
           </div>
