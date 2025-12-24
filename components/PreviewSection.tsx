@@ -107,13 +107,7 @@ const HeroBanner: React.FC<{
         
         {/* Animated shimmer effect on hover - plays once */}
         {/* Smooth Wave Background instead of radial gradients */}
-        <div 
-          className="absolute inset-0 opacity-20 transition-all duration-700 group-hover:opacity-30 mix-blend-multiply dark:mix-blend-screen" 
-          style={{ 
-             backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 900'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='0' x2='0' y1='1' y2='0' gradientTransform='rotate(0,0.5,0.5)'%3E%3Cstop offset='0' stop-color='%23808080'/%3E%3Cstop offset='1' stop-color='%23FFFFFF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='%23FFF' fill-opacity='1' stroke-miterlimit='10'%3E%3Cg stroke='url(%23a)' stroke-width='3.57'%3E%3Cpath d='M-363.5 358.5c106.8-.7 213.6-1.5 328.9-8.7 115.3-7.2 239-20.9 337.5-12.8 98.5 8.1 171.9 38.3 260.6 57 88.7 18.7 192.6 26 288.4 18.2 95.8-7.8 183.5-30.7 271.3-53.5'/%3E%3Cpath d='M-363.5 373.5c106.8-.7 213.6-1.5 328.9-8.7 115.3-7.2 239-20.9 337.5-12.8 98.5 8.1 171.9 38.3 260.6 57 88.7 18.7 192.6 26 288.4 18.2 95.8-7.8 183.5-30.7 271.3-53.5'/%3E%3Cpath d='M-363.5 388.5c106.8-.7 213.6-1.5 328.9-8.7 115.3-7.2 239-20.9 337.5-12.8 98.5 8.1 171.9 38.3 260.6 57 88.7 18.7 192.6 26 288.4 18.2 95.8-7.8 183.5-30.7 271.3-53.5'/%3E%3Cpath d='M-363.5 403.5c106.8-.7 213.6-1.5 328.9-8.7 115.3-7.2 239-20.9 337.5-12.8 98.5 8.1 171.9 38.3 260.6 57 88.7 18.7 192.6 26 288.4 18.2 95.8-7.8 183.5-30.7 271.3-53.5'/%3E%3Cpath d='M-363.5 418.5c106.8-.7 213.6-1.5 328.9-8.7 115.3-7.2 239-20.9 337.5-12.8 98.5 8.1 171.9 38.3 260.6 57 88.7 18.7 192.6 26 288.4 18.2 95.8-7.8 183.5-30.7 271.3-53.5'/%3E%3Cpath d='M-363.5 433.5c106.8-.7 213.6-1.5 328.9-8.7 115.3-7.2 239-20.9 337.5-12.8 98.5 8.1 171.9 38.3 260.6 57 88.7 18.7 192.6 26 288.4 18.2 95.8-7.8 183.5-30.7 271.3-53.5'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-             backgroundSize: 'cover',
-          }} 
-        />
+
         <style>{`
           @keyframes shimmer {
             0% { background-position: -200% 0; }
