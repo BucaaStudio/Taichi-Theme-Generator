@@ -34,16 +34,14 @@ const NavTabsDemo: React.FC<{
               className={`cursor-pointer transition-colors pb-4 -mb-4.5 ${
                 activeTab === tab 
                   ? 'text-t-primary border-b-2 border-t-primary' 
-                  : tab === 'Settings' 
-                    ? 'text-t-accent hover:text-t-accent/80' 
-                    : 'hover:text-t-text'
+                  : 'hover:text-t-text'
               }`}
             >
               {tab}
             </span>
           ))}
         </div>
-        <div className={`h-8 w-8 shrink-0 ${rClass} bg-t-accent flex items-center justify-center text-t-accentFg text-xs shadow-sm hover:scale-110 transition-transform cursor-pointer`}>JD</div>
+        <div className={`h-8 w-8 shrink-0 ${rClass} bg-t-accent flex items-center justify-center text-t-accentFg text-xs shadow-sm hover:scale-110 transition-transform cursor-pointer`}>BS</div>
       </div>
     </div>
   );
@@ -77,14 +75,15 @@ const VolumeSlider: React.FC<{
 const HeroBanner: React.FC<{
   rClass: string;
   sClass: string;
+  sClassHover: string;
   badgeBorder: string;
   themeName: string;
   bClass: string;
-}> = ({ rClass, sClass, badgeBorder, themeName, bClass }) => {
+}> = ({ rClass, sClass, sClassHover, badgeBorder, themeName, bClass }) => {
   return (
     <section className="space-y-4">
       <h3 className="text-sm font-bold uppercase tracking-wider text-t-muted">Display Section</h3>
-      <div className={`relative overflow-hidden ${rClass} ${sClass} ${bClass} aspect-[16/9] flex items-center justify-center p-4 sm:p-8 md:p-12 group`}>
+      <div className={`relative overflow-hidden ${rClass} ${sClass} ${bClass} aspect-[16/9] flex items-center justify-center p-4 sm:p-8 md:p-12 group transition-all duration-300 hover:${sClassHover} hover:-translate-y-1`}>
         {/* Real Background Image */}
         <div className="absolute inset-0 transition-transform duration-[3000ms] ease-in-out group-hover:scale-110 group-hover:rotate-1">
           <img 
@@ -252,6 +251,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
       <HeroBanner 
         rClass={rClass} 
         sClass={sClass} 
+        sClassHover={sClassHover}
         badgeBorder={badgeBorder}
         themeName={themeName}
         bClass={bClass}
