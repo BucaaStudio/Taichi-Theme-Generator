@@ -89,7 +89,7 @@ const App: React.FC = () => {
   const [designOptions, setDesignOptions] = useState<DesignOptions>({
     borderWidth: 1,
     shadowStrength: 3,
-    shadowOpacity: 50,
+    shadowOpacity: 15,
     gradientLevel: 0,
     radius: 3,
     brightnessLevel: 0, 
