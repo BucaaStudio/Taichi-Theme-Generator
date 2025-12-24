@@ -287,22 +287,25 @@ const App: React.FC = () => {
   const handleTokenUpdate = useCallback((side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => {
     if (!currentTheme) return;
 
-    setCurrentTheme(prev => {
-      if (!prev) return null;
-      const updated = {
-        ...prev,
-        [side]: {
-          ...prev[side],
-          [key]: value
-        }
-      };
-      
-      // Don't update history for manual edits - only save generated themes
-      // User can always regenerate if they want to save changes
-      
-      return updated;
+    // Create updated theme object
+    const updatedTheme = {
+      ...currentTheme,
+      [side]: {
+        ...currentTheme[side],
+        [key]: value
+      }
+    };
+    
+    // Push modification to history
+    // This allows Undo (Cmd+Z) to revert this change
+    setHistory(prev => {
+       const newHist = [updatedTheme, ...prev];
+       if (newHist.length > MAX_HISTORY) return newHist.slice(0, MAX_HISTORY);
+       return newHist;
     });
-  }, [currentTheme, historyIndex]);
+    setHistoryIndex(0);
+    setCurrentTheme(updatedTheme);
+  }, [currentTheme]);
 
   // Toggle lock on a color token
   const toggleColorLock = useCallback((key: keyof ThemeTokens) => {
@@ -330,16 +333,19 @@ const App: React.FC = () => {
   }, [mode, generateNewTheme]);
 
   const undo = () => {
-    if (historyIndex > 0) {
-      setHistoryIndex(prev => prev - 1);
-      setCurrentTheme(history[historyIndex - 1]);
+    // Go back in time (increment index)
+    // History is [Newest, ..., Oldest]
+    if (historyIndex < history.length - 1) {
+      setHistoryIndex(prev => prev + 1);
+      setCurrentTheme(history[historyIndex + 1]);
     }
   };
 
   const redo = () => {
-    if (historyIndex < history.length - 1) {
-      setHistoryIndex(prev => prev + 1);
-      setCurrentTheme(history[historyIndex + 1]);
+    // Go forward in time (decrement index)
+    if (historyIndex > 0) {
+      setHistoryIndex(prev => prev - 1);
+      setCurrentTheme(history[historyIndex - 1]);
     }
   };
 
