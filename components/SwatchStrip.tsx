@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeTokens, ColorFormat, LockedColors } from '../types';
-import { formatColor, parseToHex } from '../utils/colorUtils';
+import { formatColor, parseToHex, hexToRgb } from '../utils/colorUtils';
 import { Copy, Check, Lock, Unlock } from 'lucide-react';
 
 interface SwatchStripProps {
@@ -14,182 +14,113 @@ interface SwatchStripProps {
   onToggleLock: (key: keyof ThemeTokens) => void;
 }
 
-interface TokenBlockProps {
+interface CompactSwatchProps {
   tokenKey: string;
   lightHex: string;
   darkHex: string;
   format: ColorFormat;
-  isDarkUI: boolean;
   onUpdate: (side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => void;
   isLocked: boolean;
   onToggleLock: () => void;
 }
 
-const TokenBlock: React.FC<TokenBlockProps> = ({ 
+// Helper to get contrasting text color
+const getContrastColor = (hex: string): string => {
+  const { r, g, b } = hexToRgb(hex);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? '#000000' : '#ffffff';
+};
+
+// Helper to get short color value
+const getShortValue = (hex: string, format: ColorFormat): string => {
+  const full = formatColor(hex, format);
+  // For compact display, extract just the values
+  if (format === 'hex') return hex.toUpperCase().slice(1); // Remove #
+  if (full.startsWith('rgb(')) return full.slice(4, -1).replace(/\s/g, '');
+  if (full.startsWith('hsl(')) {
+    const match = full.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+    if (match) return `${match[1]} ${match[2]} ${match[3]}`;
+  }
+  return hex.toUpperCase().slice(1);
+};
+
+const CompactSwatch: React.FC<CompactSwatchProps> = ({ 
   tokenKey, 
   lightHex, 
   darkHex, 
   format, 
-  isDarkUI, 
   onUpdate,
   isLocked,
   onToggleLock
 }) => {
-  const [copied, setCopied] = useState<string | null>(null);
+  const [copied, setCopied] = useState<'light' | 'dark' | null>(null);
 
-  const copyToClipboard = (hex: string, type: 'light' | 'dark') => {
+  const copyToClipboard = (hex: string, side: 'light' | 'dark', e: React.MouseEvent) => {
+    e.stopPropagation();
     const val = formatColor(hex, format);
     navigator.clipboard.writeText(val);
-    setCopied(type);
+    setCopied(side);
     setTimeout(() => setCopied(null), 1500);
   };
 
-  const labelColor = 'text-t-muted';
-  const blockBorder = 'border-t-border';
-  
+  const lightContrast = getContrastColor(lightHex);
+  const darkContrast = getContrastColor(darkHex);
+  const lightShort = getShortValue(lightHex, format);
+  const darkShort = getShortValue(darkHex, format);
+
   return (
-    <div className={`flex flex-col w-full rounded-xl border ${blockBorder} overflow-hidden transition-colors group/token`}>
-      {/* Label */}
-      <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border-b ${blockBorder} ${labelColor} flex justify-between items-center bg-opacity-50`}>
-        <span>{tokenKey}</span>
+    <div className="flex flex-col rounded-lg overflow-hidden border border-t-border group/token transition-all hover:scale-[1.02] hover:shadow-md">
+      {/* Header with token name and lock */}
+      <div className="flex items-center justify-between px-2 py-1 bg-t-surface text-[9px] font-bold uppercase tracking-wider text-t-text/70">
+        <span className="truncate">{tokenKey}</span>
         <button
           onClick={onToggleLock}
-          className={`transition-opacity p-0.5 rounded hover:bg-gray-500/20 ${isLocked ? '!opacity-100' : 'opacity-0 group-hover/token:opacity-100'}`}
+          className={`transition-opacity p-0.5 rounded hover:bg-t-text/10 ${isLocked ? 'opacity-100' : 'opacity-0 group-hover/token:opacity-100'}`}
           title={isLocked ? 'Unlock color' : 'Lock color'}
         >
-          {isLocked ? <Lock size={12} /> : <Unlock size={12} />}
+          {isLocked ? <Lock size={10} /> : <Unlock size={10} />}
         </button>
       </div>
-
-      {/* Light Token */}
-      <SwatchRow 
-        hex={lightHex} 
-        format={format} 
-        isDarkUI={isDarkUI} 
-        side="light"
-        onCopy={() => copyToClipboard(lightHex, 'light')}
-        copied={copied === 'light'}
-        onUpdate={(val) => onUpdate('light', tokenKey as keyof ThemeTokens, val)}
-      />
-
-      {/* Divider */}
-      <div className={`h-px w-full ${blockBorder}`}></div>
-
-      {/* Dark Token */}
-      <SwatchRow 
-        hex={darkHex} 
-        format={format} 
-        isDarkUI={isDarkUI} 
-        side="dark"
-        onCopy={() => copyToClipboard(darkHex, 'dark')}
-        copied={copied === 'dark'}
-        onUpdate={(val) => onUpdate('dark', tokenKey as keyof ThemeTokens, val)}
-      />
-    </div>
-  );
-};
-
-interface SwatchRowProps {
-  hex: string;
-  format: ColorFormat;
-  isDarkUI: boolean;
-  side: 'light' | 'dark';
-  onCopy: () => void;
-  copied: boolean;
-  onUpdate: (newHex: string) => void;
-}
-
-const SwatchRow: React.FC<SwatchRowProps> = ({ hex, format, isDarkUI, onCopy, copied, onUpdate }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [inputValue, setInputValue] = useState('');
-  
-  // Format logic - full value with format
-  const fullValue = formatColor(hex, format);
-  
-  // Strip format prefix for display to save space
-  const getDisplayValue = (formatted: string): string => {
-    // Remove format prefix and parentheses for compact display
-    if (formatted.startsWith('rgb(')) return formatted.slice(4, -1);
-    if (formatted.startsWith('cmyk(')) return formatted.slice(5, -1);
-    if (formatted.startsWith('hsl(')) return formatted.slice(4, -1);
-    if (formatted.startsWith('lab(')) return formatted.slice(4, -1);
-    if (formatted.startsWith('lch(')) return formatted.slice(4, -1);
-    if (formatted.startsWith('oklch(')) return formatted.slice(6, -1);
-    if (formatted.startsWith('color(display-p3 ')) return formatted.slice(17, -1);
-    return formatted; // HEX - no prefix to remove
-  };
-  
-  const displayValue = getDisplayValue(fullValue);
-
-  const startEditing = () => {
-    setInputValue(displayValue);
-    setIsEditing(true);
-  };
-
-  const handleBlur = () => {
-    setIsEditing(false);
-    const newHex = parseToHex(inputValue, format);
-    if (newHex && newHex !== hex) {
-      onUpdate(newHex);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      (e.target as HTMLInputElement).blur();
-    }
-  };
-
-  const bgHover = 'hover:bg-t-surface2';
-  const textColor = 'text-t-text';
-
-  return (
-    <div className={`flex items-center p-2 gap-2 ${bgHover} transition-colors group relative`}>
-      {/* Clickable Swatch with background pattern */}
-      <button 
-        onClick={onCopy}
-        className="w-12 h-12 rounded-lg shadow-md border-2 border-t-border shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition-transform relative overflow-hidden" 
-        style={{ 
-          backgroundColor: hex,
-          backgroundImage: `
-            linear-gradient(45deg, rgba(0,0,0,0.05) 25%, transparent 25%),
-            linear-gradient(-45deg, rgba(0,0,0,0.05) 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.05) 75%),
-            linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.05) 75%)
-          `,
-          backgroundSize: '8px 8px',
-          backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0px'
-        }}
-        title={`Click to copy: ${fullValue}`}
-      >
-        {copied && (
-           <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white backdrop-blur-[1px]">
-             <Check size={16} strokeWidth={3} />
-           </div>
-        )}
-      </button>
-
-      {/* Editable Text */}
-      <div className="flex-1 min-w-0 flex items-center h-full">
-        {isEditing ? (
-          <input 
-            type="text" 
-            autoFocus
-            className={`w-full text-[10px] font-mono bg-transparent outline-none border-b border-t-primary ${textColor}`}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-          />
-        ) : (
-          <span 
-            onClick={startEditing}
-            className={`text-[10px] font-mono truncate w-full cursor-text hover:text-t-primary transition-colors select-none ${textColor}`}
-            title={`Full value: ${fullValue}\nClick to edit`}
-          >
-            {displayValue}
-          </span>
-        )}
+      
+      {/* Color swatches side by side */}
+      <div className="flex flex-1">
+        {/* Light swatch */}
+        <button
+          onClick={(e) => copyToClipboard(lightHex, 'light', e)}
+          className="flex-1 h-12 relative flex items-center justify-center cursor-pointer hover:brightness-110 transition-all"
+          style={{ backgroundColor: lightHex }}
+          title={`Light: ${formatColor(lightHex, format)}\nClick to copy`}
+        >
+          {copied === 'light' ? (
+            <Check size={14} style={{ color: lightContrast }} strokeWidth={3} />
+          ) : (
+            <span 
+              className="text-[8px] font-mono font-medium opacity-80 group-hover/token:opacity-100 truncate px-1"
+              style={{ color: lightContrast }}
+            >
+              {lightShort}
+            </span>
+          )}
+        </button>
+        
+        {/* Dark swatch */}
+        <button
+          onClick={(e) => copyToClipboard(darkHex, 'dark', e)}
+          className="flex-1 h-12 relative flex items-center justify-center cursor-pointer hover:brightness-110 transition-all"
+          style={{ backgroundColor: darkHex }}
+          title={`Dark: ${formatColor(darkHex, format)}\nClick to copy`}
+        >
+          {copied === 'dark' ? (
+            <Check size={14} style={{ color: darkContrast }} strokeWidth={3} />
+          ) : (
+            <span 
+              className="text-[8px] font-mono font-medium opacity-80 group-hover/token:opacity-100 truncate px-1"
+              style={{ color: darkContrast }}
+            >
+              {darkShort}
+            </span>
+          )}
+        </button>
       </div>
     </div>
   );
@@ -199,8 +130,8 @@ const SwatchStrip: React.FC<SwatchStripProps> = ({ light, dark, format, isDarkUI
   // Use theme colors for background
   const themeTokens = isDarkUI ? dark : light;
   
-  // Map token keys we want to display - now 8 colors
-  const tokens = ['bg', 'surface', 'text', 'primary', 'secondary', 'accent', 'success', 'error'];
+  // 10 tokens to display
+  const tokens = ['bg', 'surface', 'text', 'textMuted', 'textOnColor', 'primary', 'secondary', 'accent', 'success', 'error'];
 
   // CSS Variables for theme colors
   const styleVars = {
@@ -209,6 +140,7 @@ const SwatchStrip: React.FC<SwatchStripProps> = ({ light, dark, format, isDarkUI
     '--surface2': themeTokens.surface2,
     '--text': themeTokens.text,
     '--text-muted': themeTokens.textMuted,
+    '--text-on-color': themeTokens.textOnColor,
     '--primary': themeTokens.primary,
     '--primary-fg': themeTokens.primaryFg,
     '--secondary': themeTokens.secondary,
@@ -228,19 +160,19 @@ const SwatchStrip: React.FC<SwatchStripProps> = ({ light, dark, format, isDarkUI
 
   return (
     <div 
-      className="sticky top-0 z-40 backdrop-blur-md border-b border-t-border p-2 shadow-sm transition-colors duration-300"
+      className="sticky top-0 z-40 backdrop-blur-md border-b border-t-border py-2 px-3 shadow-sm transition-colors duration-300"
       style={styleVars}
     >
       <div className="max-w-[1920px] mx-auto w-full">
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2 w-full">
+        {/* Compact grid: 5 columns on large, 5 on medium, 2 on mobile - fits 10 swatches */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-1.5 w-full">
           {tokens.map(key => (
-            <TokenBlock 
+            <CompactSwatch 
               key={key}
               tokenKey={key} 
               lightHex={light[key as keyof ThemeTokens]} 
               darkHex={dark[key as keyof ThemeTokens]} 
               format={format} 
-              isDarkUI={isDarkUI} 
               onUpdate={onUpdate}
               isLocked={!!lockedColors[key as keyof ThemeTokens]}
               onToggleLock={() => onToggleLock(key as keyof ThemeTokens)}

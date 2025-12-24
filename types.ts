@@ -10,6 +10,7 @@ export interface ThemeTokens {
   surface2: string;
   text: string;
   textMuted: string;
+  textOnColor: string;  // Text color for use on colored backgrounds (primary, secondary, etc.)
   primary: string;
   primaryFg: string;
   secondary: string;

@@ -11,9 +11,8 @@ interface PreviewProps {
   options: DesignOptions;
 }
 
-// Helper: Get contrasting text color based on theme
-// For colored backgrounds, we use bg color which should contrast
-const getTextOnColor = (themeName: string) => themeName === 'Dark' ? 'text-white' : 'text-white';
+// Helper: Use the textOnColor token for text on colored backgrounds
+const getTextOnColor = () => 'text-t-textOnColor';
 
 // Clickable Navigation Tabs Component
 const NavTabsDemo: React.FC<{
@@ -27,12 +26,12 @@ const NavTabsDemo: React.FC<{
 }> = ({ bClass, rClass, sClass, bBottom, rClassInner, options, themeName }) => {
   const [activeTab, setActiveTab] = useState('Dashboard');
   const tabs = ['Dashboard', 'Team', 'Settings'];
-  const fgOnColor = getTextOnColor(themeName);
+  const fgOnColor = getTextOnColor();
   
   return (
     <div className={`${bClass} ${rClass} ${sClass} overflow-hidden bg-t-surface`}>
       <div className={`${bBottom} p-4 flex items-center justify-between gap-4`} style={{ backgroundColor: 'color-mix(in srgb, var(--surface) 90%, var(--text) 10%)' }}>
-        <div className="flex gap-3 sm:gap-4 text-sm font-medium text-t-text/60 flex-wrap">
+        <div className="flex gap-3 sm:gap-4 text-sm font-medium text-t-textMuted flex-wrap">
           {tabs.map(tab => (
             <span
               key={tab}
@@ -90,7 +89,7 @@ const HeroBanner: React.FC<{
   
   return (
     <section className="space-y-4">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-t-text/60">Display Section</h3>
+      <h3 className="text-sm font-bold uppercase tracking-wider text-t-textMuted">Display Section</h3>
       <div className={`relative overflow-hidden isolate ${rClass} ${sClass} ${bClass} aspect-[16/9] flex items-center justify-center p-4 sm:p-8 md:p-12 group transition-all duration-300 hover:${sClassHover} hover:-translate-y-1`} style={{ willChange: 'transform' }}>
         {/* Real Background Image */}
         <div className="absolute inset-0 transition-transform duration-[3000ms] ease-in-out group-hover:scale-110 group-hover:rotate-1">
@@ -253,7 +252,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
         <h1 className="text-5xl font-extrabold tracking-tight text-t-text">
           Taichi Theme <span className={textGradient}>Generator</span>
         </h1>
-        <p className="text-xl text-t-text/70 max-w-lg leading-relaxed">
+        <p className="text-xl text-t-textMuted max-w-lg leading-relaxed">
           Create beautiful light and dark theme color schemes instantly. 
           This palette generator uses semantic design system tokens like{' '}
           <code className={`bg-t-primary/20 text-t-primary px-2 py-0.5 text-base font-bold ${rClassInner} border border-t-primary/30`}>primary</code>,{' '}
@@ -261,7 +260,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
           <code className={`bg-t-accent/20 text-t-accent px-2 py-0.5 text-base font-bold ${rClassInner} border border-t-accent/30`}>accent</code>{' '}
           to build harmonious dual themes.
         </p>
-        <p className="text-sm text-t-text/50 mt-16">
+        <p className="text-sm text-t-textMuted mt-16">
           Press <code className={`bg-t-accent/20 text-t-accent px-2 py-0.5 font-mono font-bold ${rClassInner} border border-t-accent/30`}>Space</code> to generate a new color theme pair.
         </p>
       </section>
@@ -278,7 +277,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
 
       {/* Buttons & Actions - Shows: primary, secondary, accent, error, surface, text */}
       <section className="space-y-6">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-t-text/60">Actions</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-t-textMuted">Actions</h3>
         <div className="flex flex-wrap gap-4 items-center">
           
           {/* Primary Button */}
@@ -340,21 +339,21 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
 
       {/* Form Elements */}
       <section className="space-y-6">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-t-text/60">Input Fields</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-t-textMuted">Input Fields</h3>
         <div className="grid gap-6 max-w-xl">
           <div className="space-y-2">
             <label className="text-sm font-medium text-t-text">Email Address</label>
             <div className="relative group">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-t-text/50 transition-colors group-focus-within:text-t-primary" size={18} />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-t-textMuted transition-colors group-focus-within:text-t-primary" size={18} />
               <input 
                 type="text" 
                 placeholder="you@example.com"
-                className={`w-full bg-t-surface ${bClass} ${rPill} ${sClass} pl-10 pr-4 py-2.5 text-t-text placeholder:text-t-text/40 transition-all duration-200
+                className={`w-full bg-t-surface ${bClass} ${rPill} ${sClass} pl-10 pr-4 py-2.5 text-t-text placeholder:text-t-textMuted transition-all duration-200
                 hover:border-t-primary/50
                 focus:outline-none focus:border-t-primary focus:ring-2 focus:ring-t-primary/20`}
               />
             </div>
-            <p className="text-xs text-t-text/50">We'll never share your email.</p>
+            <p className="text-xs text-t-textMuted">We'll never share your email.</p>
           </div>
 
           <div className="flex gap-6">
@@ -393,7 +392,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
 
       {/* Cards & Content - Shows all 8 colors */}
       <section className="space-y-6">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-t-text/60">Surfaces & Cards</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-t-textMuted">Surfaces & Cards</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           {/* Card 1 - Revenue Card */}
@@ -418,7 +417,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
                 <User size={32} />
              </div>
              <h4 className="text-lg font-bold text-t-text">John Doe</h4>
-             <p className="text-t-text/60 text-sm mb-4">Product Designer</p>
+             <p className="text-t-textMuted text-sm mb-4">Product Designer</p>
              <div className="flex gap-2">
                <span className={`px-2 py-1 ${rClassInner} text-xs font-medium text-t-secondary bg-t-secondary/15 border border-t-secondary/30 hover:bg-t-secondary hover:${fgOnColor} transition-colors cursor-default`}>UI/UX</span>
                <span className={`px-2 py-1 ${rClassInner} text-xs font-medium text-t-accent bg-t-accent/15 border border-t-accent/30 hover:bg-t-accent hover:${fgOnColor} transition-colors cursor-default`}>React</span>
@@ -434,7 +433,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
 
        {/* Alerts - Shows: secondary (info), error, success */}
       <section className="space-y-4">
-         <h3 className="text-sm font-bold uppercase tracking-wider text-t-text/60">Feedback</h3>
+         <h3 className="text-sm font-bold uppercase tracking-wider text-t-textMuted">Feedback</h3>
          <div className="flex flex-col gap-3">
             <div className={`flex items-center gap-3 p-4 ${rPill} ${sClass} bg-t-secondary/10 border border-t-secondary/30 text-t-text transition-transform hover:scale-[1.01]`}>
                <Info className="text-t-secondary shrink-0" size={20} />
@@ -453,10 +452,10 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
 
        {/* Navigation Example */}
       <section className="space-y-4">
-         <h3 className="text-sm font-bold uppercase tracking-wider text-t-text/60">Navigation Structure</h3>
+         <h3 className="text-sm font-bold uppercase tracking-wider text-t-textMuted">Navigation Structure</h3>
          <NavTabsDemo bClass={bClass} rClass={rClass} sClass={sClass} bBottom={bBottom} rClassInner={rClassInner} options={options} themeName={themeName} />
          <div className={`${bClass} ${rClass} ${sClass} bg-t-surface p-6`}>
-           <div className="flex items-center text-xs text-t-text/50 mb-6">
+           <div className="flex items-center text-xs text-t-textMuted mb-6">
              <span className="hover:text-t-primary cursor-pointer transition-colors">Home</span> <ChevronRight size={12} className="mx-1"/> 
              <span className="hover:text-t-primary cursor-pointer transition-colors">Settings</span> <ChevronRight size={12} className="mx-1"/> 
              <span className="text-t-text font-medium">Profile</span>
@@ -475,13 +474,13 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
                 <div className={`w-6 h-6 ${rClassInner} ${primaryBg}`}></div>
                 Brand
               </div>
-              <p className="text-sm text-t-text/60 leading-relaxed">
+              <p className="text-sm text-t-textMuted leading-relaxed">
                 Building the future of design systems, one token at a time.
               </p>
           </div>
           <div className="space-y-4">
               <div className="font-bold text-t-text text-sm uppercase tracking-wider">Product</div>
-              <ul className="space-y-2 text-sm text-t-text/60">
+              <ul className="space-y-2 text-sm text-t-textMuted">
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Features</li>
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Integrations</li>
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Pricing</li>
@@ -489,7 +488,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
           </div>
           <div className="space-y-4">
               <div className="font-bold text-t-text text-sm uppercase tracking-wider">Resources</div>
-              <ul className="space-y-2 text-sm text-t-text/60">
+              <ul className="space-y-2 text-sm text-t-textMuted">
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Documentation</li>
                 <li className="hover:text-t-primary cursor-pointer transition-colors">API Reference</li>
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Community</li>
@@ -497,7 +496,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
           </div>
           <div className="space-y-4">
               <div className="font-bold text-t-text text-sm uppercase tracking-wider">Legal</div>
-              <ul className="space-y-2 text-sm text-t-text/60">
+              <ul className="space-y-2 text-sm text-t-textMuted">
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Privacy Policy</li>
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Terms of Service</li>
               </ul>
@@ -505,7 +504,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
         </div>
         
         <div className={`${bBottom} mb-4`}></div>
-        <div className={`flex flex-col md:flex-row justify-between items-center text-xs text-t-text/50 pt-4 gap-4`}>
+        <div className={`flex flex-col md:flex-row justify-between items-center text-xs text-t-textMuted pt-4 gap-4`}>
           <span>
             Taichi Theme Generator © 2025 | Bucaa Studio. All Rights Reserved. v{__APP_VERSION__}
           </span>

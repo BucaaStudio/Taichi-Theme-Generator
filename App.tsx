@@ -201,7 +201,9 @@ const App: React.FC = () => {
     const relatedTokens: Record<string, string[]> = {
       bg: [],
       surface: ['surface2'],
-      text: ['textMuted'],
+      text: [],
+      textMuted: [],
+      textOnColor: [],  // Always white, but lockable
       primary: ['primaryFg', 'ring'],
       secondary: ['secondaryFg'],
       accent: ['accentFg'],

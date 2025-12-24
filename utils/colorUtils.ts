@@ -433,6 +433,7 @@ export function generateTheme(
     surface2: hslToHex(primaryHue, bgSat, Math.min(100, lightSurfL - 3)), // Surface 2 is usually darker in light mode for depth
     text: hslToHex(primaryHue, 10, lightTextL), 
     textMuted: hslToHex(primaryHue, 10, lightTextL + 30),
+    textOnColor: '#ffffff', // Always white for colored backgrounds
     
     primary: hslToHex(primaryHue, primarySat, lightColorMod), 
     primaryFg: '#ffffff', 
@@ -466,6 +467,7 @@ export function generateTheme(
     surface2: hslToHex(primaryHue, bgSat, darkSurfL + 5), // Lighter in dark mode
     text: hslToHex(primaryHue, 10, darkTextL),
     textMuted: hslToHex(primaryHue, 10, darkTextL - 30),
+    textOnColor: '#ffffff', // Always white for colored backgrounds
     
     primary: hslToHex(primaryHue, primarySat, darkColorMod),
     primaryFg: '#ffffff',
