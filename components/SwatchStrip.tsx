@@ -171,7 +171,7 @@ const CompactSwatch: React.FC<CompactSwatchProps> = ({
       <div className="flex flex-1">
         {/* Light swatch */}
         <div
-          className="flex-1 h-12 relative flex items-center justify-center cursor-pointer hover:brightness-110 transition-all"
+          className="flex-1 h-12 relative flex items-center justify-center cursor-pointer transition-all"
           style={{ backgroundColor: lightHex }}
           title={`Light: ${formatColor(lightHex, format)}\nClick to edit, Alt+Click to copy`}
           onClick={(e) => handleClick(lightHex, 'light', e)}
@@ -201,7 +201,7 @@ const CompactSwatch: React.FC<CompactSwatchProps> = ({
         
         {/* Dark swatch */}
         <div
-          className="flex-1 h-12 relative flex items-center justify-center cursor-pointer hover:brightness-110 transition-all"
+          className="flex-1 h-12 relative flex items-center justify-center cursor-pointer transition-all"
           style={{ backgroundColor: darkHex }}
           title={`Dark: ${formatColor(darkHex, format)}\nClick to edit, Alt+Click to copy`}
           onClick={(e) => handleClick(darkHex, 'dark', e)}
