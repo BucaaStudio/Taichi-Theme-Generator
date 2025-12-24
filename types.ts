@@ -45,8 +45,9 @@ export interface DesignOptions {
   shadowStrength: number; // 0 - 4
   gradientLevel: number; // 0 - 2
   radius: number;        // 0 - 5
-  contrastLevel: number; // 0 - 2
-  saturationLevel: number; // 0 - 2
+  brightnessLevel: number; // 0 - 4, controls bg/surface lightness
+  contrastLevel: number; // 1 - 5
+  saturationLevel: number; // 0 - 4
 }
 
 export type LockedColors = Partial<Record<keyof ThemeTokens, boolean>>;

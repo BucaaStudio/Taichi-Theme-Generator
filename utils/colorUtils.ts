@@ -326,7 +326,8 @@ export function generateTheme(
   mode: GenerationMode, 
   seedColor?: string, 
   saturationLevel: number = 2, 
-  contrastLevel: number = 2
+  contrastLevel: number = 3,
+  brightnessLevel: number = 2
 ): { light: ThemeTokens, dark: ThemeTokens, seed: string } {
   let baseHue: number;
   let baseSat = 70;
@@ -385,22 +386,29 @@ export function generateTheme(
   let secondarySat = mode === 'monochrome' ? clamp(baseSat - 30, 0, sMax - 20) : clamp(baseSat - 10, sMin, sMax);
   let accentSat = mode === 'monochrome' ? clamp(baseSat + 10, sMin, sMax) : clamp(baseSat + 10, sMin, sMax);
 
+  // --- Brightness Level Logic ---
+  // 5 Levels (0-4) controlling bg/surface lightness with more dramatic range
+  // Level 0: Darkest  | Light BG: 75  | Dark BG: 5
+  // Level 1: Dark     | Light BG: 85  | Dark BG: 10
+  // Level 2: Middle   | Light BG: 92  | Dark BG: 15
+  // Level 3: Bright   | Light BG: 97  | Dark BG: 22
+  // Level 4: Brightest| Light BG: 100 | Dark BG: 30
+  const lightBgByBrightness = [75, 85, 92, 97, 100][brightnessLevel];
+  const darkBgByBrightness = [5, 10, 15, 22, 30][brightnessLevel];
+
   // --- Dynamic Range (Contrast) Logic ---
   // 5 Levels (1-5) with more dramatic differences for better visual distinction
-  // Adjusted to ensure text is always readable, even at lowest levels
-  // Level 1: Softest | Light BG: 85, Light Text: 30 | Dark BG: 30, Dark Text: 75
-  // Level 2: Soft    | Light BG: 90, Light Text: 20 | Dark BG: 20, Dark Text: 82
-  // Level 3: Middle  | Light BG: 95, Light Text: 18 | Dark BG: 12, Dark Text: 88
-  // Level 4: High    | Light BG: 98, Light Text: 8  | Dark BG: 5,  Dark Text: 94
-  // Level 5: Max     | Light BG: 100,Light Text: 0  | Dark BG: 0,  Dark Text: 100
-  
+  // Contrast affects text lightness relative to bg
   // Adjust contrast level to 0-4 index (user sees 1-5)
   const contrastIndex = contrastLevel - 1;
   
-  const lightBgLevels   = [85, 90, 95, 98, 100];
-  const lightTextLevels = [30, 20, 18, 8, 0];
-  const darkBgLevels    = [30, 20, 12, 5, 0];
-  const darkTextLevels  = [75, 82, 88, 94, 100];
+  // Text lightness offsets from bg based on contrast
+  const lightTextOffsets = [45, 55, 65, 75, 85]; // How dark text is relative to white (higher = darker)
+  const darkTextOffsets = [45, 55, 65, 80, 90];  // How light text is relative to black (higher = lighter)
+  
+  // Apply contrast to text: text lightness = calculated from bg
+  const lightTextL = Math.max(0, lightBgByBrightness - lightTextOffsets[contrastIndex]);
+  const darkTextL = Math.min(100, darkBgByBrightness + darkTextOffsets[contrastIndex]);
   
   // Base Color Lightness Modifiers (how "poppy" the colors are against bg)
   // Lower contrast = lighter colors in light mode to blend more, darker in dark mode
@@ -412,19 +420,19 @@ export function generateTheme(
   const isTinted = rnd > 0.5 && saturationLevel > 0;
   const bgSat = isTinted ? Math.floor(seededRandom(seedVal + 5) * (saturationLevel * 3)) : Math.floor(seededRandom(seedVal + 5) * 3);
 
-  const lightBgL = lightBgLevels[contrastIndex];
-  const lightTextL = lightTextLevels[contrastIndex];
-  const darkBgL = darkBgLevels[contrastIndex];
-  const darkTextL = darkTextLevels[contrastIndex];
+  const lightBgL = lightBgByBrightness;
+  const darkBgL = darkBgByBrightness;
   
   const lightColorMod = lightColorModLevels[contrastIndex];
   const darkColorMod = darkColorModLevels[contrastIndex];
 
-  // Surface Logic
-  // Light mode: Surface is slightly lighter or darker than BG depending on contrast
-  // Dark mode: Surface is lighter than BG
-  const lightSurfL = contrastIndex >= 3 ? 100 : Math.min(100, lightBgL + (contrastIndex === 0 ? 6 : 4));
-  const darkSurfL = Math.min(100, darkBgL + (contrastIndex === 0 ? 8 : (contrastIndex === 4 ? 15 : 10))); 
+  // Surface Logic - more variation based on brightness
+  // Light mode: Surface differs from BG more at extremes
+  const lightSurfOffset = [8, 6, 4, 2, 0][brightnessLevel]; // Darker surface at darker brightness
+  const darkSurfOffset = [3, 5, 8, 10, 12][brightnessLevel]; // Lighter surface at brighter brightness
+  
+  const lightSurfL = Math.min(100, lightBgL + lightSurfOffset);
+  const darkSurfL = Math.min(100, darkBgL + darkSurfOffset); 
 
   // Generate Tokens
   const light: ThemeTokens = {

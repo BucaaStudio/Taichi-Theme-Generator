@@ -90,6 +90,7 @@ const App: React.FC = () => {
     shadowStrength: 2,
     gradientLevel: 0,
     radius: 3,
+    brightnessLevel: 2, // Default to Middle (scale 0-4)
     contrastLevel: 3, // Default to Middle (scale 1-5)
     saturationLevel: 2 // Default to Middle (scale 0-4)
   });
@@ -108,6 +109,7 @@ const App: React.FC = () => {
       // Parse Design Options from URL
       const sat = params.get('sat') ? parseInt(params.get('sat')!) : undefined;
       const con = params.get('con') ? parseInt(params.get('con')!) : undefined;
+      const bri = params.get('bri') ? parseInt(params.get('bri')!) : undefined;
       const bw = params.get('bw') ? parseInt(params.get('bw')!) : undefined;
       const sh = params.get('sh') ? parseInt(params.get('sh')!) : undefined;
       const gr = params.get('gr') ? parseInt(params.get('gr')!) : undefined;
@@ -120,13 +122,14 @@ const App: React.FC = () => {
         shadowStrength: sh ?? prev.shadowStrength,
         gradientLevel: gr ?? prev.gradientLevel,
         radius: rd ?? prev.radius,
+        brightnessLevel: bri ?? prev.brightnessLevel,
         contrastLevel: con ?? prev.contrastLevel,
         saturationLevel: sat ?? prev.saturationLevel
       }));
 
       // Generate Theme directly with these params
-      // We pass sat/con explicitly because the state update above might not be flushed yet
-      generateNewTheme(urlMode, urlSeed, sat, con);
+      // We pass sat/con/bri explicitly because the state update above might not be flushed yet
+      generateNewTheme(urlMode, urlSeed, sat, con, bri);
       
       // Remove encoded params cleanly from URL bar to show pretty URL if desired, 
       // but we want to KEEP them for sharing.
@@ -155,6 +158,7 @@ const App: React.FC = () => {
     params.set('seed', currentTheme.seed);
     params.set('sat', designOptions.saturationLevel.toString());
     params.set('con', designOptions.contrastLevel.toString());
+    params.set('bri', designOptions.brightnessLevel.toString());
     params.set('bw', designOptions.borderWidth.toString());
     params.set('sh', designOptions.shadowStrength.toString());
     params.set('gr', designOptions.gradientLevel.toString());
@@ -184,13 +188,15 @@ const App: React.FC = () => {
     genMode: GenerationMode, 
     seed?: string, 
     saturation?: number,
-    contrast?: number
+    contrast?: number,
+    brightness?: number
   ) => {
     // If param is undefined, use current state.
     const sLevel = saturation !== undefined ? saturation : designOptions.saturationLevel;
     const cLevel = contrast !== undefined ? contrast : designOptions.contrastLevel;
+    const bLevel = brightness !== undefined ? brightness : designOptions.brightnessLevel;
     
-    const { light, dark, seed: newSeed } = generateTheme(genMode, seed, sLevel, cLevel);
+    const { light, dark, seed: newSeed } = generateTheme(genMode, seed, sLevel, cLevel, bLevel);
     
     // Preserve locked colors from current theme
     // Also lock related tokens when a base token is locked
@@ -251,7 +257,7 @@ const App: React.FC = () => {
     // New items are always at index 0
     setHistoryIndex(0);
     setCurrentTheme(newTheme);
-  }, [historyIndex, designOptions.saturationLevel, designOptions.contrastLevel, lockedColors, currentTheme]);
+  }, [historyIndex, designOptions.saturationLevel, designOptions.contrastLevel, designOptions.brightnessLevel, lockedColors, currentTheme]);
 
   // Update a single token (manual edit)
   const handleTokenUpdate = useCallback((side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => {
@@ -796,7 +802,7 @@ const App: React.FC = () => {
              </div>
            </div>
 
-            {/* Saturation Level */}
+             {/* Saturation Level */}
            <div className="space-y-3">
              <div className="flex justify-between items-center">
                <label className="text-xs font-bold uppercase tracking-wider opacity-70">Saturation</label>
@@ -811,6 +817,24 @@ const App: React.FC = () => {
              />
              <div className="flex justify-between text-[10px] opacity-40 px-0.5">
                <span>Mono</span><span>Vivid</span>
+             </div>
+           </div>
+
+           {/* Brightness Level */}
+           <div className="space-y-3">
+             <div className="flex justify-between items-center">
+               <label className="text-xs font-bold uppercase tracking-wider opacity-70">Brightness</label>
+               <span className="text-xs font-mono opacity-50">Lvl {designOptions.brightnessLevel}</span>
+             </div>
+             <input 
+               type="range" min="0" max="4" step="1"
+               value={designOptions.brightnessLevel}
+               onChange={(e) => updateOption('brightnessLevel', parseInt(e.target.value))}
+               className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
+               style={{ accentColor: shellTheme.primary }}
+             />
+             <div className="flex justify-between text-[10px] opacity-40 px-0.5">
+               <span>Dark</span><span>Light</span>
              </div>
            </div>
 
