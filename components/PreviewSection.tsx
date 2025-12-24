@@ -96,9 +96,31 @@ const HeroBanner: React.FC<{
         {/* Dynamic Theme Overlay */}
         <div className={`absolute inset-0 ${themeName === 'Dark' ? 'bg-black/60' : 'bg-white/60'} backdrop-blur-[1px] transition-colors duration-500`} />
         
-        {/* Gradient Accents */}
-        <div className="absolute inset-0 opacity-30 mix-blend-overlay transition-all duration-700 group-hover:opacity-40" 
-             style={{ backgroundImage: `radial-gradient(circle at 20% 30%, var(--primary) 0%, transparent 60%), radial-gradient(circle at 80% 70%, var(--accent) 0%, transparent 60%)` }} />
+        {/* Gradient Accents - Animated on hover */}
+        <div 
+          className="absolute inset-0 opacity-30 mix-blend-overlay transition-all duration-700 group-hover:opacity-50" 
+          style={{ 
+            backgroundImage: `radial-gradient(circle at 20% 30%, var(--primary) 0%, transparent 60%), radial-gradient(circle at 80% 70%, var(--accent) 0%, transparent 60%)`,
+            backgroundSize: '200% 200%',
+            animation: 'none'
+          }} 
+        />
+        
+        {/* Animated shimmer effect on hover */}
+        <div 
+          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+          style={{
+            background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)`,
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 2s ease-in-out infinite'
+          }}
+        />
+        <style>{`
+          @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+        `}</style>
         
         {/* SVG Mesh Pattern Overlay for Texture */}
         <div className="absolute inset-0 opacity-[0.05] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/08/svg'%3E%3Cpath d='M30 0l25.98 15v30L30 60 4.02 45V15z' fill-rule='evenodd' stroke='%23000' stroke-width='1' fill='none'/%3E%3C/svg%3E")` }} />
