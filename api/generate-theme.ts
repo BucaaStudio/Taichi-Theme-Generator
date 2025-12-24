@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { rateLimit } from '../utils/rate-limit';
+import { rateLimit } from './utils/rate-limit';
 
 /**
  * API Endpoint: Generate Theme

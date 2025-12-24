@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { rateLimit, getRateLimitStatus } from '../utils/rate-limit';
+import { rateLimit, getRateLimitStatus } from './utils/rate-limit';
 
 /**
  * API Endpoint: Get Theme History
