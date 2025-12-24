@@ -797,7 +797,7 @@ const App: React.FC = () => {
            {/* Shadow Opacity */}
            <div className="space-y-3">
              <div className="flex justify-between items-center">
-               <label className="text-xs font-bold uppercase tracking-wider opacity-70">Opacity</label>
+               <label className="text-xs font-bold uppercase tracking-wider opacity-70">Shadow Opacity</label>
                <span className="text-xs font-mono opacity-50">{designOptions.shadowOpacity}%</span>
              </div>
              <input 

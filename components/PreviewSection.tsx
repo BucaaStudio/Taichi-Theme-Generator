@@ -29,7 +29,7 @@ const NavTabsDemo: React.FC<{
   const fgOnColor = getTextOnColor();
   
   return (
-    <div className={`${bClass} ${rClass} ${sClass} overflow-hidden bg-t-card`}>
+    <div className={`${bClass} ${rClass} ${sClass} overflow-hidden bg-t-card transition-all duration-300`}>
       <div className={`${bBottom} p-4 flex items-center justify-between gap-4`} style={{ backgroundColor: 'color-mix(in srgb, var(--card) 90%, var(--text) 10%)' }}>
         <div className="flex gap-3 sm:gap-4 text-sm font-medium text-t-textMuted flex-wrap">
           {tabs.map(tab => (
@@ -180,7 +180,9 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
       case 0: return 'border-0';
       case 1: return 'border';
       case 2: return 'border-2';
-      case 3: return 'border-4';
+      case 3: return 'border-[3px]';
+      case 4: return 'border-4';
+      case 5: return 'border-[5px]';
       default: return 'border';
     }
   };
@@ -190,7 +192,9 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
        case 0: return 'border-b-0';
        case 1: return 'border-b';
        case 2: return 'border-b-2';
-       case 3: return 'border-b-4';
+       case 3: return 'border-b-[3px]';
+       case 4: return 'border-b-4';
+       case 5: return 'border-b-[5px]';
        default: return 'border-b';
     }
   };
@@ -211,8 +215,8 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
       default: return 'shadow';
     }
   };
-  const sClass = getShadow(options.shadowStrength);
-  const sClassHover = getShadow(Math.min(5, options.shadowStrength + 2));
+  const sClass = `${getShadow(options.shadowStrength)} shadow-black/[${options.shadowOpacity / 100}]`;
+  const sClassHover = `${getShadow(Math.min(5, options.shadowStrength + 2))} shadow-black/[${options.shadowOpacity / 100}]`;
 
   // Gradients
   const isGradient = options.gradientLevel > 0;
@@ -281,28 +285,28 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
         <div className="flex flex-wrap gap-4 items-center">
           
           {/* Primary Button */}
-          <button className={`${primaryBg} px-5 py-2.5 ${rPill} font-semibold ${sClass} ${bAction} transition-all duration-200 
+          <button className={`${primaryBg} px-5 py-2.5 ${rPill} font-semibold ${sClass} ${bAction} transition-all duration-300 
             hover:${sClassHover} hover:-translate-y-0.5 hover:brightness-110 
             active:translate-y-0 active:scale-95 active:shadow-none focus:ring-4 focus:ring-t-primary/30`}>
             Primary Action
           </button>
 
           {/* Secondary Button */}
-          <button className={`${secondaryBg} px-5 py-2.5 ${rPill} font-semibold ${bAction} ${sClass} transition-all duration-200 
+          <button className={`${secondaryBg} px-5 py-2.5 ${rPill} font-semibold ${bAction} ${sClass} transition-all duration-300 
             hover:brightness-95 hover:shadow-sm hover:${sClassHover}
             active:scale-95 active:brightness-90 focus:ring-4 focus:ring-t-secondary/30`}>
             Secondary
           </button>
 
           {/* Accent Button */}
-          <button className={`${accentBg} px-5 py-2.5 ${rPill} font-semibold ${bAction} ${sClass} transition-all duration-200 
+          <button className={`${accentBg} px-5 py-2.5 ${rPill} font-semibold ${bAction} ${sClass} transition-all duration-300 
             hover:brightness-95 hover:shadow-sm hover:${sClassHover}
             active:scale-95 active:brightness-90 focus:ring-4 focus:ring-t-accent/30`}>
             Accent
           </button>
 
           {/* Outline Button */}
-          <button className={`${bClass} text-t-text bg-t-card px-5 py-2.5 ${rPill} font-semibold ${sClass} transition-all duration-200 
+          <button className={`${bClass} text-t-text bg-t-card px-5 py-2.5 ${rPill} font-semibold ${sClass} transition-all duration-300 
             hover:border-t-primary hover:text-t-primary hover:bg-t-bg hover:${sClassHover}
             active:scale-95 active:bg-t-primary/5 focus:ring-4 focus:ring-t-primary/30`}>
             Outline
@@ -348,7 +352,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
               <input 
                 type="text" 
                 placeholder="you@example.com"
-                className={`w-full bg-t-card ${bClass} ${rPill} ${sClass} pl-10 pr-4 py-2.5 text-t-text placeholder:text-t-textMuted transition-all duration-200
+                className={`w-full bg-t-card ${bClass} ${rPill} ${sClass} pl-10 pr-4 py-2.5 text-t-text placeholder:text-t-textMuted transition-all duration-300
                 hover:border-t-primary/50
                 focus:outline-none focus:border-t-primary focus:ring-2 focus:ring-t-primary/20`}
               />
@@ -359,7 +363,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
           <div className="flex gap-6">
             <div className="space-y-2 flex-1">
               <label className="text-sm font-medium text-t-text">Select Option</label>
-              <select className={`w-full bg-t-card ${bClass} ${rPill} ${sClass} px-4 py-2.5 text-t-text transition-all duration-200
+              <select className={`w-full bg-t-card ${bClass} ${rPill} ${sClass} px-4 py-2.5 text-t-text transition-all duration-300
                 hover:border-t-primary/50
                 focus:outline-none focus:border-t-primary focus:ring-2 focus:ring-t-primary/20`}>
                 <option>Version 1.0</option>
@@ -435,15 +439,15 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
       <section className="space-y-4">
          <h3 className="text-sm font-bold uppercase tracking-wider text-t-textMuted">Feedback</h3>
          <div className="flex flex-col gap-3">
-            <div className={`flex items-center gap-3 p-4 ${rPill} ${sClass} bg-t-secondary/10 border border-t-secondary/30 text-t-text transition-transform hover:scale-[1.01]`}>
+            <div className={`flex items-center gap-3 p-4 ${rPill} ${sClass} bg-t-secondary/10 border border-t-secondary/30 text-t-text transition-all duration-300 hover:scale-[1.01]`}>
                <Info className="text-t-secondary shrink-0" size={20} />
                <div className="flex-1 text-sm"><span className="font-bold">Update Available:</span> A new version of the system is ready.</div>
             </div>
-            <div className={`flex items-center gap-3 p-4 ${rPill} ${sClass} bg-t-bad/10 border border-t-bad/30 text-t-text transition-transform hover:scale-[1.01]`}>
+            <div className={`flex items-center gap-3 p-4 ${rPill} ${sClass} bg-t-bad/10 border border-t-bad/30 text-t-text transition-all duration-300 hover:scale-[1.01]`}>
                <AlertTriangle className="text-t-bad shrink-0" size={20} />
                <div className="flex-1 text-sm"><span className="font-bold">Connection Lost:</span> Check your internet settings.</div>
             </div>
-            <div className={`flex items-center gap-3 p-4 ${rPill} ${sClass} bg-t-good/10 border border-t-good/30 text-t-text transition-transform hover:scale-[1.01]`}>
+            <div className={`flex items-center gap-3 p-4 ${rPill} ${sClass} bg-t-good/10 border border-t-good/30 text-t-text transition-all duration-300 hover:scale-[1.01]`}>
                <Check className="text-t-good shrink-0" size={20} />
                <div className="flex-1 text-sm"><span className="font-bold">Success:</span> Your changes have been saved.</div>
             </div>
@@ -454,7 +458,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
       <section className="space-y-4">
          <h3 className="text-sm font-bold uppercase tracking-wider text-t-textMuted">Navigation Structure</h3>
          <NavTabsDemo bClass={bClass} rClass={rClass} sClass={sClass} bBottom={bBottom} rClassInner={rClassInner} options={options} themeName={themeName} />
-         <div className={`${bClass} ${rClass} ${sClass} bg-t-card p-6`}>
+         <div className={`${bClass} ${rClass} ${sClass} bg-t-card p-6 transition-all duration-300`}>
            <div className="flex items-center text-xs text-t-textMuted mb-6">
              <span className="hover:text-t-primary cursor-pointer transition-colors">Home</span> <ChevronRight size={12} className="mx-1"/> 
              <span className="hover:text-t-primary cursor-pointer transition-colors">Settings</span> <ChevronRight size={12} className="mx-1"/> 
