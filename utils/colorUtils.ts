@@ -10,45 +10,35 @@ function clamp(num: number, min: number, max: number) {
  * Apply brightness compression to a lightness value.
  * 
  * @param lightness - Original lightness value (0-100)
- * @param brightnessLevel - Brightness level (1-5)
- *   - 1 (Dim): Compresses toward dark - colors near white shift toward gray
- *   - 3 (Normal): No change
- *   - 5 (Bright): Compresses toward bright - colors near black shift toward gray
- * @returns Adjusted lightness value
- * 
- * The shift amount is proportional to distance from center (50):
- * - Colors at 50% gray: no shift
- * - Colors near 0% or 100%: maximum shift toward center
+ * @param brightnessLevel - Brightness level (-5 to 5)
+ *   - negative: Compresses toward dark (dim)
+ *   - 0: Normal (no change)
+ *   - positive: Compresses toward bright (bright)
  */
 function applyBrightness(lightness: number, brightnessLevel: number): number {
-  // Level 3 is neutral (no change)
-  if (brightnessLevel === 3) return lightness;
+  if (brightnessLevel === 0) return lightness;
   
-  // Calculate deviation from center (50)
   const deviation = lightness - 50;
   
-  // Compression factor: how much to compress toward 50
-  // Level 1 (dim): compress bright colors down, deviations > 0 get reduced
-  // Level 5 (bright): compress dark colors up, deviations < 0 get reduced
-  const compressionAmount = [0.5, 0.25, 0, 0.25, 0.5][brightnessLevel - 1];
+  // Compression intensity (0 to ~0.6)
+  // Max compression at level 5
+  const intensity = (Math.abs(brightnessLevel) / 5) * 0.6;
   
-  if (brightnessLevel < 3) {
-    // Dim mode: compress bright colors toward 50
+  if (brightnessLevel < 0) {
+    // Dim mode: compress bright colors toward 50 (or lower, effectively darkening)
+    // Actually, "dimming" typically means pushing towards dark. 
+    // The previous logic pushed bright colors down.
     if (deviation > 0) {
-      // Bright colors get compressed
-      return 50 + deviation * (1 - compressionAmount);
+      return 50 + deviation * (1 - intensity);
     } else {
-      // Dark colors stay mostly the same (slight compression)
-      return 50 + deviation * (1 - compressionAmount * 0.3);
+      return 50 + deviation * (1 - intensity * 0.3);
     }
   } else {
-    // Bright mode: compress dark colors toward 50
+    // Bright mode: compress dark colors up toward 50
     if (deviation < 0) {
-      // Dark colors get compressed up toward 50
-      return 50 + deviation * (1 - compressionAmount);
+      return 50 + deviation * (1 - intensity);
     } else {
-      // Bright colors stay mostly the same (slight compression)
-      return 50 + deviation * (1 - compressionAmount * 0.3);
+      return 50 + deviation * (1 - intensity * 0.3);
     }
   }
 }
@@ -374,9 +364,9 @@ function getHarmonyHues(baseHue: number, mode: GenerationMode): number[] {
 export function generateTheme(
   mode: GenerationMode, 
   seedColor?: string, 
-  saturationLevel: number = 2, 
-  contrastLevel: number = 3,
-  brightnessLevel: number = 2
+  saturationLevel: number = 0, // -5 to 5
+  contrastLevel: number = 0,   // -5 to 5
+  brightnessLevel: number = 0  // -5 to 5
 ): { light: ThemeTokens, dark: ThemeTokens, seed: string } {
   let baseHue: number;
   let baseSat = 70;
@@ -402,14 +392,18 @@ export function generateTheme(
     const satRandom = seededRandom(seedVal + 1);
     
     if (mode === 'random') {
-        switch(saturationLevel) {
-            case 0: baseSat = 0; break; // Pure grayscale
-            case 1: baseSat = Math.floor(satRandom * 10) + 15; break; // Low
-            case 2: baseSat = Math.floor(satRandom * 10) + 30; break; // Low-Medium
-            case 3: baseSat = Math.floor(satRandom * 10) + 50; break; // High-Medium
-            case 4: baseSat = Math.floor(satRandom * 10) + 70; break; // High
-            case 5: baseSat = Math.floor(satRandom * 10) + 90; break; // Maximum
-            default: baseSat = Math.floor(satRandom * 10) + 50;
+        // Base Saturation mapping for random generation
+        // Normal (0) -> ~60
+        // -5 -> 0 (Grayscale)
+        // +5 -> 95 (Vivid)
+        const satNorm = saturationLevel + 5; // 0 to 10
+        const randVariation = Math.floor(satRandom * 20); // 0-20 variation
+        
+        if (saturationLevel === -5) {
+            baseSat = 0;
+        } else {
+            // Map 0-10 scale to roughly 0-100 range
+            baseSat = (satNorm * 9) + randVariation; 
         }
     }
   }
@@ -425,87 +419,104 @@ export function generateTheme(
   const secondaryHue = hues[1];
   const accentHue = hues[2];
 
-  // Adjust Primary Saturation based on level (Clamping)
-  // Ensure the primary color follows the slider intent strongly
-  // Equal spacing: 0, 15-25, 30-40, 50-60, 70-80, 90-100
+  // Adjust Primary Saturation based on level (-5 to 5)
+  // -5: Grayscale (0)
+  // 0: Medium (50-70)
+  // +5: Vivid (90-100)
+  
   let primarySat = baseSat;
-  const sMin = [0, 15, 30, 50, 70, 90][saturationLevel];
-  const sMax = [0, 25, 45, 65, 85, 100][saturationLevel];
+  
+  // Calculate specific min/max bounds based on saturation level
+  // Map -5 to 5 range to 0 to 100 saturation bands
+  // Level -> Min Sat
+  // -5 -> 0
+  // 0 -> 40
+  // 5 -> 90
+  const satLevelIndex = saturationLevel + 5; // 0 to 10
+  
+  const getMinSat = (lvl: number) => {
+      if (lvl <= 0) return 0; // -5
+      return Math.min(90, lvl * 9); 
+  };
+  const getMaxSat = (lvl: number) => {
+      if (lvl <= 0) return 0;
+      return Math.min(100, (lvl * 9) + 20);
+  };
+
+  const sMin = getMinSat(satLevelIndex);
+  const sMax = getMaxSat(satLevelIndex);
+
   primarySat = clamp(baseSat, sMin, sMax);
 
   let secondarySat = mode === 'monochrome' ? clamp(baseSat - 30, 0, sMax - 20) : clamp(baseSat - 10, sMin, sMax);
   let accentSat = mode === 'monochrome' ? clamp(baseSat + 10, sMin, sMax) : clamp(baseSat + 10, sMin, sMax);
 
-  // --- Brightness Level Logic (1-5 scale) ---
-  // Brightness compresses the entire color range toward light or dark
-  // Level 1 (Dim): Compresses toward dark - lightest colors become ~50% gray
-  // Level 3 (Normal): Equal headroom - equal distance to white and black
-  // Level 5 (Bright): Compresses toward bright - darkest colors become ~50% gray
-  //
-  // The effect works by defining anchor points:
-  // - Base light mode bg: where the light theme bg lands
-  // - Base dark mode bg: where the dark theme bg lands
-  // 
-  // At level 3 (normal):
-  //   Light bg ~95%, Dark bg ~10% (equal ~5% headroom on each side)
-  //
-  // At level 1 (dim/compressed to dark):
-  //   Light bg ~50% (compressed down), Dark bg ~5%
-  //
-  // At level 5 (bright/compressed to bright):
-  //   Light bg ~100%, Dark bg ~50% (compressed up)
+  // --- Brightness Level Logic (-5 to 5 scale) ---
+  // Level -5 (Dim): Compresses toward dark
+  // Level 0 (Normal): Equal headroom
+  // Level +5 (Bright): Compresses toward bright
   
-  const brightnessIndex = brightnessLevel - 1; // Convert 1-5 to 0-4 index
+  // Map -5 to 5 -> 0 to 1 for interpolation or direct lookups
+  // For simplicity, we'll map to indices or continuous values
   
-  // Non-linear compression curves
-  // Light mode background: compressed toward 50% at level 1, toward 100% at level 5
-  const lightBgByBrightness = [50, 70, 95, 98, 100][brightnessIndex];
-  // Dark mode background: stays dark at level 1, compressed toward 50% at level 5
-  const darkBgByBrightness = [5, 8, 10, 25, 50][brightnessIndex];
+  // Background Lightness Adjustments
+  // Normal Light Bg = 98 (Paper)
+  // Normal Dark Bg = 8 (Dark Grey)
+  
+  let lightBgL = 98;
+  let darkBgL = 8;
+  
+  if (brightnessLevel < 0) {
+      // Dimming
+      // Light: 98 -> 50
+      // Dark: 8 -> 5
+      lightBgL = 98 - (Math.abs(brightnessLevel) * 9); // down to ~53
+      darkBgL = 8 - (Math.abs(brightnessLevel) * 0.6); // down to ~5
+  } else {
+      // Brightening
+      // Light: 98 -> 100
+      // Dark: 8 -> 40
+      lightBgL = 98 + (brightnessLevel * 0.4); // up to 100
+      darkBgL = 8 + (brightnessLevel * 6); // up to 38
+  }
 
-  // --- Dynamic Range (Contrast) Logic ---
-  // 5 Levels (1-5) with more dramatic differences for better visual distinction
-  // Contrast affects text lightness relative to bg
-  // Adjust contrast level to 0-4 index (user sees 1-5)
-  const contrastIndex = contrastLevel - 1;
+  // --- Dynamic Range (Contrast) Logic (-5 to 5) ---
+  // -5: Low Contrast (Text closer to BG)
+  // 0: Normal
+  // +5: High Contrast (Text furthest from BG)
   
-  // Text lightness offsets from bg based on contrast
-  // These are adjusted based on brightness to maintain readability
-  const lightTextOffsets = [40, 50, 60, 70, 80]; // How dark text is relative to bg
-  const darkTextOffsets = [40, 50, 60, 75, 85];  // How light text is relative to bg
+  // Base text offsets from BG
+  const baseLightTextOffset = 65; // Black text on white
+  const baseDarkTextOffset = 70;  // White text on black
   
-  // Apply contrast to text: text lightness = calculated from bg
-  // Clamp to ensure text stays readable even at brightness extremes
-  const lightTextL = Math.max(5, lightBgByBrightness - lightTextOffsets[contrastIndex]);
-  const darkTextL = Math.min(95, darkBgByBrightness + darkTextOffsets[contrastIndex]);
+  const contrastFactor = 1 + (contrastLevel * 0.1); // 0.5 to 1.5 multiplier
+  
+  const lightTextL = clamp(lightBgL - (baseLightTextOffset * contrastFactor), 5, 90);
+  const darkTextL = clamp(darkBgL + (baseDarkTextOffset * contrastFactor), 15, 98);
   
   // Base Color Lightness Modifiers (how "poppy" the colors are against bg)
-  // Adjusted based on brightness to keep colors balanced
-  const baseLightColorMod = [58, 54, 50, 46, 42][contrastIndex];
-  const baseDarkColorMod = [48, 54, 60, 66, 72][contrastIndex];
+  // Modulate based on brightness and contrast
+  const baseLightColorMod = 46;
+  const baseDarkColorMod = 60;
   
   // Shift color lightness based on brightness compression
-  // At dim levels, colors are darker; at bright levels, colors are lighter
-  const brightnessShift = [-12, -6, 0, 6, 12][brightnessIndex];
+  const brightnessShift = brightnessLevel * 3; // -15 to +15
   
   const lightColorMod = clamp(baseLightColorMod + brightnessShift, 30, 70);
   const darkColorMod = clamp(baseDarkColorMod + brightnessShift, 35, 80);
 
   // Random variance to background saturation if tinted
   const rnd = seededRandom(seedVal + 4);
-  const isTinted = rnd > 0.5 && saturationLevel > 0;
-  const bgSat = isTinted ? Math.floor(seededRandom(seedVal + 5) * (saturationLevel * 3)) : Math.floor(seededRandom(seedVal + 5) * 3);
+  const isTinted = rnd > 0.5 && saturationLevel > -3; // Don't tint if very desaturated
+  const bgSat = isTinted ? Math.floor(seededRandom(seedVal + 5) * ((saturationLevel + 5) * 1.5)) : Math.floor(seededRandom(seedVal + 5) * 3);
 
-  const lightBgL = lightBgByBrightness;
-  const darkBgL = darkBgByBrightness;
-
-  // Surface Logic - relative to bg with brightness adjustment
-  // More contrast between bg and surface at extreme brightness levels
-  const lightSurfOffset = [8, 5, 3, 1, 0][brightnessIndex]; // More offset at dim
-  const darkSurfOffset = [3, 5, 6, 8, 10][brightnessIndex]; // More offset at bright
+  // Surface Logic - relative to bg
+  const lightSurfOffset = 2 + (Math.abs(brightnessLevel - 5) * 0.5); // Slight variance
+  const darkSurfOffset = 4 + (brightnessLevel * 0.5); 
   
-  const lightSurfL = clamp(lightBgL + lightSurfOffset, 0, 100);
-  const darkSurfL = clamp(darkBgL + darkSurfOffset, 0, 100); 
+  const lightSurfL = clamp(lightBgL - lightSurfOffset, 0, 100);
+  // Dark surface usually lighter than bg
+  const darkSurfL = clamp(darkBgL + 5 + (contrastLevel * 0.5), 0, 100); 
 
   // Generate Tokens with brightness applied to ALL colors
   // applyBrightness shifts lightness proportionally based on distance from 50% gray

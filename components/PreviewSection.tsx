@@ -216,34 +216,53 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
     }
   };
   const sClass = `${getShadow(options.shadowStrength)} shadow-black/[${options.shadowOpacity / 100}]`;
-  const sClassHover = `${getShadow(Math.min(5, options.shadowStrength + 2))} shadow-black/[${options.shadowOpacity / 100}]`;
-
+  // Hover only needs to change the size/offset, the color/opacity is inherited from sClass (if present) or we re-apply it if needed.
+  // Actually, standard tailwind shadow classes use the current shadow color variable.
+  // So we just need the new size class.
+  const sClassHover = getShadow(Math.min(5, options.shadowStrength + 2));
+  
   // Gradients
-  const isGradient = options.gradientLevel > 0;
-  const isStrongGradient = options.gradientLevel === 2;
+  // 0: None
+  // 1: Subtle Top-Bottom
+  // 2: Stronger Top-Bottom
+  // 3: Diagonal
+  // 4: Stronger Diagonal
+  // 5: Vivid/Complex
   
-  let primaryBg = `bg-t-primary ${fgOnColor}`;
-  let secondaryBg = `bg-t-secondary ${fgOnColor}`;
-  let accentBg = `bg-t-accent ${fgOnColor}`;
-  let goodBg = `bg-t-good ${fgOnColor}`;
-  let badBg = `bg-t-bad ${fgOnColor}`;
-  let textGradient = `text-t-primary`;
+  const getGradientClass = (level: number, colorName: string, fgColor: string, isLight: boolean) => {
+     if (level === 0) return `bg-t-${colorName} ${fgColor}`;
+     
+     const base = `bg-t-${colorName}`;
+     const mixColor = isLight ? 'black' : 'white';
+     
+     switch(level) {
+       case 1: 
+         return `bg-gradient-to-b from-t-${colorName} to-[color-mix(in_srgb,var(--${colorName})_95%,${mixColor})] ${fgColor}`;
+       case 2:
+         return `bg-gradient-to-b from-t-${colorName} to-[color-mix(in_srgb,var(--${colorName})_85%,${mixColor})] ${fgColor}`;
+       case 3:
+         return `bg-gradient-to-br from-t-${colorName} via-t-${colorName} to-[color-mix(in_srgb,var(--${colorName})_90%,${mixColor})] ${fgColor}`;
+       case 4:
+         return `bg-gradient-to-br from-t-${colorName} via-t-${colorName} to-[color-mix(in_srgb,var(--${colorName})_80%,${mixColor})] ${fgColor}`;
+       case 5:
+         // Vivid: Mix with accent or complementary? Or just stronger contrast
+         return `bg-gradient-to-br from-t-${colorName} via-t-${colorName} to-[color-mix(in_srgb,var(--${colorName})_60%,${mixColor})] ${fgColor}`;
+       default:
+         return `bg-t-${colorName} ${fgColor}`;
+     }
+  };
   
-  if (isGradient) {
-      if (themeName === 'Light') {
-         primaryBg = isStrongGradient 
-            ? `bg-gradient-to-br from-t-primary via-t-primary to-[color-mix(in_srgb,var(--primary)_85%,black)] ${fgOnColor}` 
-            : `bg-gradient-to-b from-t-primary to-[color-mix(in_srgb,var(--primary)_90%,black)] ${fgOnColor}`;
-      } else {
-         primaryBg = isStrongGradient
-            ? `bg-gradient-to-br from-t-primary via-t-primary to-[color-mix(in_srgb,var(--primary)_85%,white)] ${fgOnColor}`
-            : `bg-gradient-to-b from-t-primary to-[color-mix(in_srgb,var(--primary)_90%,white)] ${fgOnColor}`;
-      }
-
-      textGradient = isStrongGradient 
-        ? `text-transparent bg-clip-text bg-gradient-to-r from-t-primary to-[color-mix(in_srgb,var(--primary)_80%,${themeName === 'Light' ? 'black' : 'white'})]`
-        : `text-t-primary`;
-  }
+  const isLight = themeName === 'Light';
+  
+  const primaryBg = getGradientClass(options.gradientLevel, 'primary', fgOnColor, isLight);
+  const secondaryBg = getGradientClass(options.gradientLevel, 'secondary', fgOnColor, isLight);
+  const accentBg = getGradientClass(options.gradientLevel, 'accent', fgOnColor, isLight);
+  const goodBg = getGradientClass(options.gradientLevel, 'good', fgOnColor, isLight);
+  const badBg = getGradientClass(options.gradientLevel, 'bad', fgOnColor, isLight);
+  
+  const textGradient = options.gradientLevel > 1
+    ? `text-transparent bg-clip-text bg-gradient-to-r from-t-primary to-[color-mix(in_srgb,var(--primary)_${100 - (options.gradientLevel * 10)}%,${isLight ? 'black' : 'white'})]`
+    : `text-t-primary`;
 
   return (
     <div className="p-8 space-y-12 min-h-full flex flex-col">

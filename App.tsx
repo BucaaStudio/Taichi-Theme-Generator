@@ -92,9 +92,9 @@ const App: React.FC = () => {
     shadowOpacity: 50,
     gradientLevel: 0,
     radius: 3,
-    brightnessLevel: 3, // Default to Middle (scale 1-5)
-    contrastLevel: 3, // Default to Middle (scale 1-5)
-    saturationLevel: 2 // Default to Middle (scale 0-5)
+    brightnessLevel: 0, 
+    contrastLevel: 0, 
+    saturationLevel: 0 
   });
   
   const [lockedColors, setLockedColors] = useState<LockedColors>({});
@@ -853,10 +853,10 @@ const App: React.FC = () => {
            <div className="space-y-3">
              <div className="flex justify-between items-center">
                <label className="text-xs font-bold uppercase tracking-wider opacity-70">Saturation</label>
-               <span className="text-xs font-mono opacity-50">Lvl {designOptions.saturationLevel}</span>
+               <span className="text-xs font-mono opacity-50">{designOptions.saturationLevel > 0 ? '+' : ''}{designOptions.saturationLevel}</span>
              </div>
              <input 
-               type="range" min="0" max="5" step="1"
+               type="range" min="-5" max="5" step="1"
                value={designOptions.saturationLevel}
                onChange={(e) => updateOption('saturationLevel', parseInt(e.target.value))}
                className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
@@ -871,17 +871,17 @@ const App: React.FC = () => {
            <div className="space-y-3">
              <div className="flex justify-between items-center">
                <label className="text-xs font-bold uppercase tracking-wider opacity-70">Brightness</label>
-               <span className="text-xs font-mono opacity-50">Lvl {designOptions.brightnessLevel}</span>
+               <span className="text-xs font-mono opacity-50">{designOptions.brightnessLevel > 0 ? '+' : ''}{designOptions.brightnessLevel}</span>
              </div>
              <input 
-               type="range" min="1" max="5" step="1"
+               type="range" min="-5" max="5" step="1"
                value={designOptions.brightnessLevel}
                onChange={(e) => updateOption('brightnessLevel', parseInt(e.target.value))}
                className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
                style={{ accentColor: shellTheme.primary }}
              />
              <div className="flex justify-between text-[10px] opacity-40 px-0.5">
-               <span>Dim</span><span>Bright</span>
+               <span>Dark</span><span>Bright</span>
              </div>
            </div>
 
@@ -889,10 +889,10 @@ const App: React.FC = () => {
            <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Contrast</label>
-                <span className="text-xs font-mono opacity-50">Lvl {designOptions.contrastLevel}</span>
+                <span className="text-xs font-mono opacity-50">{designOptions.contrastLevel > 0 ? '+' : ''}{designOptions.contrastLevel}</span>
               </div>
               <input 
-                type="range" min="1" max="5" step="1"
+                type="range" min="-5" max="5" step="1"
                 value={designOptions.contrastLevel}
                 onChange={(e) => updateOption('contrastLevel', parseInt(e.target.value))}
                 className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"

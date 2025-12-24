@@ -46,9 +46,9 @@ export interface DesignOptions {
   shadowOpacity: number; // 0 - 100 (%)
   gradientLevel: number; // 0 - 5
   radius: number;        // 0 - 5
-  brightnessLevel: number; // 1 - 5, compresses colors toward bright(5) or dark(1), 3 is normal
-  contrastLevel: number; // 1 - 5
-  saturationLevel: number; // 0 - 5
+  brightnessLevel: number; // -5 to 5, 0 is normal
+  contrastLevel: number; // -5 to 5, 0 is normal
+  saturationLevel: number; // -5 to 5, 0 is normal
 }
 
 export type LockedColors = Partial<Record<keyof ThemeTokens, boolean>>;

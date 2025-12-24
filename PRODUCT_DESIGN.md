@@ -157,82 +157,57 @@ Output color format for copy/export and on-screen display:
 
 **Location**: Below header, above swatch strip\
 **Toggle**: Click the Options (⚙️) button in header\
-**Layout**: 7-column grid on desktop, 4-column on tablet, 2-column on mobile
+**Layout**: Responsive grid
 
-#### 2.1 Border Width Slider
+#### 2.1 Border Width
 
-- **Range**: 0-5 (None, 1px, 2px, 3px, 4px, 5px) (default 1)
-- **Labels**: "None" ↔ "Thick"
-- **Effect**: Controls border thickness on UI elements in preview
-- **Display**: Shows actual pixel value (e.g., "2px")
+- **Range**: `0` (None) to `5` (Thick)
+- **Effect**: Controls interface border thickness
 
-#### 2.2 Shadow Size Slider
+#### 2.2 Shadow Size
 
-- **Range**: 0-5 (None to XL shadow) (default 3)
-- **Labels**: "Flat" ↔ "Float"
-- **Effect**: Controls shadow size on cards/buttons in preview
-- **Display**: Shows level number (e.g., "Lvl 3")
+- **Range**: `0` (Flat) to `5` (Floating)
+- **Effect**: Controls shadow elevation
 
-#### 2.3 Shadow Opacity Slider
+#### 2.3 Shadow Opacity
 
-- **Range**: 0-100 (%) (default 50%)
-- **Labels**: "0%" ↔ "100%"
-- **Effect**: Controls shadow opacity on cards/buttons in preview
-- **Display**: Shows actual percentage value (e.g., "50%")
+- **Range**: `5` to `95` (%)
+- **Effect**: Controls shadow transparency
 
-#### 2.4 Roundness Slider
+#### 2.4 Roundness
 
-- **Range**: 0-5 (Sharp to Very Round) (default 3)
-- **Labels**: "Square" ↔ "Round"
-- **Effect**: Controls border-radius on UI elements
-- **Mapping**: 0=none, 1=sm, 2=md, 3=xl, 4=2xl, 5=3xl/full
+- **Range**: `0` (Square) to `5` (Round/Pill)
+- **Effect**: Controls border-radius
 
-#### 2.5 Gradients Slider
+#### 2.5 Gradients
 
-- **Range**: 0-5 (none, uptodown, downtoup, lefttoright, righttoleft, diagonal)
-- **Labels**: "None" ↔ "Diagonal"
-- **Effect**: Controls gradient direction on preview elements
-- **Mapping**: 0=solid color, 1=uptodown, 2=downtoup, 3=lefttoright,
-  4=righttoleft, 5=diagonal
+- **Range**: `0` (Solid) to `5` (Complex)
+- **Effect**: Controls background gradient intensity and direction
+- **Levels**:
+  - 0: Solid
+  - 1: Subtle Vertical
+  - 2: Medium Vertical
+  - 3: Subtle Diagonal
+  - 4: Medium Diagonal
+  - 5: Vivid/Complex
 
-#### 2.6 Brightness Slider
+#### 2.6 Saturation
 
-- **Range**: 1-5
-- **Labels**: "Dim" ↔ "Bright"
-- **Default**: 3 (Normal)
-- **Effect**: Shifts entire color range toward dark or bright (all colors in the
-  theme)
-- **Behavior**:
-  - Level 1 (Dim): Shift all colors toward black (darken)
-  - Level 3 (Normal): No change - equal headroom to white and black
-  - Level 5 (Bright): Shift all colors toward white (lighten)
-- **Algorithm**: Uses `applyBrightness(lightness, level)` function:
-  - Colors at 50% gray: minimal/no shift
-  - Colors near 0% or 100%: maximum shift toward 50%
-  - Shift amount proportional to distance from center gray
-- **Triggers Regeneration**: Yes
-- **Applied To**: ALL color tokens in the theme
+- **Range**: `-5` (Mono) to `+5` (Vivid)
+- **Default**: `0` (Normal)
+- **Effect**: Shifts color saturation relative to base hue
 
-#### 2.7 Contrast Slider
+#### 2.7 Brightness
 
-- **Range**: 1-5
-- **Labels**: "Soft" ↔ "Max"
-- **Effect**: Controls difference between darkest and lightest colors in the
-  theme (Dynamic Range)
-- **Behavior**: Higher values create greater contrast between colors
-- **Triggers Regeneration**: Yes
-- **Applied To**: ALL color tokens in the theme
+- **Range**: `-5` (Dark) to `+5` (Bright)
+- **Default**: `0` (Normal)
+- **Effect**: Compresses color dynamic range toward dark or light
 
-#### 2.8 Saturation Slider
+#### 2.8 Contrast
 
-- **Range**: 0-5
-- **Labels**: "Mono" ↔ "Vivid"
-- **Effect**: Controls color saturation across all generated colors
-- **Behavior**:
-  - Level 0: Pure grayscale
-  - Level 1-5: Progressively more saturated colors
-- **Triggers Regeneration**: Yes
-- **Applied To**: ALL color tokens in the theme
+- **Range**: `-5` (Soft) to `+5` (Max)
+- **Default**: `0` (Normal)
+- **Effect**: Controls light/dark text separation from background
 
 ---
 
@@ -409,12 +384,13 @@ The application state is encoded in URL parameters for sharing:
 | ------ | ------------------------------------------ |
 | `mode` | Generation mode (random, monochrome, etc.) |
 | `seed` | Seed color hex value                       |
-| `sat`  | Saturation level (0-4)                     |
-| `con`  | Contrast level (1-5)                       |
-| `bri`  | Brightness level (1-5)                     |
+| `sat`  | Saturation level (-5 to 5)                 |
+| `con`  | Contrast level (-5 to 5)                   |
+| `bri`  | Brightness level (-5 to 5)                 |
 | `bw`   | Border width (0-5)                         |
 | `sh`   | Shadow strength (0-5)                      |
-| `gr`   | Gradient level (0-2)                       |
+| `so`   | Shadow opacity (5-95)                      |
+| `gr`   | Gradient level (0-5)                       |
 | `rd`   | Radius level (0-5)                         |
 
 ---
