@@ -19,14 +19,18 @@ const NavTabsDemo: React.FC<{
   bBottom: string;
   rClassInner: string;
   options: DesignOptions;
-}> = ({ bClass, rClass, sClass, bBottom, rClassInner, options }) => {
+  themeName: string;
+}> = ({ bClass, rClass, sClass, bBottom, rClassInner, options, themeName }) => {
   const [activeTab, setActiveTab] = useState('Dashboard');
   const tabs = ['Dashboard', 'Team', 'Settings'];
   
+  // Use bg for foreground text on colored backgrounds
+  const fgOnColor = themeName === 'Dark' ? 'text-t-bg' : 'text-t-bg';
+  
   return (
     <div className={`${bClass} ${rClass} ${sClass} overflow-hidden bg-t-surface`}>
-      <div className={`${bBottom} p-4 flex items-center justify-between gap-4 bg-t-surface2/30`}>
-        <div className="flex gap-3 sm:gap-4 text-sm font-medium text-t-muted flex-wrap">
+      <div className={`${bBottom} p-4 flex items-center justify-between gap-4 bg-t-surface/80`}>
+        <div className="flex gap-3 sm:gap-4 text-sm font-medium text-t-text/60 flex-wrap">
           {tabs.map(tab => (
             <span
               key={tab}
@@ -41,7 +45,7 @@ const NavTabsDemo: React.FC<{
             </span>
           ))}
         </div>
-        <div className={`h-8 w-8 shrink-0 ${rClass} bg-t-accent flex items-center justify-center text-t-accentFg text-xs shadow-sm hover:scale-110 transition-transform cursor-pointer`}>BS</div>
+        <div className={`h-8 w-8 shrink-0 ${rClass} bg-t-accent flex items-center justify-center ${fgOnColor} text-xs shadow-sm hover:scale-110 transition-transform cursor-pointer`}>BS</div>
       </div>
     </div>
   );
@@ -67,11 +71,12 @@ const VolumeSlider: React.FC<{
         max="100" 
         value={volume}
         onChange={(e) => setVolume(parseInt(e.target.value))}
-        className={`w-full h-2 bg-t-surface2 ${rClass} ${bClass} ${sClass} appearance-none cursor-pointer accent-t-primary transition-colors`} 
+        className={`w-full h-2 bg-t-text/10 ${rClass} ${bClass} ${sClass} appearance-none cursor-pointer accent-t-primary transition-colors`} 
       />
     </div>
   );
 };
+
 const HeroBanner: React.FC<{
   rClass: string;
   sClass: string;
@@ -80,9 +85,12 @@ const HeroBanner: React.FC<{
   themeName: string;
   bClass: string;
 }> = ({ rClass, sClass, sClassHover, badgeBorder, themeName, bClass }) => {
+  // Use bg for text on colored backgrounds
+  const fgOnColor = 'text-t-bg';
+  
   return (
     <section className="space-y-4">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-t-muted">Display Section</h3>
+      <h3 className="text-sm font-bold uppercase tracking-wider text-t-text/60">Display Section</h3>
       <div className={`relative overflow-hidden isolate ${rClass} ${sClass} ${bClass} aspect-[16/9] flex items-center justify-center p-4 sm:p-8 md:p-12 group transition-all duration-300 hover:${sClassHover} hover:-translate-y-1`} style={{ willChange: 'transform' }}>
         {/* Real Background Image */}
         <div className="absolute inset-0 transition-transform duration-[3000ms] ease-in-out group-hover:scale-110 group-hover:rotate-1">
@@ -127,7 +135,7 @@ const HeroBanner: React.FC<{
 
         {/* Content */}
         <div className="relative z-10 text-center space-y-2 sm:space-y-4 max-w-2xl px-2 sm:px-4">
-          <div className={`inline-block px-2 sm:px-3 py-0.5 sm:py-1 bg-t-secondary text-t-secondaryFg text-[8px] sm:text-[10px] font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] shadow-lg rounded-full mb-1 sm:mb-2`}>
+          <div className={`inline-block px-2 sm:px-3 py-0.5 sm:py-1 bg-t-secondary ${fgOnColor} text-[8px] sm:text-[10px] font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] shadow-lg rounded-full mb-1 sm:mb-2`}>
             Premium Experience
           </div>
           <h2 className="text-2xl sm:text-3xl md:text-5xl lg:text-7xl font-black text-t-text leading-[1.05] tracking-tight drop-shadow-xl transition-all duration-500 group-hover:scale-[1.01]">
@@ -147,6 +155,9 @@ const HeroBanner: React.FC<{
 
 const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
   // --- Style Mappers ---
+  
+  // Use bg color for foreground on colored backgrounds
+  const fgOnColor = 'text-t-bg';
   
   // Radius - Equal visual distance between levels
   const getRadius = (level: number) => {
@@ -170,8 +181,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
   // Pill-shaped buttons (fully rounded left/right for rectangular buttons at max roundness)
   const rPill = options.radius === 5 ? 'rounded-full' : rClass;
 
-  // Border
-  // Map slider 0-3 to Tailwind classes
+  // Border - using text color with opacity instead of separate border token
   const getBorderClass = (level: number) => {
     switch(level) {
       case 0: return 'border-0';
@@ -193,13 +203,12 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
     }
   };
 
-  const bClass = options.borderWidth > 0 ? `${getBorderClass(options.borderWidth)} border-t-border` : 'border border-transparent';
-  const bBottom = options.borderWidth > 0 ? `${getBorderBottomClass(options.borderWidth)} border-t-border` : 'border-b border-transparent';
+  // Use text color with opacity for borders
+  const bClass = options.borderWidth > 0 ? `${getBorderClass(options.borderWidth)} border-t-text/20` : 'border border-transparent';
+  const bBottom = options.borderWidth > 0 ? `${getBorderBottomClass(options.borderWidth)} border-t-text/20` : 'border-b border-transparent';
   
   // Specific class just for buttons to optionally show border if slider is active
-  // If border slider is 0, we use transparent border to keep size consistent or just no border
-  const bAction = options.borderWidth > 0 ? `${getBorderClass(options.borderWidth)} border-t-border` : '';
-  const bActionTransparent = options.borderWidth > 0 ? `${getBorderClass(options.borderWidth)} border-transparent` : '';
+  const bAction = options.borderWidth > 0 ? `${getBorderClass(options.borderWidth)} border-t-text/20` : '';
 
   // Badge Border logic: use slider width, but tint with primary color
   const badgeBorder = options.borderWidth > 0 ? `${getBorderClass(options.borderWidth)} border-t-primary/20` : 'border border-transparent';
@@ -220,27 +229,21 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
   const sClassHover = getShadow(Math.min(5, options.shadowStrength + 2)); // hover state
 
   // Gradients
-  // Level 0: Solid
-  // Level 1: Subtle (Linear) - brightness variation
-  // Level 2: Strong (Diagonal) - brightness variation
   const isGradient = options.gradientLevel > 0;
   const isStrongGradient = options.gradientLevel === 2;
   
-  let primaryBg = `bg-t-primary text-t-primaryFg`;
+  let primaryBg = `bg-t-primary ${fgOnColor}`;
   let textGradient = `text-t-primary`;
   
   if (isGradient) {
-      // Use brightness filters for gradients instead of different color tokens
       if (themeName === 'Light') {
-         // Light Mode: Primary with darker variation
          primaryBg = isStrongGradient 
-            ? `bg-gradient-to-br from-t-primary via-t-primary to-[color-mix(in_srgb,var(--primary)_85%,black)] text-t-primaryFg` 
-            : `bg-gradient-to-b from-t-primary to-[color-mix(in_srgb,var(--primary)_90%,black)] text-t-primaryFg`;
+            ? `bg-gradient-to-br from-t-primary via-t-primary to-[color-mix(in_srgb,var(--primary)_85%,black)] ${fgOnColor}` 
+            : `bg-gradient-to-b from-t-primary to-[color-mix(in_srgb,var(--primary)_90%,black)] ${fgOnColor}`;
       } else {
-         // Dark Mode: Primary with lighter variation
          primaryBg = isStrongGradient
-            ? `bg-gradient-to-br from-t-primary via-t-primary to-[color-mix(in_srgb,var(--primary)_85%,white)] text-t-primaryFg`
-            : `bg-gradient-to-b from-t-primary to-[color-mix(in_srgb,var(--primary)_90%,white)] text-t-primaryFg`;
+            ? `bg-gradient-to-br from-t-primary via-t-primary to-[color-mix(in_srgb,var(--primary)_85%,white)] ${fgOnColor}`
+            : `bg-gradient-to-b from-t-primary to-[color-mix(in_srgb,var(--primary)_90%,white)] ${fgOnColor}`;
       }
 
       textGradient = isStrongGradient 
@@ -259,16 +262,16 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
         <h1 className="text-5xl font-extrabold tracking-tight text-t-text">
           Taichi Theme <span className={textGradient}>Generator</span>
         </h1>
-        <p className="text-xl text-t-muted max-w-lg leading-relaxed">
+        <p className="text-xl text-t-text/60 max-w-lg leading-relaxed">
           Create beautiful light and dark theme color schemes instantly. 
-          This palette generator uses semantic design system tokens like <code className={`bg-t-surface2 text-t-primary px-3 py-1 text-base font-medium ${rClassInner}`}>primary</code>, <code className={`bg-t-surface2 text-t-secondary px-3 py-1 text-base font-medium ${rClassInner}`}>secondary</code> and <code className={`bg-t-surface2 text-t-accent px-3 py-1 text-base font-medium ${rClassInner}`}>accent</code> to build harmonious dual themes.
+          This palette generator uses semantic design system tokens like <code className={`bg-t-surface text-t-primary px-3 py-1 text-base font-medium ${rClassInner}`}>primary</code>, <code className={`bg-t-surface text-t-secondary px-3 py-1 text-base font-medium ${rClassInner}`}>secondary</code> and <code className={`bg-t-surface text-t-accent px-3 py-1 text-base font-medium ${rClassInner}`}>accent</code> to build harmonious dual themes.
         </p>
-        <p className="text-sm text-t-muted opacity-75 mt-16">
-          Press <code className={`bg-t-surface2 text-t-accent px-2 py-0.5 font-mono font-bold ${rClassInner}`}>Space</code> to generate a new color theme pair.
+        <p className="text-sm text-t-text/50 mt-16">
+          Press <code className={`bg-t-surface text-t-accent px-2 py-0.5 font-mono font-bold ${rClassInner}`}>Space</code> to generate a new color theme pair.
         </p>
       </section>
 
-      <hr className={options.borderWidth > 0 ? 'border-t-border' : 'border-transparent'} />
+      <hr className={options.borderWidth > 0 ? 'border-t-text/20' : 'border-transparent'} />
 
       <HeroBanner 
         rClass={rClass} 
@@ -281,27 +284,27 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
 
       {/* Buttons & Actions */}
       <section className="space-y-6">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-t-muted">Actions</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-t-text/60">Actions</h3>
         <div className="flex flex-wrap gap-4 items-center">
           
           {/* Primary Button */}
           <button className={`${primaryBg} px-5 py-2.5 ${rPill} font-medium ${sClass} ${bAction} transition-all duration-200 
             hover:${sClassHover} hover:-translate-y-0.5 hover:brightness-110 
-            active:translate-y-0 active:scale-95 active:shadow-none focus:ring-4 focus:ring-t-ring/30`}>
+            active:translate-y-0 active:scale-95 active:shadow-none focus:ring-4 focus:ring-t-primary/30`}>
             Primary Action
           </button>
 
           {/* Secondary Button */}
-          <button className={`bg-t-secondary text-t-secondaryFg px-5 py-2.5 ${rPill} font-medium ${bAction} ${sClass} transition-all duration-200 
+          <button className={`bg-t-secondary ${fgOnColor} px-5 py-2.5 ${rPill} font-medium ${bAction} ${sClass} transition-all duration-200 
             hover:brightness-95 hover:shadow-sm hover:${sClassHover}
-            active:scale-95 active:brightness-90 focus:ring-4 focus:ring-t-ring/30`}>
+            active:scale-95 active:brightness-90 focus:ring-4 focus:ring-t-secondary/30`}>
             Secondary
           </button>
 
           {/* Outline Button */}
           <button className={`${bClass} text-t-text bg-t-surface px-5 py-2.5 ${rPill} font-medium ${sClass} transition-all duration-200 
-            hover:border-t-primary hover:text-t-primary hover:bg-t-surface2 hover:${sClassHover}
-            active:scale-95 active:bg-t-primary/5 focus:ring-4 focus:ring-t-ring/30`}>
+            hover:border-t-primary hover:text-t-primary hover:bg-t-bg hover:${sClassHover}
+            active:scale-95 active:bg-t-primary/5 focus:ring-4 focus:ring-t-primary/30`}>
             Outline
           </button>
 
@@ -313,14 +316,14 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
           </button>
 
           {/* Destructive Button */}
-          <button className={`bg-t-error text-t-errorFg px-5 py-2.5 ${rPill} font-medium ${sClass} ${bAction} transition-all duration-200 
+          <button className={`bg-t-error ${fgOnColor} px-5 py-2.5 ${rPill} font-medium ${sClass} ${bAction} transition-all duration-200 
             hover:shadow-md hover:brightness-110 hover:${sClassHover}
             active:scale-95 active:brightness-90`}>
             Destructive
           </button>
 
           {/* Disabled Button */}
-          <button disabled className={`bg-t-surface2 text-t-muted px-5 py-2.5 ${rPill} font-medium ${bAction} ${sClass} cursor-not-allowed opacity-60`}>
+          <button disabled className={`bg-t-text/10 text-t-text/40 px-5 py-2.5 ${rPill} font-medium ${bAction} ${sClass} cursor-not-allowed`}>
             Disabled
           </button>
         </div>
@@ -331,7 +334,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
             active:scale-90 active:rotate-0`}>
             <Settings size={20} />
           </button>
-          <button className={`p-3 ${rFull} bg-t-surface2 text-t-text ${sClass} ${bAction} transition-all duration-200
+          <button className={`p-3 ${rFull} bg-t-text/10 text-t-text ${sClass} ${bAction} transition-all duration-200
             hover:bg-t-primary/20 hover:text-t-primary hover:${sClassHover}
             active:bg-t-primary/30 active:scale-90`}>
             <Bell size={20} />
@@ -341,21 +344,21 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
 
       {/* Form Elements */}
       <section className="space-y-6">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-t-muted">Input Fields</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-t-text/60">Input Fields</h3>
         <div className="grid gap-6 max-w-xl">
           <div className="space-y-2">
             <label className="text-sm font-medium text-t-text">Email Address</label>
             <div className="relative group">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-t-muted transition-colors group-focus-within:text-t-primary" size={18} />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-t-text/50 transition-colors group-focus-within:text-t-primary" size={18} />
               <input 
                 type="text" 
                 placeholder="you@example.com"
-                className={`w-full bg-t-surface ${bClass} ${rPill} ${sClass} pl-10 pr-4 py-2.5 text-t-text placeholder:text-t-muted transition-all duration-200
+                className={`w-full bg-t-surface ${bClass} ${rPill} ${sClass} pl-10 pr-4 py-2.5 text-t-text placeholder:text-t-text/40 transition-all duration-200
                 hover:border-t-primary/50
                 focus:outline-none focus:border-t-primary focus:ring-2 focus:ring-t-primary/20`}
               />
             </div>
-            <p className="text-xs text-t-muted">We'll never share your email.</p>
+            <p className="text-xs text-t-text/50">We'll never share your email.</p>
           </div>
 
           <div className="flex gap-6">
@@ -394,38 +397,38 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
 
       {/* Cards & Content */}
       <section className="space-y-6">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-t-muted">Surfaces & Cards</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-t-text/60">Surfaces & Cards</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           {/* Card 1 */}
           <div className={`bg-t-surface ${bClass} ${rClass} p-6 ${sClass} transition-all duration-300 relative overflow-hidden group hover:${sClassHover} hover:-translate-y-1 ${options.borderWidth > 0 ? 'hover:border-t-primary/30' : ''}`}>
              <div className={`absolute top-0 left-0 w-full h-1 ${primaryBg} group-hover:h-1.5 transition-all`}></div>
              <div className="flex justify-between items-start mb-4">
-               <div className={`p-2 bg-t-secondary/10 ${rClassInner} text-t-secondary group-hover:bg-t-secondary group-hover:text-t-secondaryFg transition-colors`}>
+               <div className={`p-2 bg-t-secondary/10 ${rClassInner} text-t-secondary group-hover:bg-t-secondary group-hover:${fgOnColor} transition-colors`}>
                  <BarChart2 size={24} />
                </div>
-               <span className={`text-xs font-bold text-t-success bg-t-success/10 px-2 py-1 ${rClassInner} border ${options.borderWidth > 0 ? 'border-transparent' : 'border-transparent'} group-hover:border-t-success/20`}>+24.5%</span>
+               <span className={`text-xs font-bold text-t-success bg-t-success/10 px-2 py-1 ${rClassInner} border border-transparent group-hover:border-t-success/20`}>+24.5%</span>
              </div>
              <h4 className="text-lg font-bold text-t-text mb-1">Weekly Revenue</h4>
              <p className="text-3xl font-mono font-bold text-t-text mb-4">$45,231.89</p>
-             <div className={`h-2 w-full bg-t-surface2 ${rFull} overflow-hidden`}>
+             <div className={`h-2 w-full bg-t-text/10 ${rFull} overflow-hidden`}>
                <div className={`h-full ${primaryBg} w-[70%] group-hover:w-[75%] transition-all duration-1000`}></div>
              </div>
           </div>
 
           {/* Card 2 */}
           <div className={`bg-t-surface ${bClass} ${rClass} p-6 ${sClass} flex flex-col items-center text-center transition-all duration-300 hover:${sClassHover} hover:-translate-y-1`}>
-             <div className={`w-16 h-16 ${rFull} bg-t-surface2 mb-4 flex items-center justify-center text-t-muted transition-transform duration-300 hover:scale-110 hover:bg-t-primary/10 hover:text-t-primary`}>
+             <div className={`w-16 h-16 ${rFull} bg-t-text/10 mb-4 flex items-center justify-center text-t-text/50 transition-transform duration-300 hover:scale-110 hover:bg-t-primary/10 hover:text-t-primary`}>
                 <User size={32} />
              </div>
              <h4 className="text-lg font-bold text-t-text">John Doe</h4>
-             <p className="text-t-muted text-sm mb-4">Product Designer</p>
+             <p className="text-t-text/60 text-sm mb-4">Product Designer</p>
              <div className="flex gap-2">
-               <span className={`px-2 py-1 ${rClassInner} text-xs ${bClass} text-t-secondary bg-t-secondary/10 border-t-secondary/20 hover:bg-t-secondary hover:text-t-secondaryFg transition-colors cursor-default`}>UI/UX</span>
-               <span className={`px-2 py-1 ${rClassInner} text-xs bg-t-accent/10 text-t-accent border ${options.borderWidth > 0 ? 'border-t-accent/20' : 'border-transparent'} hover:bg-t-accent hover:text-t-accentFg transition-colors cursor-default`}>React</span>
+               <span className={`px-2 py-1 ${rClassInner} text-xs ${bClass} text-t-secondary bg-t-secondary/10 hover:bg-t-secondary hover:${fgOnColor} transition-colors cursor-default`}>UI/UX</span>
+               <span className={`px-2 py-1 ${rClassInner} text-xs bg-t-accent/10 text-t-accent border ${options.borderWidth > 0 ? 'border-t-accent/20' : 'border-transparent'} hover:bg-t-accent hover:${fgOnColor} transition-colors cursor-default`}>React</span>
              </div>
              <button className={`mt-4 w-full py-2 ${rClassInner} ${bClass} text-t-primary text-sm font-medium transition-all duration-200
-               hover:bg-t-primary hover:text-t-primaryFg hover:border-transparent
+               hover:bg-t-primary hover:${fgOnColor} hover:border-transparent
                active:scale-95`}>
                View Profile
              </button>
@@ -435,7 +438,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
 
        {/* Alerts */}
       <section className="space-y-4">
-         <h3 className="text-sm font-bold uppercase tracking-wider text-t-muted">Feedback</h3>
+         <h3 className="text-sm font-bold uppercase tracking-wider text-t-text/60">Feedback</h3>
          <div className="flex flex-col gap-3">
             <div className={`flex items-center gap-3 p-4 ${rPill} ${sClass} bg-t-secondary/10 ${bClass} border-t-secondary/20 text-t-text transition-transform hover:scale-[1.01]`}>
                <Info className="text-t-secondary shrink-0" size={20} />
@@ -454,35 +457,35 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
 
        {/* Navigation Example */}
       <section className="space-y-4">
-         <h3 className="text-sm font-bold uppercase tracking-wider text-t-muted">Navigation Structure</h3>
-         <NavTabsDemo bClass={bClass} rClass={rClass} sClass={sClass} bBottom={bBottom} rClassInner={rClassInner} options={options} />
+         <h3 className="text-sm font-bold uppercase tracking-wider text-t-text/60">Navigation Structure</h3>
+         <NavTabsDemo bClass={bClass} rClass={rClass} sClass={sClass} bBottom={bBottom} rClassInner={rClassInner} options={options} themeName={themeName} />
          <div className={`${bClass} ${rClass} ${sClass} bg-t-surface p-6`}>
-           <div className="flex items-center text-xs text-t-muted mb-6">
+           <div className="flex items-center text-xs text-t-text/50 mb-6">
              <span className="hover:text-t-primary cursor-pointer transition-colors">Home</span> <ChevronRight size={12} className="mx-1"/> 
              <span className="hover:text-t-primary cursor-pointer transition-colors">Settings</span> <ChevronRight size={12} className="mx-1"/> 
              <span className="text-t-text font-medium">Profile</span>
            </div>
-           <div className={`h-32 bg-t-surface2 ${rClassInner} animate-pulse`}></div>
+           <div className={`h-32 bg-t-text/5 ${rClassInner} animate-pulse`}></div>
          </div>
       </section>
 
       <div className="flex-1"></div>
 
       {/* Footer */}
-      <footer className={`mt-12 border-t ${options.borderWidth > 0 ? 'border-t-border' : 'border-transparent'} pt-12 pb-4`}>
+      <footer className={`mt-12 border-t ${options.borderWidth > 0 ? 'border-t-text/20' : 'border-transparent'} pt-12 pb-4`}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="space-y-4">
               <div className="font-bold text-t-text flex items-center gap-2">
                 <div className={`w-6 h-6 ${rClassInner} ${primaryBg}`}></div>
                 Brand
               </div>
-              <p className="text-sm text-t-muted leading-relaxed">
+              <p className="text-sm text-t-text/60 leading-relaxed">
                 Building the future of design systems, one token at a time.
               </p>
           </div>
           <div className="space-y-4">
               <div className="font-bold text-t-text text-sm uppercase tracking-wider">Product</div>
-              <ul className="space-y-2 text-sm text-t-muted">
+              <ul className="space-y-2 text-sm text-t-text/60">
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Features</li>
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Integrations</li>
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Pricing</li>
@@ -490,7 +493,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
           </div>
           <div className="space-y-4">
               <div className="font-bold text-t-text text-sm uppercase tracking-wider">Resources</div>
-              <ul className="space-y-2 text-sm text-t-muted">
+              <ul className="space-y-2 text-sm text-t-text/60">
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Documentation</li>
                 <li className="hover:text-t-primary cursor-pointer transition-colors">API Reference</li>
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Community</li>
@@ -498,7 +501,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
           </div>
           <div className="space-y-4">
               <div className="font-bold text-t-text text-sm uppercase tracking-wider">Legal</div>
-              <ul className="space-y-2 text-sm text-t-muted">
+              <ul className="space-y-2 text-sm text-t-text/60">
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Privacy Policy</li>
                 <li className="hover:text-t-primary cursor-pointer transition-colors">Terms of Service</li>
               </ul>
@@ -506,7 +509,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
         </div>
         
         <div className={`${bBottom} mb-4`}></div>
-        <div className={`flex flex-col md:flex-row justify-between items-center text-xs text-t-muted pt-4 gap-4`}>
+        <div className={`flex flex-col md:flex-row justify-between items-center text-xs text-t-text/50 pt-4 gap-4`}>
           <span>
             Taichi Theme Generator © 2025 | Bucaa Studio. All Rights Reserved. v{__APP_VERSION__}
           </span>
