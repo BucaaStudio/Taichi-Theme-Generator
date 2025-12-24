@@ -90,7 +90,7 @@ const App: React.FC = () => {
     shadowStrength: 2,
     gradientLevel: 0,
     radius: 3,
-    brightnessLevel: 2, // Default to Middle (scale 0-4)
+    brightnessLevel: 3, // Default to Middle (scale 1-5)
     contrastLevel: 3, // Default to Middle (scale 1-5)
     saturationLevel: 2 // Default to Middle (scale 0-4)
   });
@@ -827,14 +827,14 @@ const App: React.FC = () => {
                <span className="text-xs font-mono opacity-50">Lvl {designOptions.brightnessLevel}</span>
              </div>
              <input 
-               type="range" min="0" max="4" step="1"
+               type="range" min="1" max="5" step="1"
                value={designOptions.brightnessLevel}
                onChange={(e) => updateOption('brightnessLevel', parseInt(e.target.value))}
                className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
                style={{ accentColor: shellTheme.primary }}
              />
              <div className="flex justify-between text-[10px] opacity-40 px-0.5">
-               <span>Dark</span><span>Light</span>
+               <span>Dim</span><span>Bright</span>
              </div>
            </div>
 

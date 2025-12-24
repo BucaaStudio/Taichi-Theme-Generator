@@ -45,7 +45,7 @@ export interface DesignOptions {
   shadowStrength: number; // 0 - 4
   gradientLevel: number; // 0 - 2
   radius: number;        // 0 - 5
-  brightnessLevel: number; // 0 - 4, controls bg/surface lightness
+  brightnessLevel: number; // 1 - 5, compresses colors toward bright(5) or dark(1), 3 is normal
   contrastLevel: number; // 1 - 5
   saturationLevel: number; // 0 - 4
 }

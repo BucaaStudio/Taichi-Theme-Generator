@@ -386,15 +386,32 @@ export function generateTheme(
   let secondarySat = mode === 'monochrome' ? clamp(baseSat - 30, 0, sMax - 20) : clamp(baseSat - 10, sMin, sMax);
   let accentSat = mode === 'monochrome' ? clamp(baseSat + 10, sMin, sMax) : clamp(baseSat + 10, sMin, sMax);
 
-  // --- Brightness Level Logic ---
-  // 5 Levels (0-4) controlling bg/surface lightness with more dramatic range
-  // Level 0: Darkest  | Light BG: 75  | Dark BG: 5
-  // Level 1: Dark     | Light BG: 85  | Dark BG: 10
-  // Level 2: Middle   | Light BG: 92  | Dark BG: 15
-  // Level 3: Bright   | Light BG: 97  | Dark BG: 22
-  // Level 4: Brightest| Light BG: 100 | Dark BG: 30
-  const lightBgByBrightness = [75, 85, 92, 97, 100][brightnessLevel];
-  const darkBgByBrightness = [5, 10, 15, 22, 30][brightnessLevel];
+  // --- Brightness Level Logic (1-5 scale) ---
+  // Brightness compresses the entire color range toward light or dark
+  // Level 1 (Dim): Compresses toward dark - lightest colors become ~50% gray
+  // Level 3 (Normal): Equal headroom - equal distance to white and black
+  // Level 5 (Bright): Compresses toward bright - darkest colors become ~50% gray
+  //
+  // The effect works by defining anchor points:
+  // - Base light mode bg: where the light theme bg lands
+  // - Base dark mode bg: where the dark theme bg lands
+  // 
+  // At level 3 (normal):
+  //   Light bg ~95%, Dark bg ~10% (equal ~5% headroom on each side)
+  //
+  // At level 1 (dim/compressed to dark):
+  //   Light bg ~50% (compressed down), Dark bg ~5%
+  //
+  // At level 5 (bright/compressed to bright):
+  //   Light bg ~100%, Dark bg ~50% (compressed up)
+  
+  const brightnessIndex = brightnessLevel - 1; // Convert 1-5 to 0-4 index
+  
+  // Non-linear compression curves
+  // Light mode background: compressed toward 50% at level 1, toward 100% at level 5
+  const lightBgByBrightness = [50, 70, 95, 98, 100][brightnessIndex];
+  // Dark mode background: stays dark at level 1, compressed toward 50% at level 5
+  const darkBgByBrightness = [5, 8, 10, 25, 50][brightnessIndex];
 
   // --- Dynamic Range (Contrast) Logic ---
   // 5 Levels (1-5) with more dramatic differences for better visual distinction
@@ -403,17 +420,26 @@ export function generateTheme(
   const contrastIndex = contrastLevel - 1;
   
   // Text lightness offsets from bg based on contrast
-  const lightTextOffsets = [45, 55, 65, 75, 85]; // How dark text is relative to white (higher = darker)
-  const darkTextOffsets = [45, 55, 65, 80, 90];  // How light text is relative to black (higher = lighter)
+  // These are adjusted based on brightness to maintain readability
+  const lightTextOffsets = [40, 50, 60, 70, 80]; // How dark text is relative to bg
+  const darkTextOffsets = [40, 50, 60, 75, 85];  // How light text is relative to bg
   
   // Apply contrast to text: text lightness = calculated from bg
-  const lightTextL = Math.max(0, lightBgByBrightness - lightTextOffsets[contrastIndex]);
-  const darkTextL = Math.min(100, darkBgByBrightness + darkTextOffsets[contrastIndex]);
+  // Clamp to ensure text stays readable even at brightness extremes
+  const lightTextL = Math.max(5, lightBgByBrightness - lightTextOffsets[contrastIndex]);
+  const darkTextL = Math.min(95, darkBgByBrightness + darkTextOffsets[contrastIndex]);
   
   // Base Color Lightness Modifiers (how "poppy" the colors are against bg)
-  // Lower contrast = lighter colors in light mode to blend more, darker in dark mode
-  const lightColorModLevels = [58, 54, 50, 46, 42]; 
-  const darkColorModLevels  = [48, 54, 60, 66, 72];
+  // Adjusted based on brightness to keep colors balanced
+  const baseLightColorMod = [58, 54, 50, 46, 42][contrastIndex];
+  const baseDarkColorMod = [48, 54, 60, 66, 72][contrastIndex];
+  
+  // Shift color lightness based on brightness compression
+  // At dim levels, colors are darker; at bright levels, colors are lighter
+  const brightnessShift = [-12, -6, 0, 6, 12][brightnessIndex];
+  
+  const lightColorMod = clamp(baseLightColorMod + brightnessShift, 30, 70);
+  const darkColorMod = clamp(baseDarkColorMod + brightnessShift, 35, 80);
 
   // Random variance to background saturation if tinted
   const rnd = seededRandom(seedVal + 4);
@@ -422,17 +448,14 @@ export function generateTheme(
 
   const lightBgL = lightBgByBrightness;
   const darkBgL = darkBgByBrightness;
-  
-  const lightColorMod = lightColorModLevels[contrastIndex];
-  const darkColorMod = darkColorModLevels[contrastIndex];
 
-  // Surface Logic - more variation based on brightness
-  // Light mode: Surface differs from BG more at extremes
-  const lightSurfOffset = [8, 6, 4, 2, 0][brightnessLevel]; // Darker surface at darker brightness
-  const darkSurfOffset = [3, 5, 8, 10, 12][brightnessLevel]; // Lighter surface at brighter brightness
+  // Surface Logic - relative to bg with brightness adjustment
+  // More contrast between bg and surface at extreme brightness levels
+  const lightSurfOffset = [8, 5, 3, 1, 0][brightnessIndex]; // More offset at dim
+  const darkSurfOffset = [3, 5, 6, 8, 10][brightnessIndex]; // More offset at bright
   
-  const lightSurfL = Math.min(100, lightBgL + lightSurfOffset);
-  const darkSurfL = Math.min(100, darkBgL + darkSurfOffset); 
+  const lightSurfL = clamp(lightBgL + lightSurfOffset, 0, 100);
+  const darkSurfL = clamp(darkBgL + darkSurfOffset, 0, 100); 
 
   // Generate Tokens
   const light: ThemeTokens = {
