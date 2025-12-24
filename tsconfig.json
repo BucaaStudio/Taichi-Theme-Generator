@@ -13,18 +13,17 @@
     "types": [
       "node"
     ],
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
     "paths": {
       "@/*": [
         "./*"
       ]
     },
+    "allowImportingTsExtensions": true,
     "noEmit": true
   }
 }
