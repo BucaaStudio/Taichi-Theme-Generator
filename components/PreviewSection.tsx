@@ -124,16 +124,37 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options, onUpdateOp
   return (
     <div className="p-6 md:p-10 space-y-8 bg-t-bg min-h-full">
       
-      {/* Main Title */}
-      <header className="text-center space-y-4 pb-6 border-b border-t-border">
-        <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-t-text tracking-tight">
-          Taichi Theme Generator
-        </h1>
-        <p className="text-lg text-t-textMuted max-w-2xl mx-auto">
-          Generate balanced color palettes using the <strong className="text-t-primary">OKLCH color space</strong>. 
-          This is the <span className={`font-bold ${themeName === 'Dark' ? 'text-t-accent' : 'text-t-secondary'}`}>{themeName}</span> theme preview.
-        </p>
-      </header>
+      {/* Hero Section with Background Image */}
+      <section 
+        className={`relative overflow-hidden ${rClass} ${sClass} p-8 md:p-12`}
+        style={{
+          backgroundImage: `linear-gradient(to right, var(--bg) 0%, transparent 50%, var(--bg) 100%), url('/hero-bg.jpg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-t-primary/20 via-transparent to-t-secondary/20 pointer-events-none" />
+        
+        {/* Content */}
+        <div className="relative z-10 space-y-4">
+          <h1 className="text-4xl md:text-5xl lg:text-7xl font-black tracking-tight text-left">
+            <span className="text-t-primary">Taichi</span>{' '}
+            <span className="text-t-text">Theme Generator</span>
+          </h1>
+          <p className="text-lg text-t-textMuted max-w-xl text-left">
+            Generate balanced color palettes using the <strong className="text-t-primary">OKLCH color space</strong>. 
+            {themeName === 'Dark' ? (
+              <span className="text-t-accent font-semibold"> Dark mode preview.</span>
+            ) : (
+              <span className="text-t-secondary font-semibold"> Light mode preview.</span>
+            )}
+          </p>
+        </div>
+        
+        {/* Glass Edge */}
+        <div className={`absolute inset-0 ${rClass} border border-white/10 pointer-events-none`} />
+      </section>
 
       {/* Step 1: Generate */}
       <section className="space-y-4">

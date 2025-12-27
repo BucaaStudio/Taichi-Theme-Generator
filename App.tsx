@@ -148,6 +148,11 @@ const App: React.FC = () => {
         next.contrastLevel = Math.floor(Math.random() * 11) - 5;
       }
       
+      // Dark First: toggle randomly
+      if (!lockedOptions.darkFirst) {
+        next.darkFirst = Math.random() > 0.5;
+      }
+      
       return next;
     });
   }, [lockedOptions]);
@@ -819,16 +824,18 @@ const App: React.FC = () => {
 
       {showOptions && (
         <div 
-          className="border-b px-4 py-4 shrink-0 shadow-inner z-40 relative grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-x-4 gap-y-4 transition-colors duration-500"
+          className="border-b px-4 py-4 shrink-0 shadow-inner z-40 relative space-y-4 transition-colors duration-500"
           style={{ backgroundColor: shellTheme.bg, borderColor: shellTheme.border }}
         >
+          {/* Row 1: Sliders */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-x-4 gap-y-4">
            {/* Border Width */}
-           <div className="space-y-2">
+           <div className="space-y-2 group/opt">
              <div className="flex justify-between items-center">
                <div className="flex items-center gap-1.5">
                  <button 
                    onClick={() => toggleOptionLock('borderWidth')}
-                   className={`p-0.5 rounded transition-colors ${lockedOptions.borderWidth ? 'text-t-primary' : 'opacity-30 hover:opacity-60'}`}
+                   className={`p-0.5 rounded transition-all ${lockedOptions.borderWidth ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                    title={lockedOptions.borderWidth ? 'Unlock' : 'Lock'}
                  >
                    {lockedOptions.borderWidth ? <Lock size={10} /> : <Unlock size={10} />}
@@ -850,17 +857,17 @@ const App: React.FC = () => {
            </div>
 
            {/* Shadow Strength (Size) */}
-           <div className="space-y-2">
+           <div className="space-y-2 group/opt">
              <div className="flex justify-between items-center">
                <div className="flex items-center gap-1.5">
                  <button 
                    onClick={() => toggleOptionLock('shadowStrength')}
-                   className={`p-0.5 rounded transition-colors ${lockedOptions.shadowStrength ? 'text-t-primary' : 'opacity-30 hover:opacity-60'}`}
+                   className={`p-0.5 rounded transition-all ${lockedOptions.shadowStrength ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                    title={lockedOptions.shadowStrength ? 'Unlock' : 'Lock'}
                  >
                    {lockedOptions.shadowStrength ? <Lock size={10} /> : <Unlock size={10} />}
                  </button>
-                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Shadow</label>
+                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Shd Size</label>
                </div>
                <span className="text-xs font-mono opacity-50">Lvl {designOptions.shadowStrength}</span>
              </div>
@@ -872,17 +879,17 @@ const App: React.FC = () => {
                style={{ accentColor: shellTheme.primary }}
              />
              <div className="flex justify-between text-[10px] opacity-40 px-0.5">
-               <span>Flat</span><span>Float</span>
+               <span>None</span><span>Deep</span>
              </div>
            </div>
 
            {/* Shadow Opacity */}
-           <div className="space-y-2">
+           <div className="space-y-2 group/opt">
              <div className="flex justify-between items-center">
                <div className="flex items-center gap-1.5">
                  <button 
                    onClick={() => toggleOptionLock('shadowOpacity')}
-                   className={`p-0.5 rounded transition-colors ${lockedOptions.shadowOpacity ? 'text-t-primary' : 'opacity-30 hover:opacity-60'}`}
+                   className={`p-0.5 rounded transition-all ${lockedOptions.shadowOpacity ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                    title={lockedOptions.shadowOpacity ? 'Unlock' : 'Lock'}
                  >
                    {lockedOptions.shadowOpacity ? <Lock size={10} /> : <Unlock size={10} />}
@@ -904,12 +911,12 @@ const App: React.FC = () => {
            </div>
 
            {/* Corner Radius */}
-           <div className="space-y-2">
+           <div className="space-y-2 group/opt">
              <div className="flex justify-between items-center">
                <div className="flex items-center gap-1.5">
                  <button 
                    onClick={() => toggleOptionLock('radius')}
-                   className={`p-0.5 rounded transition-colors ${lockedOptions.radius ? 'text-t-primary' : 'opacity-30 hover:opacity-60'}`}
+                   className={`p-0.5 rounded transition-all ${lockedOptions.radius ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                    title={lockedOptions.radius ? 'Unlock' : 'Lock'}
                  >
                    {lockedOptions.radius ? <Lock size={10} /> : <Unlock size={10} />}
@@ -931,12 +938,12 @@ const App: React.FC = () => {
            </div>
 
            {/* Saturation Level */}
-           <div className="space-y-2">
+           <div className="space-y-2 group/opt">
              <div className="flex justify-between items-center">
                <div className="flex items-center gap-1.5">
                  <button 
                    onClick={() => toggleOptionLock('saturationLevel')}
-                   className={`p-0.5 rounded transition-colors ${lockedOptions.saturationLevel ? 'text-t-primary' : 'opacity-30 hover:opacity-60'}`}
+                   className={`p-0.5 rounded transition-all ${lockedOptions.saturationLevel ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                    title={lockedOptions.saturationLevel ? 'Unlock' : 'Lock'}
                  >
                    {lockedOptions.saturationLevel ? <Lock size={10} /> : <Unlock size={10} />}
@@ -953,17 +960,17 @@ const App: React.FC = () => {
                style={{ accentColor: shellTheme.primary }}
              />
              <div className="flex justify-between text-[10px] opacity-40 px-0.5">
-               <span>Mono</span><span>Vivid</span>
+               <span>Muted</span><span>Vivid</span>
              </div>
            </div>
 
            {/* Brightness Level */}
-           <div className="space-y-2">
+           <div className="space-y-2 group/opt">
              <div className="flex justify-between items-center">
                <div className="flex items-center gap-1.5">
                  <button 
                    onClick={() => toggleOptionLock('brightnessLevel')}
-                   className={`p-0.5 rounded transition-colors ${lockedOptions.brightnessLevel ? 'text-t-primary' : 'opacity-30 hover:opacity-60'}`}
+                   className={`p-0.5 rounded transition-all ${lockedOptions.brightnessLevel ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                    title={lockedOptions.brightnessLevel ? 'Unlock' : 'Lock'}
                  >
                    {lockedOptions.brightnessLevel ? <Lock size={10} /> : <Unlock size={10} />}
@@ -985,12 +992,12 @@ const App: React.FC = () => {
            </div>
 
            {/* Contrast Level */}
-           <div className="space-y-2">
+           <div className="space-y-2 group/opt">
              <div className="flex justify-between items-center">
                <div className="flex items-center gap-1.5">
                  <button 
                    onClick={() => toggleOptionLock('contrastLevel')}
-                   className={`p-0.5 rounded transition-colors ${lockedOptions.contrastLevel ? 'text-t-primary' : 'opacity-30 hover:opacity-60'}`}
+                   className={`p-0.5 rounded transition-all ${lockedOptions.contrastLevel ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                    title={lockedOptions.contrastLevel ? 'Unlock' : 'Lock'}
                  >
                    {lockedOptions.contrastLevel ? <Lock size={10} /> : <Unlock size={10} />}
@@ -1010,10 +1017,20 @@ const App: React.FC = () => {
                <span>Soft</span><span>Max</span>
              </div>
            </div>
+          </div>
 
+          {/* Row 2: Toggles */}
+          <div className="flex flex-wrap gap-6 pt-2 border-t border-t-border/30">
            {/* Dark First Toggle */}
-           <div className="space-y-2 flex flex-col justify-center">
-             <label className="flex items-center gap-2 cursor-pointer group">
+           <div className="flex items-center gap-2 group/opt">
+             <button 
+               onClick={() => toggleOptionLock('darkFirst')}
+               className={`p-0.5 rounded transition-all ${lockedOptions.darkFirst ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
+               title={lockedOptions.darkFirst ? 'Unlock' : 'Lock'}
+             >
+               {lockedOptions.darkFirst ? <Lock size={10} /> : <Unlock size={10} />}
+             </button>
+             <label className="flex items-center gap-2 cursor-pointer">
                <input 
                  type="checkbox" 
                  checked={designOptions.darkFirst}
@@ -1021,16 +1038,22 @@ const App: React.FC = () => {
                  className="w-4 h-4 rounded cursor-pointer"
                  style={{ accentColor: shellTheme.primary }}
                />
-               <span className="text-xs font-bold uppercase tracking-wider opacity-70 group-hover:opacity-100 transition-opacity">
+               <span className="text-xs font-bold uppercase tracking-wider opacity-70">
                  Dark First
                </span>
              </label>
-             <p className="text-[10px] opacity-40">Generate dark theme first</p>
            </div>
 
            {/* Gradients Toggle */}
-           <div className="space-y-2 flex flex-col justify-center">
-             <label className="flex items-center gap-2 cursor-pointer group">
+           <div className="flex items-center gap-2 group/opt">
+             <button 
+               onClick={() => toggleOptionLock('gradients')}
+               className={`p-0.5 rounded transition-all ${lockedOptions.gradients ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
+               title={lockedOptions.gradients ? 'Unlock' : 'Lock'}
+             >
+               {lockedOptions.gradients ? <Lock size={10} /> : <Unlock size={10} />}
+             </button>
+             <label className="flex items-center gap-2 cursor-pointer">
                <input 
                  type="checkbox" 
                  checked={designOptions.gradients}
@@ -1038,12 +1061,12 @@ const App: React.FC = () => {
                  className="w-4 h-4 rounded cursor-pointer"
                  style={{ accentColor: shellTheme.primary }}
                />
-               <span className="text-xs font-bold uppercase tracking-wider opacity-70 group-hover:opacity-100 transition-opacity">
+               <span className="text-xs font-bold uppercase tracking-wider opacity-70">
                  Gradients
                </span>
              </label>
-             <p className="text-[10px] opacity-40">Apply to colored elements</p>
            </div>
+          </div>
         </div>
       )}
 
