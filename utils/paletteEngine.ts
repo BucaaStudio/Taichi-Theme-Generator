@@ -118,20 +118,39 @@ const NEUTRAL_TARGETS = {
 function buildNeutralFoundation(
   baseHue: number,
   warmth: number,
-  contrastLevel: number
+  contrastLevel: number,
+  brightnessLevel: number = 0,
+  saturationLevel: number = 0
 ): NeutralFoundation {
   const targets = NEUTRAL_TARGETS.light;
   
-  // Adjust based on contrast level (-5 to 5)
-  const contrastMod = contrastLevel * 0.01;
+  // Contrast level adjusts the spread between light and dark values
+  // (-5 to 5): negative = lower contrast, positive = higher contrast
+  const contrastMod = contrastLevel * 0.015;
+  
+  // Brightness level shifts all lightness values
+  // (-5 to 5): negative = darker, positive = lighter
+  const brightnessMod = brightnessLevel * 0.02;
+  
+  // Saturation level affects the chroma/tint of neutral colors
+  // (-5 to 5): negative = more neutral, positive = more tinted
+  const chromaMod = Math.max(0, saturationLevel * 0.003);
+  
+  // Apply brightness to lightness targets
+  const bgL = Math.max(0.85, Math.min(0.99, targets.bg + brightnessMod + contrastMod));
+  const cardL = Math.max(0.80, Math.min(0.96, targets.card + brightnessMod * 0.8 + contrastMod * 0.5));
+  const card2L = Math.max(0.75, Math.min(0.93, targets.card2 + brightnessMod * 0.6 + contrastMod * 0.3));
+  const textL = Math.max(0.05, Math.min(0.35, targets.text - brightnessMod * 0.3 - contrastMod));
+  const textMutedL = Math.max(0.25, Math.min(0.55, targets.textMuted - brightnessMod * 0.2 - contrastMod * 0.5));
+  const borderL = Math.max(0.70, Math.min(0.88, targets.border + brightnessMod * 0.3));
   
   return {
-    bg: createNeutral(targets.bg + contrastMod, baseHue, warmth),
-    card: createNeutral(targets.card + contrastMod * 0.5, baseHue, warmth),
-    card2: createNeutral(targets.card2 + contrastMod * 0.3, baseHue, warmth),
-    text: createNeutral(targets.text - contrastMod, baseHue, warmth * 0.3),
-    textMuted: createNeutral(targets.textMuted - contrastMod * 0.5, baseHue, warmth * 0.2),
-    border: createNeutral(targets.border, baseHue, warmth * 0.5),
+    bg: clampToSRGBGamut({ L: bgL, C: chromaMod, H: warmth > 0 ? 60 : 240 }),
+    card: clampToSRGBGamut({ L: cardL, C: chromaMod * 0.8, H: warmth > 0 ? 60 : 240 }),
+    card2: clampToSRGBGamut({ L: card2L, C: chromaMod * 0.6, H: warmth > 0 ? 60 : 240 }),
+    text: clampToSRGBGamut({ L: textL, C: chromaMod * 0.2, H: baseHue }),
+    textMuted: clampToSRGBGamut({ L: textMutedL, C: chromaMod * 0.15, H: baseHue }),
+    border: clampToSRGBGamut({ L: borderL, C: chromaMod * 0.4, H: warmth > 0 ? 60 : 240 }),
   };
 }
 
@@ -207,40 +226,63 @@ function constructBrandColors(
   bg: OklchColor,
   rng: SeededRandom,
   saturationLevel: number,
-  brightnessLevel: number
+  brightnessLevel: number,
+  contrastLevel: number
 ): BrandColors {
-  const baseL = 0.55 + brightnessLevel * 0.02;
-  const baseC = 0.15 + saturationLevel * 0.015;
+  // Brightness affects base lightness of all brand colors
+  // Range: -5 to 5 maps to lightness adjustments
+  const baseL = 0.52 + brightnessLevel * 0.025;
+  
+  // Saturation level strongly affects chroma
+  // Range: -5 (grayscale) to 5 (vivid)
+  // Map from -5..5 to 0.02..0.28 chroma range
+  const satNormalized = (saturationLevel + 5) / 10; // 0 to 1
+  const baseC = 0.02 + satNormalized * 0.24;
+  
+  // Contrast affects the lightness difference between colors
+  const contrastMod = contrastLevel * 0.02;
   
   // Generate candidates for primary
   const primaryCandidates = generateChromaSamples(hues[0], baseL, rng);
   const primary = selectBestCandidate(primaryCandidates, bg, []);
   
-  // Adjust primary chroma based on saturation level
+  // Apply saturation and brightness to primary
   const adjustedPrimary = clampToSRGBGamut({
-    ...primary,
-    C: Math.max(0.05, Math.min(0.25, baseC + (saturationLevel * 0.01))),
+    L: Math.max(0.35, Math.min(0.70, baseL - contrastMod)),
+    C: Math.max(0.03, baseC),
+    H: primary.H,
   });
   
   // Generate scale for primary
   const primaryScale = generateScale(adjustedPrimary);
   
-  // Secondary from second hue
-  const secondaryCandidates = generateChromaSamples(hues[1], baseL - 0.05, rng);
+  // Secondary - slightly less saturated, different lightness
+  const secondaryL = Math.max(0.40, Math.min(0.75, baseL + 0.08));
+  const secondaryCandidates = generateChromaSamples(hues[1], secondaryL, rng);
   const secondary = selectBestCandidate(secondaryCandidates, bg, [adjustedPrimary]);
   
-  // Accent from third hue - ensure separation from primary
-  const accentCandidates = generateChromaSamples(hues[2], baseL + 0.05, rng);
-  const accent = selectBestCandidate(accentCandidates, bg, [adjustedPrimary, secondary]);
+  const adjustedSecondary = clampToSRGBGamut({
+    L: secondaryL,
+    C: Math.max(0.02, baseC * 0.75),
+    H: secondary.H,
+  });
+  
+  // Accent - slightly more saturated, brighter
+  const accentL = Math.max(0.45, Math.min(0.72, baseL + 0.05));
+  const accentCandidates = generateChromaSamples(hues[2], accentL, rng);
+  const accent = selectBestCandidate(accentCandidates, bg, [adjustedPrimary, adjustedSecondary]);
+  
+  const adjustedAccent = clampToSRGBGamut({
+    L: accentL,
+    C: Math.max(0.03, baseC * 1.1),
+    H: accent.H,
+  });
   
   return {
     primary: adjustedPrimary,
     primaryScale,
-    secondary: clampToSRGBGamut({
-      ...secondary,
-      C: secondary.C * 0.8,
-    }),
-    accent: clampToSRGBGamut(accent),
+    secondary: adjustedSecondary,
+    accent: adjustedAccent,
   };
 }
 
@@ -259,7 +301,8 @@ function constructStatusColors(
   hues: number[],
   bg: OklchColor,
   rng: SeededRandom,
-  saturationLevel: number
+  saturationLevel: number,
+  brightnessLevel: number
 ): StatusColors {
   // Good - prefer green-ish
   let goodHue = hues[3];
@@ -275,12 +318,16 @@ function constructStatusColors(
     [goodHue, badHue] = [badHue, goodHue];
   }
   
-  const baseSat = 0.14 + saturationLevel * 0.01;
-  const baseL = 0.55;
+  // Saturation affects chroma of status colors
+  const satNormalized = (saturationLevel + 5) / 10; // 0 to 1
+  const baseC = 0.08 + satNormalized * 0.16;
   
-  const good = clampToSRGBGamut({ L: baseL, C: baseSat, H: goodHue });
-  const bad = clampToSRGBGamut({ L: baseL, C: baseSat, H: badHue });
-  const warn = clampToSRGBGamut({ L: baseL + 0.1, C: baseSat, H: 60 }); // Yellow-ish
+  // Brightness affects lightness
+  const baseL = 0.52 + brightnessLevel * 0.025;
+  
+  const good = clampToSRGBGamut({ L: baseL, C: baseC, H: goodHue });
+  const bad = clampToSRGBGamut({ L: baseL, C: baseC, H: badHue });
+  const warn = clampToSRGBGamut({ L: baseL + 0.12, C: baseC * 0.9, H: 60 }); // Yellow-ish
   
   return {
     good,
@@ -451,15 +498,15 @@ export function generatePalette(
     }
   }
   
-  // Step 1: Build neutral foundation (light mode)
+  // Step 1: Build neutral foundation (light mode) - applies all three levels
   const warmth = rng.nextFloat(-0.5, 0.5);
-  const neutrals = buildNeutralFoundation(baseHue, warmth, contrastLevel);
+  const neutrals = buildNeutralFoundation(baseHue, warmth, contrastLevel, brightnessLevel, saturationLevel);
   
-  // Step 2: Construct brand colors
-  const brand = constructBrandColors(hues, neutrals.bg, rng, saturationLevel, brightnessLevel);
+  // Step 2: Construct brand colors - applies saturation, brightness, contrast
+  const brand = constructBrandColors(hues, neutrals.bg, rng, saturationLevel, brightnessLevel, contrastLevel);
   
-  // Step 3: Construct status colors
-  const status = constructStatusColors(hues, neutrals.bg, rng, saturationLevel);
+  // Step 3: Construct status colors - applies saturation, brightness
+  const status = constructStatusColors(hues, neutrals.bg, rng, saturationLevel, brightnessLevel);
   
   // Step 4: Assemble light theme
   const light: ThemeTokens = {

@@ -417,10 +417,10 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options }) => {
           {themeName} Theme Preview
         </div>
         <h1 className="text-5xl font-extrabold tracking-tight text-t-text">
-          OKLCH <span className={textGradient}>Palette Engine</span>
+          Taichi <span className={textGradient}>Theme Generator</span>
         </h1>
         <p className="text-xl text-t-textMuted max-w-2xl leading-relaxed">
-          This generator uses the <strong className="text-t-primary">OKLCH color space</strong> — a perceptually uniform model where equal numeric changes produce equal visual changes. Unlike RGB or HSL, OKLCH ensures your palettes are mathematically balanced.
+          Generate beautiful, balanced color palettes using the <strong className="text-t-primary">OKLCH color space</strong> — a perceptually uniform model where equal numeric changes produce equal visual changes. Adjust saturation, brightness, and contrast to fine-tune your entire theme.
         </p>
       </section>
 
