@@ -1,4 +1,5 @@
 import { ThemeTokens, GenerationMode, ColorFormat } from '../types';
+import { generateTheme as paletteEngineGenerateTheme } from './paletteEngine';
 
 // --- Basic Math Helpers ---
 
@@ -224,186 +225,15 @@ export function generateTheme(
   brightnessLevel: number = 0,
   overridePalette?: string[]
 ): { light: ThemeTokens, dark: ThemeTokens, seed: string } {
-  let hues: number[] = [];
-  let sats: number[] = [];
-  let baseHue: number = 0;
-  let baseSat = 70;
-  let seedVal = 0;
-
-  if (overridePalette && overridePalette.length === 5) {
-    // Find first valid color to use as seed
-    const firstValidColor = overridePalette.find(p => p && p !== '') || '#3b82f6';
-    seedVal = getSeedValue(firstValidColor);
-    
-    // Generate fallback connection logic if some are missing
-    // We base fallbacks on the first valid color's harmony
-    const baseHsl = hexToHsl(firstValidColor);
-    
-    // Use the current mode (or analogous if random) to frame the missing colors
-    const fallbackMode = mode === 'random' ? 'analogous' : mode;
-    const fallbackHues = getHarmonyHues(baseHsl.h, fallbackMode);
-    
-    overridePalette.forEach((hex, i) => {
-      if (hex && hex !== '') {
-        const hsl = hexToHsl(hex);
-        hues.push(hsl.h);
-        sats.push(hsl.s);
-      } else {
-        // Use generated harmony hue and standard saturation
-        hues.push(fallbackHues[i]);
-        sats.push(70); // Default saturation for filled slots
-      }
-    });
-    baseHue = hues[0];
-    baseSat = sats[0];
-  } else {
-    if (seedColor) {
-      seedVal = getSeedValue(seedColor);
-      const hsl = hexToHsl(seedColor);
-      baseHue = hsl.h;
-      baseSat = hsl.s;
-    } else {
-      baseHue = randomHue();
-      const tempSeed = hslToHex(baseHue, 50, 50);
-      seedVal = getSeedValue(tempSeed);
-      const satRandom = seededRandom(seedVal + 1);
-      if (mode === 'random') {
-          const satNorm = saturationLevel + 5; 
-          const randVariation = Math.floor(satRandom * 20); 
-          if (saturationLevel === -5) { baseSat = 0; }
-          else { baseSat = (satNorm * 9) + randVariation; }
-      }
-    }
-    if (mode === 'random') {
-      const harmonyModes: GenerationMode[] = ['analogous', 'complementary', 'split-complementary', 'triadic', 'tetradic', 'compound', 'triadic-split'];
-      const randomHarmonyIndex = Math.floor(seededRandom(seedVal + 10) * harmonyModes.length);
-      const selectedHarmony = harmonyModes[randomHarmonyIndex];
-      hues = getHarmonyHues(baseHue, selectedHarmony);
-    } else {
-      hues = getHarmonyHues(baseHue, mode);
-    }
-  }
-
-  let primaryHue = hues[0];
-  let secondaryHue = hues[1];
-  let accentHue = hues[2];
-  let goodHue = hues[3];
-  let badHue = hues[4];
-
-  if (!overridePalette) {
-    const distanceToHue = (h: number, t: number) => Math.min(Math.abs(h - t), 360 - Math.abs(h - t));
-    const goodDistToGreen = distanceToHue(goodHue, 120);
-    const goodDistToRed = distanceToHue(goodHue, 0);
-    const badDistToGreen = distanceToHue(badHue, 120);
-    const badDistToRed = distanceToHue(badHue, 0);
-    if (badDistToGreen < goodDistToGreen || goodDistToRed < badDistToRed) {
-      [goodHue, badHue] = [badHue, goodHue];
-    }
-  }
-
-  const satLevelIndex = saturationLevel + 5; 
-  const getMinSat = (lvl: number) => lvl <= 0 ? 0 : Math.min(90, lvl * 9); 
-  const getMaxSat = (lvl: number) => lvl <= 0 ? 0 : Math.min(100, (lvl * 9) + 20);
-  const sMin = getMinSat(satLevelIndex);
-  const sMax = getMaxSat(satLevelIndex);
-
-  let primarySat = overridePalette ? sats[0] : clamp(baseSat, sMin, sMax);
-  let secondarySat = overridePalette ? sats[1] : (mode === 'monochrome' ? clamp(baseSat - 30, 0, sMax - 20) : clamp(baseSat - 10, sMin, sMax));
-  let accentSat = overridePalette ? sats[2] : clamp(baseSat + 10, sMin, sMax);
-  let goodSat = overridePalette ? sats[3] : clamp(baseSat, sMin, sMax);
-  let badSat = overridePalette ? sats[4] : clamp(baseSat, sMin, sMax);
-
-  let lightBase = 96; 
-  let darkBase = 10;
-  if (contrastLevel > 0) {
-      lightBase = 96 + (contrastLevel * 0.8);
-      darkBase = 10 - (contrastLevel * 2); 
-  } else {
-      lightBase = 96 + (contrastLevel * 0.8);
-      darkBase = 10 - (contrastLevel * 1.6);
-  }
-
-  let lightBgL = lightBase;
-  let darkBgL = darkBase;
-  if (brightnessLevel < 0) {
-      lightBgL = lightBase - (Math.abs(brightnessLevel) * 7); 
-      darkBgL = Math.max(0, darkBase - (Math.abs(brightnessLevel) * 1)); 
-  } else {
-      lightBgL = Math.min(100, lightBase + (brightnessLevel * 0.8));
-      darkBgL = darkBase + (brightnessLevel * 5); 
-  }
-
-  const baseLightTextOffset = 65;
-  const baseDarkTextOffset = 70;
-  const contrastFactor = 1 + (contrastLevel * 0.1);
-  const lightTextL = clamp(lightBgL - (baseLightTextOffset * contrastFactor), 5, 90);
-  const darkTextL = clamp(darkBgL + (baseDarkTextOffset * contrastFactor), 15, 98);
-  const baseLightColorMod = 46;
-  const baseDarkColorMod = 50;
-  const brightnessShift = brightnessLevel * 3;
-  const contrastShiftLight = contrastLevel * -2;
-  const contrastShiftDark = contrastLevel * 2;
-  const lightColorMod = clamp(baseLightColorMod + brightnessShift + contrastShiftLight, 30, 70);
-  const darkColorMod = clamp(baseDarkColorMod + brightnessShift + contrastShiftDark, 35, 80);
-
-  const rnd = seededRandom(seedVal + 4);
-  const isTinted = rnd > 0.5 && saturationLevel > -3;
-  const bgSat = isTinted ? Math.floor(seededRandom(seedVal + 5) * ((saturationLevel + 5) * 1.5)) : Math.floor(seededRandom(seedVal + 5) * 3);
-
-  const lightSurfOffset = 2 + (Math.abs(brightnessLevel - 5) * 0.5);
-  const darkSurfOffset = 4 + (brightnessLevel * 0.5); 
-  const lightSurfL = clamp(lightBgL - lightSurfOffset, 0, 100);
-  const darkSurfL = clamp(darkBgL + 5 + (contrastLevel * 0.5), 0, 100); 
-
-  const light: ThemeTokens = {
-    bg: hslToHex(primaryHue, bgSat, applyBrightness(lightBgL, brightnessLevel)), 
-    card: hslToHex(primaryHue, bgSat, applyBrightness(Math.min(100, lightSurfL), brightnessLevel)),
-    card2: hslToHex(primaryHue, bgSat, applyBrightness(Math.min(100, lightSurfL - 3), brightnessLevel)),
-    text: hslToHex(primaryHue, 10, applyBrightness(lightTextL, brightnessLevel)), 
-    textMuted: hslToHex(primaryHue, 10, applyBrightness(lightTextL + 30, brightnessLevel)),
-    textOnColor: applyBrightness(lightColorMod, brightnessLevel) > 65 ? hslToHex(primaryHue, Math.max(0, (saturationLevel + 5) * 2), 10) : hslToHex(primaryHue, Math.max(0, (saturationLevel + 5) * 2), 98),
-    primary: hslToHex(primaryHue, primarySat, applyBrightness(lightColorMod, brightnessLevel)), 
-    primaryFg: '#ffffff', 
-    secondary: mode === 'monochrome' ? hslToHex(secondaryHue, 10, applyBrightness(Math.min(lightColorMod + 20, 80), brightnessLevel)) : hslToHex(secondaryHue, secondarySat, applyBrightness(Math.min(lightColorMod + 10, 75), brightnessLevel)),
-    secondaryFg: hslToHex(secondaryHue, 40, applyBrightness(lightTextL, brightnessLevel)),
-    accent: hslToHex(accentHue, accentSat, applyBrightness(lightColorMod + 5, brightnessLevel)),
-    accentFg: '#ffffff',
-    border: hslToHex(primaryHue, 10, applyBrightness(lightBgL - 10, brightnessLevel)),
-    ring: hslToHex(primaryHue, 60, applyBrightness(60, brightnessLevel)),
-    good: hslToHex(goodHue, goodSat, applyBrightness(Math.max(lightColorMod - 5, 40), brightnessLevel)),
-    goodFg: '#ffffff',
-    warn: hslToHex(accentHue, accentSat, applyBrightness(Math.max(lightColorMod, 45), brightnessLevel)),
-    warnFg: '#ffffff',
-    bad: hslToHex(badHue, badSat, applyBrightness(Math.max(lightColorMod + 5, 50), brightnessLevel)),
-    badFg: '#ffffff'
-  };
-
-  const dark: ThemeTokens = {
-    bg: hslToHex(primaryHue, bgSat, applyBrightness(darkBgL, brightnessLevel)), 
-    card: hslToHex(primaryHue, bgSat, applyBrightness(darkSurfL, brightnessLevel)), 
-    card2: hslToHex(primaryHue, bgSat, applyBrightness(darkSurfL + 5, brightnessLevel)),
-    text: hslToHex(primaryHue, 10, applyBrightness(darkTextL, brightnessLevel)),
-    textMuted: hslToHex(primaryHue, 10, applyBrightness(darkTextL - 30, brightnessLevel)),
-    textOnColor: applyBrightness(darkColorMod, brightnessLevel) > 65
-      ? hslToHex(primaryHue, Math.max(0, (saturationLevel + 5) * 2), 10)
-      : hslToHex(primaryHue, Math.max(0, (saturationLevel + 5) * 2), 98),
-    primary: hslToHex(primaryHue, primarySat, applyBrightness(darkColorMod, brightnessLevel)),
-    primaryFg: '#ffffff',
-    secondary: hslToHex(secondaryHue, secondarySat, applyBrightness(Math.max(darkColorMod - 10, 40), brightnessLevel)), 
-    secondaryFg: hslToHex(secondaryHue, 40, applyBrightness(darkTextL, brightnessLevel)),
-    accent: hslToHex(accentHue, accentSat, applyBrightness(darkColorMod + 5, brightnessLevel)),
-    accentFg: '#ffffff',
-    border: hslToHex(primaryHue, 15, applyBrightness(darkBgL + 12, brightnessLevel)),
-    ring: hslToHex(primaryHue, 60, applyBrightness(60, brightnessLevel)),
-    good: hslToHex(goodHue, goodSat, applyBrightness(Math.max(darkColorMod - 10, 35), brightnessLevel)),
-    goodFg: '#ffffff',
-    warn: hslToHex(accentHue, accentSat, applyBrightness(Math.max(darkColorMod - 5, 40), brightnessLevel)),
-    warnFg: '#ffffff',
-    bad: hslToHex(badHue, badSat, applyBrightness(Math.max(darkColorMod, 45), brightnessLevel)),
-    badFg: '#ffffff'
-  };
-
-  return { light, dark, seed: seedColor || hslToHex(baseHue, baseSat, 50) };
+  // Delegate to the new OKLCH-based palette engine (v25.12.2)
+  return paletteEngineGenerateTheme(
+    mode,
+    seedColor,
+    saturationLevel,
+    contrastLevel,
+    brightnessLevel,
+    overridePalette
+  );
 }
 
 export async function extractPaletteFromImage(file: File): Promise<string[]> {

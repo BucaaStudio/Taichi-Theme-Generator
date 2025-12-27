@@ -52,3 +52,38 @@ export interface DesignOptions {
 }
 
 export type LockedColors = Partial<Record<keyof ThemeTokens, boolean>>;
+
+// --- OKLCH Palette Engine Types (v25.12.2) ---
+
+export interface OklchColor {
+  L: number;  // Lightness: 0-1
+  C: number;  // Chroma: 0-0.4 (typical range)
+  H: number;  // Hue: 0-360
+}
+
+export interface ColorScale {
+  50: string;
+  100: string;
+  200: string;
+  300: string;
+  400: string;
+  500: string;
+  600: string;
+  700: string;
+  800: string;
+  900: string;
+}
+
+export interface PaletteMetadata {
+  seed: string;
+  baseHue: number;
+  mode: GenerationMode;
+  score?: number;
+  timestamp: number;
+}
+
+export interface ExtendedTheme extends DualTheme {
+  metadata: PaletteMetadata;
+  neutralScale?: ColorScale;
+  primaryScale?: ColorScale;
+}

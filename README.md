@@ -129,14 +129,40 @@ npm run preview
 
 ## Color System
 
-The generator creates comprehensive design tokens:
+**v25.12.2 - OKLCH Palette Intelligence Engine**
 
-- **Backgrounds**: `bg`, `surface`, `surface2`
-- **Text**: `text`, `textMuted`
+The generator now uses a perceptually-uniform OKLCH color space for all color
+computation, ensuring consistent and aesthetically pleasing palettes.
+
+### Core Principles
+
+- **OKLCH-First**: All color math happens in OKLCH for perceptual accuracy
+- **Light Mode First**: Light themes are generated first, then dark mode is
+  derived deterministically
+- **Scored & Validated**: Every palette is evaluated for contrast, harmony, and
+  usability
+- **Reproducible**: Seeded generation ensures identical palettes from the same
+  seed
+
+### Design Tokens
+
+- **Backgrounds**: `bg`, `card`, `card2`
+- **Text**: `text`, `textMuted`, `textOnColor`
 - **Brand**: `primary`, `secondary`, `accent`
-- **Semantic**: `success`, `warn`, `error`
+- **Semantic**: `good`, `warn`, `bad`
 - **UI**: `border`, `ring`
-- **Foregrounds**: `primaryFg`, `secondaryFg`, etc.
+- **Foregrounds**: `primaryFg`, `secondaryFg`, `accentFg`, `goodFg`, `badFg`,
+  `warnFg`
+
+### Quality Guarantees
+
+| Rule                | Guaranteed                 |
+| ------------------- | -------------------------- |
+| Contrast            | WCAG AA+ (4.5:1 minimum)   |
+| Dark/Light Identity | Mathematical derivation    |
+| Brand Consistency   | Hue preserved across modes |
+| Visual Stability    | Scored & tested            |
+| Reproducibility     | Seeded RNG                 |
 
 ## API Documentation
 
