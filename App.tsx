@@ -81,7 +81,7 @@ const App: React.FC = () => {
     }
     return false;
   });
-  const [showSwatches, setShowSwatches] = useState(true);
+  const [showSwatches, setShowSwatches] = useState(false);
 
   const [showMobileNotice, setShowMobileNotice] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -118,9 +118,9 @@ const App: React.FC = () => {
         next.shadowStrength = Math.floor(Math.random() * 6);
       }
       
-      // Shadow Opacity: 5-95 (step 5)
+      // Shadow Opacity: 5-50 (step 5)
       if (!lockedOptions.shadowOpacity) {
-        next.shadowOpacity = 5 + Math.floor(Math.random() * 19) * 5;
+        next.shadowOpacity = 5 + Math.floor(Math.random() * 10) * 5;
       }
       
       // Radius: 0-5
@@ -887,19 +887,19 @@ const App: React.FC = () => {
                  >
                    {lockedOptions.shadowOpacity ? <Lock size={10} /> : <Unlock size={10} />}
                  </button>
-                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Opacity</label>
+                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Shd Opacity</label>
                </div>
                <span className="text-xs font-mono opacity-50">{designOptions.shadowOpacity}%</span>
              </div>
              <input 
-               type="range" min="5" max="95" step="5"
+               type="range" min="5" max="50" step="5"
                value={designOptions.shadowOpacity}
                onChange={(e) => updateOption('shadowOpacity', parseInt(e.target.value))}
                className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
                style={{ accentColor: shellTheme.primary }}
              />
              <div className="flex justify-between text-[10px] opacity-40 px-0.5">
-               <span>5%</span><span>95%</span>
+               <span>5%</span><span>50%</span>
              </div>
            </div>
 
@@ -928,32 +928,6 @@ const App: React.FC = () => {
              <div className="flex justify-between text-[10px] opacity-40 px-0.5">
                <span>Square</span><span>Round</span>
              </div>
-           </div>
-
-           {/* Gradients Toggle */}
-           <div className="space-y-2 flex flex-col justify-center">
-             <div className="flex items-center gap-1.5">
-               <button 
-                 onClick={() => toggleOptionLock('gradients')}
-                 className={`p-0.5 rounded transition-colors ${lockedOptions.gradients ? 'text-t-primary' : 'opacity-30 hover:opacity-60'}`}
-                 title={lockedOptions.gradients ? 'Unlock' : 'Lock'}
-               >
-                 {lockedOptions.gradients ? <Lock size={10} /> : <Unlock size={10} />}
-               </button>
-               <label className="flex items-center gap-2 cursor-pointer group">
-                 <input 
-                   type="checkbox" 
-                   checked={designOptions.gradients}
-                   onChange={(e) => setDesignOptions(prev => ({ ...prev, gradients: e.target.checked }))}
-                   className="w-4 h-4 rounded cursor-pointer"
-                   style={{ accentColor: shellTheme.primary }}
-                 />
-                 <span className="text-xs font-bold uppercase tracking-wider opacity-70 group-hover:opacity-100 transition-opacity">
-                   Gradients
-                 </span>
-               </label>
-             </div>
-             <p className="text-[10px] opacity-40">Apply to colored elements</p>
            </div>
 
            {/* Saturation Level */}
@@ -1053,6 +1027,23 @@ const App: React.FC = () => {
              </label>
              <p className="text-[10px] opacity-40">Generate dark theme first</p>
            </div>
+
+           {/* Gradients Toggle */}
+           <div className="space-y-2 flex flex-col justify-center">
+             <label className="flex items-center gap-2 cursor-pointer group">
+               <input 
+                 type="checkbox" 
+                 checked={designOptions.gradients}
+                 onChange={(e) => setDesignOptions(prev => ({ ...prev, gradients: e.target.checked }))}
+                 className="w-4 h-4 rounded cursor-pointer"
+                 style={{ accentColor: shellTheme.primary }}
+               />
+               <span className="text-xs font-bold uppercase tracking-wider opacity-70 group-hover:opacity-100 transition-opacity">
+                 Gradients
+               </span>
+             </label>
+             <p className="text-[10px] opacity-40">Apply to colored elements</p>
+           </div>
         </div>
       )}
 
@@ -1124,7 +1115,7 @@ const App: React.FC = () => {
             className="w-full md:w-1/2 bg-t-bg transition-colors duration-500" 
             style={getStyleVars(currentTheme.light)}
           >
-             <PreviewSection themeName="Light" options={designOptions} onUpdateOption={updateOption} />
+             <PreviewSection themeName="Light" options={designOptions} onUpdateOption={updateOption} onOpenImagePicker={() => setShowImagePickerModal(true)} />
           </div>
 
           {/* Dark Side */}
@@ -1132,7 +1123,7 @@ const App: React.FC = () => {
             className="w-full md:w-1/2 bg-t-bg transition-colors duration-500" 
             style={getStyleVars(currentTheme.dark)}
           >
-             <PreviewSection themeName="Dark" options={designOptions} onUpdateOption={updateOption} />
+             <PreviewSection themeName="Dark" options={designOptions} onUpdateOption={updateOption} onOpenImagePicker={() => setShowImagePickerModal(true)} />
           </div>
         </div>
 

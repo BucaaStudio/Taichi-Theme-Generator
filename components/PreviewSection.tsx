@@ -1,29 +1,27 @@
 import React, { useState } from 'react';
 import { 
-  Palette, Sun, Moon, Zap, Shield, Shuffle, Lock, Unlock,
+  Palette, Shuffle, Lock, Unlock, Image as ImageIcon,
   ChevronRight, Check, Copy, Download, Share2, 
-  Sliders, Eye, RefreshCw, ArrowRight, Sparkles
+  Sliders, Eye, RefreshCw, Sparkles, Upload
 } from 'lucide-react';
-import { DesignOptions } from '../types';
+import { DesignOptions, ThemeTokens } from '../types';
 
 interface PreviewProps {
   themeName: string;
   options: DesignOptions;
   onUpdateOption?: (key: keyof DesignOptions, value: number | boolean) => void;
+  onOpenImagePicker?: () => void;
 }
 
 // Controlled Slider Component
 const ControlledSlider: React.FC<{
   rClass: string;
-  bClass: string;
-  sClass: string;
-  gradientClass: string;
   label: string;
   value: number;
   onChange: (value: number) => void;
   min?: number;
   max?: number;
-}> = ({ rClass, bClass, sClass, gradientClass, label, value, onChange, min = -5, max = 5 }) => {
+}> = ({ rClass, label, value, onChange, min = -5, max = 5 }) => {
   return (
     <div className="space-y-2">
       <div className="flex justify-between">
@@ -38,45 +36,14 @@ const ControlledSlider: React.FC<{
         max={max}
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value))}
-        className={`w-full h-2 bg-t-text/15 ${rClass} ${bClass} ${sClass} appearance-none cursor-pointer accent-t-primary transition-colors`} 
+        className={`w-full h-2 bg-t-text/15 ${rClass} appearance-none cursor-pointer accent-t-primary transition-colors`} 
       />
     </div>
   );
 };
 
-// Interactive Step Card
-const StepCard: React.FC<{
-  step: number;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  action?: React.ReactNode;
-  rClass: string;
-  bClass: string;
-  sClass: string;
-  gradientClass: string;
-}> = ({ step, title, description, icon, action, rClass, bClass, sClass, gradientClass }) => {
-  return (
-    <div className={`${bClass} ${rClass} ${sClass} bg-t-card p-6 transition-all duration-300 hover:-translate-y-1 group/step`}>
-      <div className="flex items-start gap-4">
-        <div className={`w-12 h-12 shrink-0 ${rClass} ${gradientClass} flex items-center justify-center text-t-textOnColor font-bold text-lg shadow-lg`}>
-          {step}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-t-primary">{icon}</span>
-            <h3 className="font-bold text-t-text text-lg">{title}</h3>
-          </div>
-          <p className="text-sm text-t-textMuted leading-relaxed mb-4">{description}</p>
-          {action}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Color Token Display
-const ColorToken: React.FC<{
+// Color Swatch with Copy
+const ColorSwatch: React.FC<{
   name: string;
   colorClass: string;
   description: string;
@@ -92,10 +59,10 @@ const ColorToken: React.FC<{
   
   return (
     <div 
-      className={`flex items-center gap-3 p-3 bg-t-card/50 ${rClass} cursor-pointer hover:bg-t-card transition-colors group/token`}
+      className={`flex items-center gap-3 p-2 bg-t-card/50 ${rClass} cursor-pointer hover:bg-t-card transition-colors group/swatch`}
       onClick={handleCopy}
     >
-      <div className={`w-8 h-8 ${rClass} ${colorClass} shadow-inner`} />
+      <div className={`w-8 h-8 ${rClass} ${colorClass} shadow-inner shrink-0`} />
       <div className="flex-1 min-w-0">
         <div className="text-xs font-mono text-t-text truncate">{name}</div>
         <div className="text-[10px] text-t-textMuted truncate">{description}</div>
@@ -103,14 +70,14 @@ const ColorToken: React.FC<{
       {copied ? (
         <Check size={14} className="text-t-good shrink-0" />
       ) : (
-        <Copy size={14} className="text-t-textMuted opacity-0 group-hover/token:opacity-100 transition-opacity shrink-0" />
+        <Copy size={14} className="text-t-textMuted opacity-0 group-hover/swatch:opacity-100 transition-opacity shrink-0" />
       )}
     </div>
   );
 };
 
-const PreviewSection: React.FC<PreviewProps> = ({ themeName, options, onUpdateOption }) => {
-  const [expandedSection, setExpandedSection] = useState<string | null>('controls');
+const PreviewSection: React.FC<PreviewProps> = ({ themeName, options, onUpdateOption, onOpenImagePicker }) => {
+  const [expandedSection, setExpandedSection] = useState<string | null>('generate');
   
   // Style utilities based on options
   const getRadius = (level: number) => {
@@ -127,7 +94,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options, onUpdateOp
   
   const getBorder = (width: number) => width > 0 ? `border-${width} border-t-border` : 'border-0';
   
-  const getShadow = (strength: number, opacity: number) => {
+  const getShadow = (strength: number) => {
     if (strength === 0) return 'shadow-none';
     const sizes = ['shadow-sm', 'shadow', 'shadow-md', 'shadow-lg', 'shadow-xl', 'shadow-2xl'];
     return sizes[Math.min(strength, 5)];
@@ -135,7 +102,7 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options, onUpdateOp
   
   const rClass = getRadius(options.radius);
   const bClass = getBorder(options.borderWidth);
-  const sClass = getShadow(options.shadowStrength, options.shadowOpacity);
+  const sClass = getShadow(options.shadowStrength);
   
   // Gradient class for buttons/backgrounds when enabled
   const gradientClass = options.gradients 
@@ -168,46 +135,94 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options, onUpdateOp
         </p>
       </header>
 
-      {/* Interactive Controls Section */}
+      {/* Step 1: Generate */}
       <section className="space-y-4">
         <button 
-          onClick={() => toggleSection('controls')}
+          onClick={() => toggleSection('generate')}
           className={`w-full flex items-center justify-between p-4 ${bClass} ${rClass} ${sClass} bg-t-card hover:bg-t-card2 transition-colors`}
         >
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 ${rClass} ${gradientClass} flex items-center justify-center text-t-textOnColor`}>
+              <Shuffle size={20} />
+            </div>
+            <div className="text-left">
+              <h2 className="font-bold text-t-text">Step 1: Generate</h2>
+              <p className="text-sm text-t-textMuted">Press Space or click to create new colors</p>
+            </div>
+          </div>
+          <ChevronRight className={`text-t-textMuted transition-transform ${expandedSection === 'generate' ? 'rotate-90' : ''}`} />
+        </button>
+        
+        {expandedSection === 'generate' && (
+          <div className={`${bClass} ${rClass} ${sClass} bg-t-card p-6 space-y-4`}>
+            <p className="text-sm text-t-textMuted">
+              Each generation creates a harmonious palette based on color theory. The harmony mode (analogous, complementary, etc.) determines color relationships.
+            </p>
+            
+            <div className="flex flex-wrap gap-3">
+              <button className={`${gradientClass} text-t-textOnColor px-6 py-3 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2`}>
+                <Shuffle size={18} />
+                Generate New
+                <span className="text-xs opacity-75 ml-1 bg-black/20 px-2 py-0.5 rounded">Space</span>
+              </button>
+              
+              <button className={`bg-t-text/10 text-t-text px-6 py-3 ${rClass} font-medium ${bClass} ${sClass} transition-all hover:bg-t-text/20 active:scale-95 flex items-center gap-2`}>
+                <RefreshCw size={18} />
+                Undo
+                <span className="text-xs opacity-50 ml-1">⌘Z</span>
+              </button>
+            </div>
+            
+            <div className={`p-4 ${rClass} bg-t-primary/10 border border-t-primary/30`}>
+              <p className="text-sm text-t-primary flex items-start gap-2">
+                <Sparkles size={16} className="shrink-0 mt-0.5" />
+                <span><strong>Pro tip:</strong> Lock individual colors in the swatch strip to keep them while regenerating others.</span>
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Step 2: Adjust Controls */}
+      <section className="space-y-4">
+        <button 
+          onClick={() => toggleSection('adjust')}
+          className={`w-full flex items-center justify-between p-4 ${bClass} ${rClass} ${sClass} bg-t-card hover:bg-t-card2 transition-colors`}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 ${rClass} ${gradientSecondary} flex items-center justify-center text-t-textOnColor`}>
               <Sliders size={20} />
             </div>
             <div className="text-left">
-              <h2 className="font-bold text-t-text">Step 1: Adjust Controls</h2>
+              <h2 className="font-bold text-t-text">Step 2: Adjust Controls</h2>
               <p className="text-sm text-t-textMuted">Fine-tune saturation, brightness, and contrast</p>
             </div>
           </div>
-          <ChevronRight className={`text-t-textMuted transition-transform ${expandedSection === 'controls' ? 'rotate-90' : ''}`} />
+          <ChevronRight className={`text-t-textMuted transition-transform ${expandedSection === 'adjust' ? 'rotate-90' : ''}`} />
         </button>
         
-        {expandedSection === 'controls' && (
+        {expandedSection === 'adjust' && (
           <div className={`${bClass} ${rClass} ${sClass} bg-t-card p-6 space-y-6`}>
             <p className="text-sm text-t-textMuted">
-              These sliders affect how colors are generated. Try adjusting them and watch the theme update in real-time.
+              These sliders affect how colors are generated. Changes apply in real-time.
             </p>
             
             {onUpdateOption ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <ControlledSlider 
-                  rClass={rClass} bClass={bClass} sClass={sClass} gradientClass={gradientClass}
+                  rClass={rClass}
                   label="Saturation" 
                   value={options.saturationLevel}
                   onChange={(v) => onUpdateOption('saturationLevel', v)}
                 />
                 <ControlledSlider 
-                  rClass={rClass} bClass={bClass} sClass={sClass} gradientClass={gradientClass}
+                  rClass={rClass}
                   label="Brightness" 
                   value={options.brightnessLevel}
                   onChange={(v) => onUpdateOption('brightnessLevel', v)}
                 />
                 <ControlledSlider 
-                  rClass={rClass} bClass={bClass} sClass={sClass} gradientClass={gradientClass}
+                  rClass={rClass}
                   label="Contrast" 
                   value={options.contrastLevel}
                   onChange={(v) => onUpdateOption('contrastLevel', v)}
@@ -249,88 +264,79 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options, onUpdateOp
         )}
       </section>
 
-      {/* Generate Action Section */}
+      {/* Step 3: Pick from Image */}
       <section className="space-y-4">
         <button 
-          onClick={() => toggleSection('generate')}
+          onClick={() => toggleSection('image')}
           className={`w-full flex items-center justify-between p-4 ${bClass} ${rClass} ${sClass} bg-t-card hover:bg-t-card2 transition-colors`}
         >
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 ${rClass} ${gradientSecondary} flex items-center justify-center text-t-textOnColor`}>
-              <Shuffle size={20} />
+            <div className={`w-10 h-10 ${rClass} ${gradientAccent} flex items-center justify-center text-t-textOnColor`}>
+              <ImageIcon size={20} />
             </div>
             <div className="text-left">
-              <h2 className="font-bold text-t-text">Step 2: Generate</h2>
-              <p className="text-sm text-t-textMuted">Press Space or click Generate for new colors</p>
+              <h2 className="font-bold text-t-text">Step 3: Pick from Image</h2>
+              <p className="text-sm text-t-textMuted">Extract colors from an uploaded image</p>
             </div>
           </div>
-          <ChevronRight className={`text-t-textMuted transition-transform ${expandedSection === 'generate' ? 'rotate-90' : ''}`} />
+          <ChevronRight className={`text-t-textMuted transition-transform ${expandedSection === 'image' ? 'rotate-90' : ''}`} />
         </button>
         
-        {expandedSection === 'generate' && (
+        {expandedSection === 'image' && (
           <div className={`${bClass} ${rClass} ${sClass} bg-t-card p-6 space-y-4`}>
             <p className="text-sm text-t-textMuted">
-              Each generation creates a harmonious palette using color theory algorithms. The harmony mode (in the header) determines the relationship between colors.
+              Upload an image to automatically extract a 5-color palette. Great for matching themes to existing brand assets or photographs.
             </p>
             
-            <div className="flex flex-wrap gap-3">
-              <button className={`${gradientClass} text-t-textOnColor px-6 py-3 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2`}>
-                <Shuffle size={18} />
-                Click to Generate
-                <span className="text-xs opacity-75 ml-1 bg-black/20 px-2 py-0.5 rounded">Space</span>
-              </button>
-              
-              <button className={`bg-t-text/10 text-t-text px-6 py-3 ${rClass} font-medium ${bClass} ${sClass} transition-all hover:bg-t-text/20 active:scale-95 flex items-center gap-2`}>
-                <RefreshCw size={18} />
-                Undo
-                <span className="text-xs opacity-50 ml-1">⌘Z</span>
-              </button>
-            </div>
+            <button 
+              onClick={() => onOpenImagePicker?.()}
+              className={`${gradientAccent} text-t-textOnColor px-6 py-3 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2`}
+            >
+              <Upload size={18} />
+              Upload Image
+            </button>
             
-            <div className={`p-4 ${rClass} bg-t-primary/10 border border-t-primary/30`}>
-              <p className="text-sm text-t-primary flex items-start gap-2">
-                <Sparkles size={16} className="shrink-0 mt-0.5" />
-                <span><strong>Pro tip:</strong> Lock colors or options you want to keep, then generate to only change the unlocked ones.</span>
+            <div className={`p-4 ${rClass} bg-t-accent/10 border border-t-accent/30`}>
+              <p className="text-sm text-t-accent flex items-start gap-2">
+                <ImageIcon size={16} className="shrink-0 mt-0.5" />
+                <span>Supported formats: JPG, PNG, WebP. The algorithm extracts the 5 most prominent colors.</span>
               </p>
             </div>
           </div>
         )}
       </section>
 
-      {/* Color Tokens Section */}
+      {/* Color Swatches Section */}
       <section className="space-y-4">
         <button 
-          onClick={() => toggleSection('tokens')}
+          onClick={() => toggleSection('swatches')}
           className={`w-full flex items-center justify-between p-4 ${bClass} ${rClass} ${sClass} bg-t-card hover:bg-t-card2 transition-colors`}
         >
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 ${rClass} ${gradientAccent} flex items-center justify-center text-t-textOnColor`}>
+            <div className={`w-10 h-10 ${rClass} bg-t-good flex items-center justify-center text-t-textOnColor`}>
               <Palette size={20} />
             </div>
             <div className="text-left">
-              <h2 className="font-bold text-t-text">Step 3: Use Your Colors</h2>
+              <h2 className="font-bold text-t-text">Color Tokens</h2>
               <p className="text-sm text-t-textMuted">Click any token to copy its CSS variable</p>
             </div>
           </div>
-          <ChevronRight className={`text-t-textMuted transition-transform ${expandedSection === 'tokens' ? 'rotate-90' : ''}`} />
+          <ChevronRight className={`text-t-textMuted transition-transform ${expandedSection === 'swatches' ? 'rotate-90' : ''}`} />
         </button>
         
-        {expandedSection === 'tokens' && (
+        {expandedSection === 'swatches' && (
           <div className={`${bClass} ${rClass} ${sClass} bg-t-card p-6 space-y-4`}>
-            <p className="text-sm text-t-textMuted">
-              Your theme includes these CSS custom properties. Click any token to copy it to your clipboard.
-            </p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              <ColorToken name="primary" colorClass="bg-t-primary" description="Main brand color" rClass={rClass} />
-              <ColorToken name="secondary" colorClass="bg-t-secondary" description="Supporting brand color" rClass={rClass} />
-              <ColorToken name="accent" colorClass="bg-t-accent" description="Highlight color" rClass={rClass} />
-              <ColorToken name="bg" colorClass="bg-t-bg" description="Page background" rClass={rClass} />
-              <ColorToken name="card" colorClass="bg-t-card" description="Card background" rClass={rClass} />
-              <ColorToken name="text" colorClass="bg-t-text" description="Primary text" rClass={rClass} />
-              <ColorToken name="good" colorClass="bg-t-good" description="Success state" rClass={rClass} />
-              <ColorToken name="bad" colorClass="bg-t-bad" description="Error state" rClass={rClass} />
-              <ColorToken name="border" colorClass="bg-t-border" description="Border color" rClass={rClass} />
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              <ColorSwatch name="primary" colorClass="bg-t-primary" description="Main brand" rClass={rClass} />
+              <ColorSwatch name="secondary" colorClass="bg-t-secondary" description="Supporting" rClass={rClass} />
+              <ColorSwatch name="accent" colorClass="bg-t-accent" description="Highlight" rClass={rClass} />
+              <ColorSwatch name="bg" colorClass="bg-t-bg border border-t-border" description="Background" rClass={rClass} />
+              <ColorSwatch name="card" colorClass="bg-t-card border border-t-border" description="Cards" rClass={rClass} />
+              <ColorSwatch name="text" colorClass="bg-t-text" description="Primary text" rClass={rClass} />
+              <ColorSwatch name="textMuted" colorClass="bg-t-textMuted" description="Muted text" rClass={rClass} />
+              <ColorSwatch name="good" colorClass="bg-t-good" description="Success" rClass={rClass} />
+              <ColorSwatch name="warn" colorClass="bg-t-warn" description="Warning" rClass={rClass} />
+              <ColorSwatch name="bad" colorClass="bg-t-bad" description="Error" rClass={rClass} />
             </div>
           </div>
         )}
@@ -343,12 +349,12 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options, onUpdateOp
           className={`w-full flex items-center justify-between p-4 ${bClass} ${rClass} ${sClass} bg-t-card hover:bg-t-card2 transition-colors`}
         >
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 ${rClass} bg-t-good flex items-center justify-center text-t-textOnColor`}>
+            <div className={`w-10 h-10 ${rClass} bg-t-text text-t-bg flex items-center justify-center`}>
               <Download size={20} />
             </div>
             <div className="text-left">
-              <h2 className="font-bold text-t-text">Step 4: Export</h2>
-              <p className="text-sm text-t-textMuted">Download CSS, share, or save to history</p>
+              <h2 className="font-bold text-t-text">Export & Share</h2>
+              <p className="text-sm text-t-textMuted">Download CSS or share via URL</p>
             </div>
           </div>
           <ChevronRight className={`text-t-textMuted transition-transform ${expandedSection === 'export' ? 'rotate-90' : ''}`} />
@@ -356,17 +362,13 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options, onUpdateOp
         
         {expandedSection === 'export' && (
           <div className={`${bClass} ${rClass} ${sClass} bg-t-card p-6 space-y-4`}>
-            <p className="text-sm text-t-textMuted">
-              Export your theme in various formats or share it with others via URL.
-            </p>
-            
             <div className="flex flex-wrap gap-3">
               <button className={`${gradientClass} text-t-textOnColor px-5 py-2.5 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2`}>
                 <Download size={16} />
                 Download CSS
               </button>
               
-              <button className={`bg-t-secondary text-t-secondaryFg px-5 py-2.5 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2`}>
+              <button className={`${gradientSecondary} text-t-textOnColor px-5 py-2.5 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2`}>
                 <Share2 size={16} />
                 Share URL
               </button>
@@ -387,10 +389,6 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options, onUpdateOp
           Live Component Preview
         </h2>
         
-        <p className="text-sm text-t-textMuted">
-          These elements update in real-time as you adjust settings. Try changing gradients, radius, borders, and shadows.
-        </p>
-        
         {/* Button Showcase */}
         <div className="space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-t-textMuted">Buttons</h3>
@@ -410,32 +408,6 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options, onUpdateOp
             <button className={`bg-t-bad text-t-badFg px-5 py-2.5 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95`}>
               Danger
             </button>
-            <button className={`${bClass} bg-t-bg text-t-text px-5 py-2.5 ${rClass} font-medium ${sClass} transition-all hover:bg-t-card active:scale-95`}>
-              Outline
-            </button>
-          </div>
-        </div>
-        
-        {/* Cards Showcase */}
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-t-textMuted">Cards</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className={`${bClass} ${rClass} ${sClass} bg-t-card2 p-4`}>
-              <div className={`w-full h-16 ${rClass} ${gradientClass} mb-3`} />
-              <h4 className="font-bold text-t-text">Card Title</h4>
-              <p className="text-sm text-t-textMuted">This card uses your theme's card2 background.</p>
-            </div>
-            <div className={`${bClass} ${rClass} ${sClass} ${gradientClass} p-4`}>
-              <h4 className="font-bold text-t-textOnColor mb-1">Gradient Card</h4>
-              <p className="text-sm text-t-textOnColor/80">This card has a gradient background when enabled.</p>
-            </div>
-            <div className={`${bClass} ${rClass} ${sClass} bg-t-card2 p-4`}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className={`w-8 h-8 ${rClass} bg-t-accent flex items-center justify-center text-t-accentFg text-sm font-bold`}>A</div>
-                <span className="font-medium text-t-text">With Avatar</span>
-              </div>
-              <p className="text-sm text-t-textMuted">Cards can contain various elements styled with your theme.</p>
-            </div>
           </div>
         </div>
         
@@ -451,9 +423,25 @@ const PreviewSection: React.FC<PreviewProps> = ({ themeName, options, onUpdateOp
             <span className={`px-3 py-1 ${rClass} bg-t-bad/15 text-t-bad text-sm font-medium`}>Error</span>
           </div>
         </div>
+        
+        {/* Cards */}
+        <div className="space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-t-textMuted">Cards</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`${bClass} ${rClass} ${sClass} bg-t-card2 p-4`}>
+              <div className={`w-full h-16 ${rClass} ${gradientClass} mb-3`} />
+              <h4 className="font-bold text-t-text">Card with Gradient</h4>
+              <p className="text-sm text-t-textMuted">Uses your theme's card2 background and primary gradient.</p>
+            </div>
+            <div className={`${bClass} ${rClass} ${sClass} ${gradientSecondary} p-4`}>
+              <h4 className="font-bold text-t-textOnColor mb-1">Filled Card</h4>
+              <p className="text-sm text-t-textOnColor/80">A card with secondary gradient background.</p>
+            </div>
+          </div>
+        </div>
       </section>
 
-      {/* Footer Info */}
+      {/* Footer */}
       <footer className="text-center text-sm text-t-textMuted pt-4 border-t border-t-border">
         <p>
           Built with <strong className="text-t-primary">OKLCH</strong> color space for perceptually uniform palettes.
