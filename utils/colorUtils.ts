@@ -8,33 +8,20 @@ function clamp(num: number, min: number, max: number) {
 
 /**
  * Apply brightness compression to a lightness value.
- * 
- * @param lightness - Original lightness value (0-100)
- * @param brightnessLevel - Brightness level (-5 to 5)
- *   - negative: Compresses toward dark (dim)
- *   - 0: Normal (no change)
- *   - positive: Compresses toward bright (bright)
  */
 function applyBrightness(lightness: number, brightnessLevel: number): number {
   if (brightnessLevel === 0) return lightness;
   
   const deviation = lightness - 50;
-  
-  // Compression intensity (0 to ~0.6)
-  // Max compression at level 5
   const intensity = (Math.abs(brightnessLevel) / 5) * 0.6;
   
   if (brightnessLevel < 0) {
-    // Dim mode: compress bright colors toward 50 (or lower, effectively darkening)
-    // Actually, "dimming" typically means pushing towards dark. 
-    // The previous logic pushed bright colors down.
     if (deviation > 0) {
       return 50 + deviation * (1 - intensity);
     } else {
       return 50 + deviation * (1 - intensity * 0.3);
     }
   } else {
-    // Bright mode: compress dark colors up toward 50
     if (deviation < 0) {
       return 50 + deviation * (1 - intensity);
     } else {
@@ -61,7 +48,7 @@ function seededRandom(seed: number): number {
 // Find the closest hue to a target from an array of hues (circular distance)
 function findClosestHue(hues: number[], targetHue: number): number {
   let closest = hues[0];
-  let minDistance = 180; // max possible circular distance
+  let minDistance = 180;
   
   for (const hue of hues) {
     const distance = Math.min(
@@ -78,7 +65,6 @@ function findClosestHue(hues: number[], targetHue: number): number {
 
 // --- Conversions ---
 
-// HSL to Hex
 export function hslToHex(h: number, s: number, l: number): string {
   l /= 100;
   const a = s * Math.min(l, 1 - l) / 100;
@@ -90,7 +76,6 @@ export function hslToHex(h: number, s: number, l: number): string {
   return `#${f(0)}${f(8)}${f(4)}`;
 }
 
-// Hex to RGB
 export function hexToRgb(hex: string): { r: number, g: number, b: number } {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result ? {
@@ -100,14 +85,13 @@ export function hexToRgb(hex: string): { r: number, g: number, b: number } {
   } : { r: 0, g: 0, b: 0 };
 }
 
-// RGB to HSL
 export function rgbToHsl(r: number, g: number, b: number): { h: number, s: number, l: number } {
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
   let h = 0, s, l = (max + min) / 2;
 
   if (max === min) {
-    h = s = 0; // achromatic
+    h = s = 0;
   } else {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
@@ -121,241 +105,91 @@ export function rgbToHsl(r: number, g: number, b: number): { h: number, s: numbe
   return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
 }
 
-// Hex to HSL
 export function hexToHsl(hex: string) {
   const rgb = hexToRgb(hex);
   return rgbToHsl(rgb.r, rgb.g, rgb.b);
 }
 
-// Approximation of OKLCH string (Standard CSS format)
 export function hexToOklchRaw(hex: string): string {
-    const { r, g, b } = hexToRgb(hex);
-    // 1. Convert to linear sRGB
-    const linear = (c: number) => {
-        const v = c / 255;
-        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-    };
-    const lr = linear(r), lg = linear(g), lb = linear(b);
-
-    // 2. Linear sRGB to LMS
-    const l = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb;
-    const m = 0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb;
-    const s = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb;
-
-    // 3. LMS to OKLCH
-    const l_ = Math.cbrt(l), m_ = Math.cbrt(m), s_ = Math.cbrt(s);
-
-    const L = 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_;
-    const C = Math.sqrt(Math.pow(1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_, 2) + Math.pow(0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_, 2));
-    let h = Math.atan2(0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_, 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_) * 180 / Math.PI;
-    
-    if (h < 0) h += 360;
-
-    // Return raw values: L% C H
-    return `${(L * 100).toFixed(1)}% ${C.toFixed(3)} ${h.toFixed(1)}`;
-}
-
-// Convert Hex to LCH (CIE LCH)
-export function hexToLch(hex: string): { l: number; c: number; h: number } {
-    const { r, g, b } = hexToRgb(hex);
-    
-    // Convert to XYZ
-    const linear = (c: number) => {
-        const v = c / 255;
-        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-    };
-    const lr = linear(r), lg = linear(g), lb = linear(b);
-    
-    const x = (lr * 0.4124564 + lg * 0.3575761 + lb * 0.1804375) * 100;
-    const y = (lr * 0.2126729 + lg * 0.7151522 + lb * 0.0721750) * 100;
-    const z = (lr * 0.0193339 + lg * 0.1191920 + lb * 0.9503041) * 100;
-    
-    // Convert XYZ to LAB
-    const xn = 95.047, yn = 100.000, zn = 108.883; // D65 illuminant
-    const f = (t: number) => t > 0.008856 ? Math.cbrt(t) : (7.787 * t + 16 / 116);
-    
-    const fx = f(x / xn);
-    const fy = f(y / yn);
-    const fz = f(z / zn);
-    
-    const L = 116 * fy - 16;
-    const a = 500 * (fx - fy);
-    const b_lab = 200 * (fy - fz);
-    
-    // Convert LAB to LCH
-    const C = Math.sqrt(a * a + b_lab * b_lab);
-    let H = Math.atan2(b_lab, a) * 180 / Math.PI;
-    if (H < 0) H += 360;
-    
-    return { l: L, c: C, h: H };
-}
-
-// Convert Hex to LAB (CIE LAB)
-export function hexToLab(hex: string): { l: number; a: number; b: number } {
-    const { r, g, b: b_rgb } = hexToRgb(hex);
-    
-    // Convert to XYZ
-    const linear = (c: number) => {
-        const v = c / 255;
-        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-    };
-    const lr = linear(r), lg = linear(g), lb = linear(b_rgb);
-    
-    const x = (lr * 0.4124564 + lg * 0.3575761 + lb * 0.1804375) * 100;
-    const y = (lr * 0.2126729 + lg * 0.7151522 + lb * 0.0721750) * 100;
-    const z = (lr * 0.0193339 + lg * 0.1191920 + lb * 0.9503041) * 100;
-    
-    // Convert XYZ to LAB
-    const xn = 95.047, yn = 100.000, zn = 108.883; // D65 illuminant
-    const f = (t: number) => t > 0.008856 ? Math.cbrt(t) : (7.787 * t + 16 / 116);
-    
-    const fx = f(x / xn);
-    const fy = f(y / yn);
-    const fz = f(z / zn);
-    
-    const L = 116 * fy - 16;
-    const a = 500 * (fx - fy);
-    const b_lab = 200 * (fy - fz);
-    
-    return { l: L, a, b: b_lab };
-}
-
-// Convert Hex to CMYK
-export function hexToCmyk(hex: string): { c: number; m: number; y: number; k: number } {
-    const { r, g, b } = hexToRgb(hex);
-    
-    // Normalize RGB values to 0-1
-    const rNorm = r / 255;
-    const gNorm = g / 255;
-    const bNorm = b / 255;
-    
-    // Calculate K (black)
-    const k = 1 - Math.max(rNorm, gNorm, bNorm);
-    
-    // Calculate CMY
-    const c = k === 1 ? 0 : (1 - rNorm - k) / (1 - k);
-    const m = k === 1 ? 0 : (1 - gNorm - k) / (1 - k);
-    const y = k === 1 ? 0 : (1 - bNorm - k) / (1 - k);
-    
-    return { 
-        c: Math.round(c * 100), 
-        m: Math.round(m * 100), 
-        y: Math.round(y * 100), 
-        k: Math.round(k * 100) 
-    };
-}
-
-// Convert Hex to Display P3
-export function hexToDisplayP3(hex: string): { r: number; g: number; b: number } {
-    const { r: r_srgb, g: g_srgb, b: b_srgb } = hexToRgb(hex);
-    
-    // Convert sRGB to linear RGB
-    const linear = (c: number) => {
-        const v = c / 255;
-        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-    };
-    
-    const r_linear = linear(r_srgb);
-    const g_linear = linear(g_srgb);
-    const b_linear = linear(b_srgb);
-    
-    // Convert linear sRGB to linear Display P3 using matrix transformation
-    const r_p3 = r_linear * 0.8224621 + g_linear * 0.1775380 + b_linear * 0.0000000;
-    const g_p3 = r_linear * 0.0331941 + g_linear * 0.9668058 + b_linear * 0.0000000;
-    const b_p3 = r_linear * 0.0170827 + g_linear * 0.0723974 + b_linear * 0.9105199;
-    
-    // Apply Display P3 gamma (same as sRGB)
-    const gamma = (c: number) => {
-        return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
-    };
-    
-    return {
-        r: Math.max(0, Math.min(1, gamma(r_p3))),
-        g: Math.max(0, Math.min(1, gamma(g_p3))),
-        b: Math.max(0, Math.min(1, gamma(b_p3)))
-    };
+  const { r, g, b } = hexToRgb(hex);
+  const linear = (c: number) => {
+    const v = c / 255;
+    return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  const lr = linear(r), lg = linear(g), lb = linear(b);
+  const l = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb;
+  const m = 0.2119034982 * lr + 0.6806995451 * lg + 0.1073970037 * lb;
+  const s = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb;
+  const l_ = Math.cbrt(l), m_ = Math.cbrt(m), s_ = Math.cbrt(s);
+  const L = 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_;
+  const a = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_;
+  const b_ = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_;
+  const C = Math.sqrt(a * a + b_ * b_);
+  let h = Math.atan2(b_, a) * (180 / Math.PI);
+  if (h < 0) h += 360;
+  return `oklch(${L.toFixed(3)} ${C.toFixed(3)} ${h.toFixed(1)})`;
 }
 
 export function formatColor(hex: string, format: ColorFormat): string {
-    if (format === 'hex') return hex.toUpperCase();
-    if (format === 'rgb') {
-        const {r,g,b} = hexToRgb(hex);
-        return `rgb(${r}, ${g}, ${b})`;
-    }
-    if (format === 'cmyk') {
-        const {c, m, y, k} = hexToCmyk(hex);
-        return `cmyk(${c}%, ${m}%, ${y}%, ${k}%)`;
-    }
-    if (format === 'hsl') {
-        const {h,s,l} = hexToHsl(hex);
-        return `hsl(${h}, ${s}%, ${l}%)`;
-    }
-    if (format === 'lab') {
-        const {l, a, b} = hexToLab(hex);
-        return `lab(${l.toFixed(1)}% ${a.toFixed(2)} ${b.toFixed(2)})`;
-    }
-    if (format === 'lch') {
-        const {l, c, h} = hexToLch(hex);
-        return `lch(${l.toFixed(1)}% ${c.toFixed(2)} ${h.toFixed(1)})`;
-    }
-    if (format === 'oklch') {
-        return `oklch(${hexToOklchRaw(hex)})`;
-    }
-    if (format === 'display-p3') {
-        const {r, g, b} = hexToDisplayP3(hex);
-        return `color(display-p3 ${r.toFixed(4)} ${g.toFixed(4)} ${b.toFixed(4)})`;
-    }
-    return hex;
+  const rgb = hexToRgb(hex);
+  const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  
+  switch (format) {
+    case 'hex': return hex.toUpperCase();
+    case 'rgb': return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+    case 'hsl': return `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
+    case 'oklch': return hexToOklchRaw(hex);
+    default: return hex.toUpperCase();
+  }
 }
 
-// Parse user input back to Hex using DOM engine for robustness
-export function parseToHex(input: string, contextFormat: ColorFormat): string | null {
-    const clean = input.trim();
-    if (!clean) return null;
+/**
+ * Parses user input into a valid Hex color string, or returns null if invalid.
+ * Supports:
+ * - Hex: #abc, #abcdef, abc, abcdef
+ * - RGB: rgb(0,0,0), 0,0,0
+ * - HSL: hsl(0,0%,0%)
+ */
+export function parseToHex(input: string, format?: ColorFormat): string | null {
+  input = input.trim().toLowerCase();
 
-    let testString = clean;
-
-    // Try to fix raw numbers based on context
-    // Check if it already has a function wrapper
-    const hasWrapper = /^[a-z]+\(/.test(clean);
-
-    // Check for raw hex (3, 4, 6, 8 chars)
-    if (/^[0-9A-Fa-f]{3,8}$/.test(clean)) {
-        testString = '#' + clean;
-    } else if (!hasWrapper && !clean.startsWith('#')) {
-        // Assume raw numbers
-        if (contextFormat === 'rgb') {
-             // 255 255 255 or 255, 255, 255
-             testString = `rgb(${clean})`;
-        } else if (contextFormat === 'hsl') {
-             testString = `hsl(${clean})`;
-        } else if (contextFormat === 'oklch') {
-             testString = `oklch(${clean})`;
-        }
+  // 1. Try Hex
+  // Match #RGB, #RRGGBB, RGB, RRGGBB
+  const hexMatch = input.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/);
+  if (hexMatch) {
+    let hex = hexMatch[1];
+    if (hex.length === 3) {
+      hex = hex.split('').map(c => c + c).join('');
     }
+    return '#' + hex;
+  }
 
-    const div = document.createElement('div');
-    div.style.color = testString;
-    // Check if valid
-    if (!div.style.color) return null; // Invalid color
-
-    // Browser converts everything to RGB computed style
-    document.body.appendChild(div);
-    const computed = window.getComputedStyle(div).color;
-    document.body.removeChild(div);
-
-    // computed is usually "rgb(r, g, b)"
-    const match = computed.match(/\d+/g);
-    if (match && match.length >= 3) {
-        const r = parseInt(match[0]);
-        const g = parseInt(match[1]);
-        const b = parseInt(match[2]);
-        // Convert RGB to Hex
-        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  // 2. Try RGB
+  // valid formats: "rgb(255, 255, 255)", "255, 255, 255", "255 255 255"
+  const rgbValues = input.match(/(\d{1,3})[,\s]+(\d{1,3})[,\s]+(\d{1,3})/);
+  if (rgbValues) {
+    const r = parseInt(rgbValues[1]);
+    const g = parseInt(rgbValues[2]);
+    const b = parseInt(rgbValues[3]);
+    if (r <= 255 && g <= 255 && b <= 255) {
+      return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
     }
-    return null;
+  }
+
+  // 3. Try HSL
+  // valid formats: "hsl(360, 100%, 50%)", "360, 100%, 50%"
+  const hslValues = input.match(/(\d{1,3})[,\s]+(\d{1,3})%?[,\s]+(\d{1,3})%?/);
+  if (hslValues && (input.includes('hsl') || format === 'hsl')) {
+    const h = parseInt(hslValues[1]);
+    const s = parseInt(hslValues[2]);
+    const l = parseInt(hslValues[3]);
+    if (h <= 360 && s <= 100 && l <= 100) {
+      return hslToHex(h, s, l);
+    }
+  }
+
+  return null;
 }
-
 
 // --- Generators ---
 
@@ -366,92 +200,17 @@ function randomHue(seedVal?: number) {
   return Math.floor(Math.random() * 360); 
 }
 
-// Returns 5 hues for: [primary, secondary, accent, good, bad]
 function getHarmonyHues(baseHue: number, mode: GenerationMode): number[] {
   switch (mode) {
-    // Monochrome: All same hue, contrast comes from lightness
-    case 'monochrome': 
-      return [baseHue, baseHue, baseHue, baseHue, baseHue];
-    
-    // Analogous: 5 colors spread 25° apart (spanning 100°)
-    case 'analogous': 
-      return [
-        baseHue,
-        (baseHue + 25) % 360,
-        (baseHue + 50) % 360,
-        (baseHue - 25 + 360) % 360,
-        (baseHue - 50 + 360) % 360
-      ];
-    
-    // Complementary: Base + complement + neighbors of each
-    case 'complementary': 
-      return [
-        baseHue,
-        (baseHue + 180) % 360,
-        (baseHue + 30) % 360,
-        (baseHue + 210) % 360,
-        (baseHue - 30 + 360) % 360
-      ];
-    
-    // Split-Complementary Extended: Base + split complements + accents
-    case 'split-complementary': 
-      return [
-        baseHue,
-        (baseHue + 150) % 360,
-        (baseHue + 210) % 360,
-        (baseHue + 30) % 360,
-        (baseHue + 180) % 360
-      ];
-    
-    // Triadic Extended: 3 main colors + 2 bridge colors
-    case 'triadic': 
-      return [
-        baseHue,
-        (baseHue + 120) % 360,
-        (baseHue + 240) % 360,
-        (baseHue + 60) % 360,
-        (baseHue + 180) % 360
-      ];
-    
-    // Tetradic/Square: 4 colors at 90° + 1 accent
-    case 'tetradic': 
-      return [
-        baseHue,
-        (baseHue + 90) % 360,
-        (baseHue + 180) % 360,
-        (baseHue + 270) % 360,
-        (baseHue + 45) % 360
-      ];
-    
-    // Compound (Warm-Cool Split): Cool primary + warm analogous opposites
-    case 'compound': 
-      return [
-        baseHue,
-        (baseHue + 165) % 360,
-        (baseHue + 180) % 360,
-        (baseHue + 195) % 360,
-        (baseHue + 30) % 360
-      ];
-    
-    // Triadic-Split: Triadic with one leg split
-    case 'triadic-split': 
-      return [
-        baseHue,
-        (baseHue + 120) % 360,
-        (baseHue + 150) % 360,
-        (baseHue + 240) % 360,
-        (baseHue + 270) % 360
-      ];
-    
-    // Default: Pentadic (5 colors evenly spaced at 72°)
-    default: 
-      return [
-        baseHue,
-        (baseHue + 72) % 360,
-        (baseHue + 144) % 360,
-        (baseHue + 216) % 360,
-        (baseHue + 288) % 360
-      ];
+    case 'monochrome': return [baseHue, baseHue, baseHue, baseHue, baseHue];
+    case 'analogous': return [baseHue, (baseHue + 25) % 360, (baseHue + 50) % 360, (baseHue - 25 + 360) % 360, (baseHue - 50 + 360) % 360];
+    case 'complementary': return [baseHue, (baseHue + 180) % 360, (baseHue + 30) % 360, (baseHue + 210) % 360, (baseHue - 30 + 360) % 360];
+    case 'split-complementary': return [baseHue, (baseHue + 150) % 360, (baseHue + 210) % 360, (baseHue + 30) % 360, (baseHue + 180) % 360];
+    case 'triadic': return [baseHue, (baseHue + 120) % 360, (baseHue + 240) % 360, (baseHue + 60) % 360, (baseHue + 180) % 360];
+    case 'tetradic': return [baseHue, (baseHue + 90) % 360, (baseHue + 180) % 360, (baseHue + 270) % 360, (baseHue + 45) % 360];
+    case 'compound': return [baseHue, (baseHue + 165) % 360, (baseHue + 180) % 360, (baseHue + 195) % 360, (baseHue + 30) % 360];
+    case 'triadic-split': return [baseHue, (baseHue + 120) % 360, (baseHue + 150) % 360, (baseHue + 240) % 360, (baseHue + 270) % 360];
+    default: return [baseHue, (baseHue + 72) % 360, (baseHue + 144) % 360, (baseHue + 216) % 360, (baseHue + 288) % 360];
   }
 }
 
@@ -460,249 +219,157 @@ function getHarmonyHues(baseHue: number, mode: GenerationMode): number[] {
 export function generateTheme(
   mode: GenerationMode, 
   seedColor?: string, 
-  saturationLevel: number = 0, // -5 to 5
-  contrastLevel: number = 0,   // -5 to 5
-  brightnessLevel: number = 0  // -5 to 5
+  saturationLevel: number = 0,
+  contrastLevel: number = 0,
+  brightnessLevel: number = 0,
+  overridePalette?: string[]
 ): { light: ThemeTokens, dark: ThemeTokens, seed: string } {
-  let baseHue: number;
+  let hues: number[] = [];
+  let sats: number[] = [];
+  let baseHue: number = 0;
   let baseSat = 70;
   let seedVal = 0;
 
-  if (seedColor) {
-    seedVal = getSeedValue(seedColor);
-    const hsl = hexToHsl(seedColor);
-    baseHue = hsl.h;
-    baseSat = hsl.s;
+  if (overridePalette && overridePalette.length === 5) {
+    // Find first valid color to use as seed
+    const firstValidColor = overridePalette.find(p => p && p !== '') || '#3b82f6';
+    seedVal = getSeedValue(firstValidColor);
+    
+    // Generate fallback connection logic if some are missing
+    // We base fallbacks on the first valid color's harmony
+    const baseHsl = hexToHsl(firstValidColor);
+    
+    // Use the current mode (or analogous if random) to frame the missing colors
+    const fallbackMode = mode === 'random' ? 'analogous' : mode;
+    const fallbackHues = getHarmonyHues(baseHsl.h, fallbackMode);
+    
+    overridePalette.forEach((hex, i) => {
+      if (hex && hex !== '') {
+        const hsl = hexToHsl(hex);
+        hues.push(hsl.h);
+        sats.push(hsl.s);
+      } else {
+        // Use generated harmony hue and standard saturation
+        hues.push(fallbackHues[i]);
+        sats.push(70); // Default saturation for filled slots
+      }
+    });
+    baseHue = hues[0];
+    baseSat = sats[0];
   } else {
-    // If random, generate a base hue and create a seed for consistency
-    baseHue = randomHue();
-    const tempSeed = hslToHex(baseHue, 50, 50);
-    seedVal = getSeedValue(tempSeed);
-    
-    // Saturation Logic (Base randomness)
-    // 0: 0% (pure grayscale)
-    // 1: 15-25% (low saturation, more visible color)
-    // 2: 40-50% (medium saturation)
-    // 3: 65-75% (high saturation)
-    // 4: 90-100% (maximum saturation)
-    const satRandom = seededRandom(seedVal + 1);
-    
+    if (seedColor) {
+      seedVal = getSeedValue(seedColor);
+      const hsl = hexToHsl(seedColor);
+      baseHue = hsl.h;
+      baseSat = hsl.s;
+    } else {
+      baseHue = randomHue();
+      const tempSeed = hslToHex(baseHue, 50, 50);
+      seedVal = getSeedValue(tempSeed);
+      const satRandom = seededRandom(seedVal + 1);
+      if (mode === 'random') {
+          const satNorm = saturationLevel + 5; 
+          const randVariation = Math.floor(satRandom * 20); 
+          if (saturationLevel === -5) { baseSat = 0; }
+          else { baseSat = (satNorm * 9) + randVariation; }
+      }
+    }
     if (mode === 'random') {
-        // Base Saturation mapping for random generation
-        // Normal (0) -> ~60
-        // -5 -> 0 (Grayscale)
-        // +5 -> 95 (Vivid)
-        const satNorm = saturationLevel + 5; // 0 to 10
-        const randVariation = Math.floor(satRandom * 20); // 0-20 variation
-        
-        if (saturationLevel === -5) {
-            baseSat = 0;
-        } else {
-            // Map 0-10 scale to roughly 0-100 range
-            baseSat = (satNorm * 9) + randVariation; 
-        }
+      const harmonyModes: GenerationMode[] = ['analogous', 'complementary', 'split-complementary', 'triadic', 'tetradic', 'compound', 'triadic-split'];
+      const randomHarmonyIndex = Math.floor(seededRandom(seedVal + 10) * harmonyModes.length);
+      const selectedHarmony = harmonyModes[randomHarmonyIndex];
+      hues = getHarmonyHues(baseHue, selectedHarmony);
+    } else {
+      hues = getHarmonyHues(baseHue, mode);
     }
   }
-  
-  let hues: number[];
-  if (mode === 'random') {
-    // Random mode picks a random color harmony for color-theory-based generation
-    const harmonyModes: GenerationMode[] = [
-      'analogous',
-      'complementary', 
-      'split-complementary',
-      'triadic',
-      'tetradic',
-      'compound',
-      'triadic-split'
-    ];
-    const randomHarmonyIndex = Math.floor(seededRandom(seedVal + 10) * harmonyModes.length);
-    const selectedHarmony = harmonyModes[randomHarmonyIndex];
-    hues = getHarmonyHues(baseHue, selectedHarmony);
-  } else {
-    hues = getHarmonyHues(baseHue, mode);
-  }
 
-  const primaryHue = hues[0];
-  const secondaryHue = hues[1];
-  const accentHue = hues[2];
+  let primaryHue = hues[0];
+  let secondaryHue = hues[1];
+  let accentHue = hues[2];
   let goodHue = hues[3];
   let badHue = hues[4];
 
-  // Prefer colors closer to semantic expectations:
-  // - Good should be closer to green (hue ~120)
-  // - Bad should be closer to red (hue ~0 or 360)
-  const distanceToHue = (hue: number, target: number) => {
-    return Math.min(Math.abs(hue - target), 360 - Math.abs(hue - target));
-  };
-  
-  const goodDistToGreen = distanceToHue(goodHue, 120);
-  const goodDistToRed = distanceToHue(goodHue, 0);
-  const badDistToGreen = distanceToHue(badHue, 120);
-  const badDistToRed = distanceToHue(badHue, 0);
-  
-  // Swap if bad is closer to green than good, or good is closer to red than bad
-  if (badDistToGreen < goodDistToGreen || goodDistToRed < badDistToRed) {
-    [goodHue, badHue] = [badHue, goodHue];
+  if (!overridePalette) {
+    const distanceToHue = (h: number, t: number) => Math.min(Math.abs(h - t), 360 - Math.abs(h - t));
+    const goodDistToGreen = distanceToHue(goodHue, 120);
+    const goodDistToRed = distanceToHue(goodHue, 0);
+    const badDistToGreen = distanceToHue(badHue, 120);
+    const badDistToRed = distanceToHue(badHue, 0);
+    if (badDistToGreen < goodDistToGreen || goodDistToRed < badDistToRed) {
+      [goodHue, badHue] = [badHue, goodHue];
+    }
   }
 
-  // Adjust Primary Saturation based on level (-5 to 5)
-  // -5: Grayscale (0)
-  // 0: Medium (50-70)
-  // +5: Vivid (90-100)
-  
-  let primarySat = baseSat;
-  
-  // Calculate specific min/max bounds based on saturation level
-  // Map -5 to 5 range to 0 to 100 saturation bands
-  // Level -> Min Sat
-  // -5 -> 0
-  // 0 -> 40
-  // 5 -> 90
-  const satLevelIndex = saturationLevel + 5; // 0 to 10
-  
-  const getMinSat = (lvl: number) => {
-      if (lvl <= 0) return 0; // -5
-      return Math.min(90, lvl * 9); 
-  };
-  const getMaxSat = (lvl: number) => {
-      if (lvl <= 0) return 0;
-      return Math.min(100, (lvl * 9) + 20);
-  };
-
+  const satLevelIndex = saturationLevel + 5; 
+  const getMinSat = (lvl: number) => lvl <= 0 ? 0 : Math.min(90, lvl * 9); 
+  const getMaxSat = (lvl: number) => lvl <= 0 ? 0 : Math.min(100, (lvl * 9) + 20);
   const sMin = getMinSat(satLevelIndex);
   const sMax = getMaxSat(satLevelIndex);
 
-  primarySat = clamp(baseSat, sMin, sMax);
+  let primarySat = overridePalette ? sats[0] : clamp(baseSat, sMin, sMax);
+  let secondarySat = overridePalette ? sats[1] : (mode === 'monochrome' ? clamp(baseSat - 30, 0, sMax - 20) : clamp(baseSat - 10, sMin, sMax));
+  let accentSat = overridePalette ? sats[2] : clamp(baseSat + 10, sMin, sMax);
+  let goodSat = overridePalette ? sats[3] : clamp(baseSat, sMin, sMax);
+  let badSat = overridePalette ? sats[4] : clamp(baseSat, sMin, sMax);
 
-  let secondarySat = mode === 'monochrome' ? clamp(baseSat - 30, 0, sMax - 20) : clamp(baseSat - 10, sMin, sMax);
-  let accentSat = mode === 'monochrome' ? clamp(baseSat + 10, sMin, sMax) : clamp(baseSat + 10, sMin, sMax);
-  let goodSat = clamp(baseSat, sMin, sMax);
-  let badSat = clamp(baseSat, sMin, sMax);
-
-  // --- Brightness Level Logic (-5 to 5 scale) ---
-  // Level -5 (Dim): Compresses toward dark
-  // Level 0 (Normal): Equal headroom
-  // Level +5 (Bright): Compresses toward bright
-  
-  // Map -5 to 5 -> 0 to 1 for interpolation or direct lookups
-  // For simplicity, we'll map to indices or continuous values
-  
-  // Background Lightness Adjustments
-  // Normal Light Bg = 96 (Headroom from white)
-  // Normal Dark Bg = 10 (Headroom from black)
-  // Contrast Level (-5 to +5) affects these anchors:
-  // +5: Push to 100 / 0
-  // -5: Pull to 92 / 18
-  
   let lightBase = 96; 
   let darkBase = 10;
-  
-  // Apply Contrast to Base Backgrounds
-  // Positive contrast expels bg outward
-  // Negative contrast pulls bg inward (grayer)
   if (contrastLevel > 0) {
-      // 0 to 5 -> 96 to 100
       lightBase = 96 + (contrastLevel * 0.8);
-      // 0 to 5 -> 10 to 0
       darkBase = 10 - (contrastLevel * 2); 
   } else {
-      // 0 to -5 -> 96 to 92
       lightBase = 96 + (contrastLevel * 0.8);
-      // 0 to -5 -> 10 to 18
       darkBase = 10 - (contrastLevel * 1.6);
   }
 
   let lightBgL = lightBase;
   let darkBgL = darkBase;
-  
   if (brightnessLevel < 0) {
-      // Dimming: Light becomes darker, Dark becomes darker (crushed)
       lightBgL = lightBase - (Math.abs(brightnessLevel) * 7); 
       darkBgL = Math.max(0, darkBase - (Math.abs(brightnessLevel) * 1)); 
   } else {
-      // Brightening: Light becomes white, Dark becomes lighter
       lightBgL = Math.min(100, lightBase + (brightnessLevel * 0.8));
       darkBgL = darkBase + (brightnessLevel * 5); 
   }
 
-  // --- Dynamic Range (Contrast) Logic (-5 to 5) ---
-  // -5: Low Contrast (Text closer to BG)
-  // 0: Normal
-  // +5: High Contrast (Text furthest from BG)
-  
-  // Base text offsets from BG
-  const baseLightTextOffset = 65; // Black text on white
-  const baseDarkTextOffset = 70;  // White text on black
-  
-  const contrastFactor = 1 + (contrastLevel * 0.1); // 0.5 to 1.5 multiplier
-  
+  const baseLightTextOffset = 65;
+  const baseDarkTextOffset = 70;
+  const contrastFactor = 1 + (contrastLevel * 0.1);
   const lightTextL = clamp(lightBgL - (baseLightTextOffset * contrastFactor), 5, 90);
   const darkTextL = clamp(darkBgL + (baseDarkTextOffset * contrastFactor), 15, 98);
-  
-  // Base Color Lightness Modifiers (how "poppy" the colors are against bg)
-  // Modulate based on brightness and contrast
   const baseLightColorMod = 46;
-  const baseDarkColorMod = 50; // Matched richness to light mode
-  
-  // Shift color lightness based on brightness compression
-  const brightnessShift = brightnessLevel * 3; // -15 to +15
-  
-  // Contrast also affects color lightness (Dynamic Range)
-  // High contrast = Darker colors in Light Mode, Lighter colors in Dark Mode (more distance from BG)
-  // Low contrast = Lighter colors in Light Mode, Darker colors in Dark Mode (less distance from BG)
-  // contrastLevel is -5 to 5.
-  const contrastShiftLight = contrastLevel * -2; // Higher contrast -> Darker color
-  const contrastShiftDark = contrastLevel * 2;   // Higher contrast -> Lighter color
-  
+  const baseDarkColorMod = 50;
+  const brightnessShift = brightnessLevel * 3;
+  const contrastShiftLight = contrastLevel * -2;
+  const contrastShiftDark = contrastLevel * 2;
   const lightColorMod = clamp(baseLightColorMod + brightnessShift + contrastShiftLight, 30, 70);
   const darkColorMod = clamp(baseDarkColorMod + brightnessShift + contrastShiftDark, 35, 80);
 
-  // Random variance to background saturation if tinted
   const rnd = seededRandom(seedVal + 4);
-  const isTinted = rnd > 0.5 && saturationLevel > -3; // Don't tint if very desaturated
+  const isTinted = rnd > 0.5 && saturationLevel > -3;
   const bgSat = isTinted ? Math.floor(seededRandom(seedVal + 5) * ((saturationLevel + 5) * 1.5)) : Math.floor(seededRandom(seedVal + 5) * 3);
 
-  // Surface Logic - relative to bg
-  const lightSurfOffset = 2 + (Math.abs(brightnessLevel - 5) * 0.5); // Slight variance
+  const lightSurfOffset = 2 + (Math.abs(brightnessLevel - 5) * 0.5);
   const darkSurfOffset = 4 + (brightnessLevel * 0.5); 
-  
   const lightSurfL = clamp(lightBgL - lightSurfOffset, 0, 100);
-  // Dark surface usually lighter than bg
   const darkSurfL = clamp(darkBgL + 5 + (contrastLevel * 0.5), 0, 100); 
 
-  // Generate Tokens with brightness applied to ALL colors
-  // applyBrightness shifts lightness proportionally based on distance from 50% gray
   const light: ThemeTokens = {
     bg: hslToHex(primaryHue, bgSat, applyBrightness(lightBgL, brightnessLevel)), 
     card: hslToHex(primaryHue, bgSat, applyBrightness(Math.min(100, lightSurfL), brightnessLevel)),
     card2: hslToHex(primaryHue, bgSat, applyBrightness(Math.min(100, lightSurfL - 3), brightnessLevel)),
     text: hslToHex(primaryHue, 10, applyBrightness(lightTextL, brightnessLevel)), 
     textMuted: hslToHex(primaryHue, 10, applyBrightness(lightTextL + 30, brightnessLevel)),
-    // textOnColor: High lightness, but saturation follows slider. 
-    // If contrast is low (-5), reduce lightness slightly to be softer? No, usually text on color needs high contrast.
-    // Dynamic textOnColor: Flip to dark if primary is too light
-    textOnColor: applyBrightness(lightColorMod, brightnessLevel) > 65 
-      ? hslToHex(primaryHue, Math.max(0, (saturationLevel + 5) * 2), 10) // Dark text for light buttons
-      : hslToHex(primaryHue, Math.max(0, (saturationLevel + 5) * 2), 98), // Light text for dark buttons
-    
+    textOnColor: applyBrightness(lightColorMod, brightnessLevel) > 65 ? hslToHex(primaryHue, Math.max(0, (saturationLevel + 5) * 2), 10) : hslToHex(primaryHue, Math.max(0, (saturationLevel + 5) * 2), 98),
     primary: hslToHex(primaryHue, primarySat, applyBrightness(lightColorMod, brightnessLevel)), 
     primaryFg: '#ffffff', 
-    
-    // Secondary: distinct color for UI elements in light mode
-    secondary: mode === 'monochrome' 
-      ? hslToHex(secondaryHue, 10, applyBrightness(Math.min(lightColorMod + 20, 80), brightnessLevel)) 
-      : hslToHex(secondaryHue, secondarySat, applyBrightness(Math.min(lightColorMod + 10, 75), brightnessLevel)),
-      
+    secondary: mode === 'monochrome' ? hslToHex(secondaryHue, 10, applyBrightness(Math.min(lightColorMod + 20, 80), brightnessLevel)) : hslToHex(secondaryHue, secondarySat, applyBrightness(Math.min(lightColorMod + 10, 75), brightnessLevel)),
     secondaryFg: hslToHex(secondaryHue, 40, applyBrightness(lightTextL, brightnessLevel)),
-    
     accent: hslToHex(accentHue, accentSat, applyBrightness(lightColorMod + 5, brightnessLevel)),
     accentFg: '#ffffff',
-    
     border: hslToHex(primaryHue, 10, applyBrightness(lightBgL - 10, brightnessLevel)),
     ring: hslToHex(primaryHue, 60, applyBrightness(60, brightnessLevel)),
-    
-    // Good, Warn, Bad: Use harmony colors directly from 5-color palette
     good: hslToHex(goodHue, goodSat, applyBrightness(Math.max(lightColorMod - 5, 40), brightnessLevel)),
     goodFg: '#ffffff',
     warn: hslToHex(accentHue, accentSat, applyBrightness(Math.max(lightColorMod, 45), brightnessLevel)),
@@ -717,25 +384,17 @@ export function generateTheme(
     card2: hslToHex(primaryHue, bgSat, applyBrightness(darkSurfL + 5, brightnessLevel)),
     text: hslToHex(primaryHue, 10, applyBrightness(darkTextL, brightnessLevel)),
     textMuted: hslToHex(primaryHue, 10, applyBrightness(darkTextL - 30, brightnessLevel)),
-    // Dynamic textOnColor: Flip to dark if primary is too light (rare in dark mode but possible at max brightness)
     textOnColor: applyBrightness(darkColorMod, brightnessLevel) > 65
       ? hslToHex(primaryHue, Math.max(0, (saturationLevel + 5) * 2), 10)
       : hslToHex(primaryHue, Math.max(0, (saturationLevel + 5) * 2), 98),
-    
     primary: hslToHex(primaryHue, primarySat, applyBrightness(darkColorMod, brightnessLevel)),
     primaryFg: '#ffffff',
-    
-    // Secondary: brighter for better readability in dark mode
     secondary: hslToHex(secondaryHue, secondarySat, applyBrightness(Math.max(darkColorMod - 10, 40), brightnessLevel)), 
     secondaryFg: hslToHex(secondaryHue, 40, applyBrightness(darkTextL, brightnessLevel)),
-    
     accent: hslToHex(accentHue, accentSat, applyBrightness(darkColorMod + 5, brightnessLevel)),
     accentFg: '#ffffff',
-    
     border: hslToHex(primaryHue, 15, applyBrightness(darkBgL + 12, brightnessLevel)),
     ring: hslToHex(primaryHue, 60, applyBrightness(60, brightnessLevel)),
-    
-    // Good, Warn, Bad: Use harmony colors directly from 5-color palette
     good: hslToHex(goodHue, goodSat, applyBrightness(Math.max(darkColorMod - 10, 35), brightnessLevel)),
     goodFg: '#ffffff',
     warn: hslToHex(accentHue, accentSat, applyBrightness(Math.max(darkColorMod - 5, 40), brightnessLevel)),
@@ -747,8 +406,7 @@ export function generateTheme(
   return { light, dark, seed: seedColor || hslToHex(baseHue, baseSat, 50) };
 }
 
-// Convert image to dominant color (very basic implementation)
-export async function extractColorFromImage(file: File): Promise<string> {
+export async function extractPaletteFromImage(file: File): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -757,27 +415,42 @@ export async function extractColorFromImage(file: File): Promise<string> {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) return reject("No context");
-        
-        canvas.width = 50; // resize for performance
-        canvas.height = 50;
-        ctx.drawImage(img, 0, 0, 50, 50);
-        
-        const data = ctx.getImageData(0, 0, 50, 50).data;
-        let r=0, g=0, b=0, count=0;
-        
-        for (let i = 0; i < data.length; i += 4 * 10) { // sample every 10th pixel
-           r += data[i];
-           g += data[i+1];
-           b += data[i+2];
-           count++;
+        const size = 100;
+        canvas.width = size;
+        canvas.height = size;
+        ctx.drawImage(img, 0, 0, size, size);
+        const data = ctx.getImageData(0, 0, size, size).data;
+        const colorCounts: Record<string, number> = {};
+        for (let i = 0; i < data.length; i += 4 * 4) {
+          const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+          if (a < 128) continue;
+          const qr = Math.round(r / 16) * 16, qg = Math.round(g / 16) * 16, qb = Math.round(b / 16) * 16;
+          const key = `${qr},${qg},${qb}`;
+          colorCounts[key] = (colorCounts[key] || 0) + 1;
         }
-        
-        r = Math.floor(r/count);
-        g = Math.floor(g/count);
-        b = Math.floor(b/count);
-        
-        const hsl = rgbToHsl(r, g, b);
-        resolve(hslToHex(hsl.h, hsl.s, hsl.l));
+        const sortedColors = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]).map(([key]) => {
+            const [r, g, b] = key.split(',').map(Number);
+            return { r, g, b, hsl: rgbToHsl(r, g, b) };
+          });
+        const palette: string[] = [];
+        const minHueDiff = 20;
+        for (const c of sortedColors) {
+          if (palette.length >= 5) break;
+          const isTooSimilar = palette.some(existingHex => {
+            const extHsl = hexToHsl(existingHex);
+            const hueDiff = Math.min(Math.abs(extHsl.h - c.hsl.h), 360 - Math.abs(extHsl.h - c.hsl.h));
+            return hueDiff < minHueDiff && Math.abs(extHsl.s - c.hsl.s) < 20 && Math.abs(extHsl.l - c.hsl.l) < 20;
+          });
+          if (!isTooSimilar) palette.push(hslToHex(c.hsl.h, c.hsl.s, c.hsl.l));
+        }
+        if (palette.length < 5) {
+          for (const c of sortedColors) {
+            if (palette.length >= 5) break;
+            const hex = hslToHex(c.hsl.h, c.hsl.s, c.hsl.l);
+            if (!palette.includes(hex)) palette.push(hex);
+          }
+        }
+        resolve(palette.length > 0 ? palette : ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']);
       };
       img.src = event.target?.result as string;
     };

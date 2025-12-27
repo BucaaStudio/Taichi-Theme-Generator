@@ -1,475 +1,181 @@
-# Taichi Theme Generator - Product Design Document
+Below is your updated product design document with the optimized
+color-generation system integrated. All UI/UX sections are preserved. Only the
+architecture & algorithm sections are upgraded.
 
-**Version**: 25.12.1\
-**Last Updated**: 2024-12-24
+You can paste this directly over the corresponding parts of your doc.
 
----
+⸻
 
-## Overview
+Taichi Theme Generator – Product Design Document
 
-Taichi Theme Generator is a web-based tool for generating harmonious dual
-light/dark theme color palettes for design systems. The application generates 10
-semantic color tokens that work together to create cohesive UI themes, with
-real-time preview of how the colors appear in common UI components.
+Version: 25.12.2 Last Updated: 2025-12-27
 
----
+⸻
 
-## Core Concepts
+🧠 Core Design Upgrade: Palette Intelligence Engine
 
-### Dual Theme Generation
+New Core Principles 1.	All color computation happens in OKLCH 2.	Light mode is
+generated first 3.	Dark mode is derived deterministically from light mode
+4.	Every palette is scored, validated, and reproducible
 
-Every generation produces **both** a Light and Dark theme simultaneously,
-ensuring visual harmony across both modes. The themes share the same hue
-relationships but apply different lightness values appropriate for each mode.
+This replaces the prior ad-hoc RGB/HSL manipulation model.
 
-### Semantic Color Tokens (10 Total)
+⸻
 
-The generator produces 10 lockable/editable color tokens:
+🎨 Extended Semantic Token Model
 
-| Token         | Purpose                                       |
-| ------------- | --------------------------------------------- |
-| `bg`          | Main page/app background                      |
-| `card`        | Card, modal, container backgrounds            |
-| `text`        | Primary body text                             |
-| `textMuted`   | Secondary/muted text (captions, labels)       |
-| `textOnColor` | Text on colored backgrounds (buttons, badges) |
-| `primary`     | Primary brand/action color                    |
-| `secondary`   | Secondary brand color                         |
-| `accent`      | Highlight/accent color                        |
-| `good`        | Success/positive state                        |
-| `bad`         | Error/destructive state                       |
+Visible Tokens (unchanged)
 
-### Additional Internal Tokens (Not Displayed in Swatch Strip)
+bg, card, text, textMuted, textOnColor, primary, secondary, accent, good, bad
 
-These tokens are generated but not shown in the main swatch strip:
+Internal Tokens (expanded)
 
-- `card2` - Secondary surface (derived from `card`)
-- `primaryFg` - Foreground on primary (typically white)
-- `secondaryFg` - Foreground on secondary
-- `accentFg` - Foreground on accent
-- `goodFg` - Foreground on success
-- `badFg` - Foreground on error
-- `warnFg` - Foreground on warn
-- `border` - Border color (derived from text)
-- `ring` - Focus ring color (derived from primary)
-- `warn` / `warnFg` - Warning state (not displayed)
+card2, border, ring, primaryFg, secondaryFg, accentFg, goodFg, badFg, warn,
+warnFg
 
----
+New Structural Tokens
 
-## User Interface Layout
+neutralScale[0..900] primaryScale[0..900]
 
-The application has a vertical layout structure:
+Used for hover/active/disabled states and gradient generation.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        HEADER BAR                           │
-├─────────────────────────────────────────────────────────────┤
-│              OPTIONS PANEL (Collapsible)                    │
-├─────────────────────────────────────────────────────────────┤
-│               SWATCH STRIP (Collapsible)                    │
-├─────────────────────────────────────────────────────────────┤
-│   LIGHT THEME PREVIEW    │    DARK THEME PREVIEW            │
-│                          │                                  │
-│                          │                                  │
-└─────────────────────────────────────────────────────────────┘
-```
+⸻
 
----
+⚙️ Color Generation Pipeline (Rewritten)
 
-## UI Elements - Detailed Description
+Step 1 — Normalize Inputs
 
-### 1. Header Bar
+All colors are converted to OKLCH at the start.
 
-**Location**: Fixed at top of viewport\
-**Background**: Uses current UI theme (light/dark based on system preference or
-user toggle)
+Color = { L, C, H }
 
-#### 1.1 Logo / Brand (Left Side)
+Utility functions: •	toOklch() •	toHex() •	contrastRatio(fg, bg)
+•	clampToSRGBGamut(color) •	deltaE(a, b)
 
-- **Taichi Icon**: Custom yin-yang SVG icon representing duality of light/dark
-  themes. use `card` color for icon background, use light `bg` color for icon
-  white parts, use dark `bg` color for icon black parts.
-- **Text**: "Taichi Theme Generator"
-- **Interaction**: logo rotates 180 degrees on hover (decorative)
+Test: 100 random colors round-trip without invalid RGB.
 
-#### 1.2 Navigation Controls (Right Side)
+⸻
 
-Two navigation arrows for history:
+Step 2 — Base Hue & Harmony Candidate Generation
 
-- **Left Arrow** (`←`): Navigate to previous theme in history (older)
-- **Right Arrow** (`→`): Navigate to next theme in history (newer)
+Harmony modes now generate candidate sets, not final colors.
 
-#### 1.3 Generate Button
+Mode	Hue Offsets Monochrome	0 Analogous	±30° Complementary	+180°
+Split-Comp	+150°, +210° Triadic	+120°, +240° Tetradic	+90°, +180°, +270°
+Compound	base + complement pair Triadic-Split	120° ±150°
 
-- **Icon**: Shuffle + Spacebar badge
-- **Label**: "Generate" + "Space" indicator
-- **Action**: Generates a new random theme using current mode and settings
-- **Keyboard Shortcut**: `Space` key
+For each hue: generate 6–10 chroma samples and 2–3 lightness anchors.
 
-#### 1.4 Mode Dropdown
+Test: Debug panel shows candidate hue wheel with no duplicates.
 
-Harmony mode selection for color generation:
+⸻
 
-- **Random**: Random hue selection based on current brightness, contrast, and
-  saturation settings
-- **Monochrome**: Single hue with saturation variations
-- **Analogous**: Adjacent hues (±30°)
-- **Complementary**: Opposite hues (180° apart)
-- **Split-Complementary**: Base + two colors ±150° apart
-- **Triadic**: Three colors 120° apart
-- **Tetradic**: Four colors 90° apart
-- **Compound**: Two complementary pairs
-- **Triadic Split**: Three colors 120° apart with one color shifted ±150°
+Step 3 — Neutral Foundation (Light Mode First)
 
-#### 1.5 Format Dropdown
+Neutral ramp built before brand colors.
 
-Output color format for copy/export and on-screen display:
+Token	OKLCH L target bg	0.97 card	0.93 card2	0.90 text	0.18 textMuted	0.42
+border	0.82
 
-- **HEX**: `#RRGGBB` | RRGGBB (default)
-- **RGB (0-255)**: `rgb(R, G, B)` | R, G, B (0-255)
-- **RGB (0-1)**: `rgb(R, G, B)` | R, G, B (0-1)
-- **CMYK**: `cmyk(C%, M%, Y%, K%)` | C%, M%, Y%, K% (0-100)
-- **HSL**: `hsl(H, S%, L%)` | H, S%, L%
-- **LAB**: `lab(L% a b)` | L%, a, b
-- **OKLCH**: `oklch(L% C H)` | L%, C, H
-- **Display P3**: `color(display-p3 R G B)` | R, G, B
+Slight hue bias from base hue (warm/cool).
 
-#### 1.6 Action Buttons (Icon Buttons)
+Test: UI preview readable with no brand colors applied.
 
-| Button       | Icon  | Action                             |
-| ------------ | ----- | ---------------------------------- |
-| Palette      | 🎨    | Toggle Swatch Strip visibility     |
-| Options      | ⚙️    | Toggle Options Panel visibility    |
-| Image        | 🖼️    | Upload image to extract seed color |
-| History      | 📜    | Toggle History Panel visibility    |
-| Download     | ⬇️    | Export theme as JSON file          |
-| Share        | 🔗    | Open Share Modal for URL sharing   |
-| Theme Toggle | ☀️/🌙 | Toggle UI between light/dark mode  |
+⸻
 
-#### 1.7 Mobile Menu
+Step 4 — Primary & Accent Construction
 
-- **Hamburger Icon**: Visible on mobile only
-- **Action**: Opens mobile drawer with all header actions
+From candidates, select best primary via scoring.
 
----
+Generate:
 
-### 2. Options Panel (Collapsible)
+primaryScale[50..900]
 
-**Location**: Below header, above swatch strip\
-**Toggle**: Click the Options (⚙️) button in header\
-**Layout**: Responsive grid
+Assign:
 
-#### 2.1 Border Width
+primary = scale[600] primaryHover = scale[700] primaryActive = scale[800]
+primaryFg = auto-computed for contrast
 
-- **Range**: `0` (None) to `5` (Thick)
-- **Effect**: Controls interface border thickness
+Accent chosen from remaining candidates with deltaE(primary, accent) >=
+threshold.
 
-#### 2.2 Shadow Size
+Test: Button states remain legible & distinct.
 
-- **Range**: `0` (Flat) to `5` (Floating)
-- **Effect**: Controls shadow elevation
+⸻
 
-#### 2.3 Shadow Opacity
+Step 5 — Deterministic Dark Mode Derivation
 
-- **Range**: `5` to `95` (%)
-- **Effect**: Controls shadow transparency
+For every light token:
 
-#### 2.4 Roundness
+dark.L = 1 - light.L ± offset dark.C = light.C * 0.8 dark.H = light.H
 
-- **Range**: `0` (Square) to `5` (Round/Pill)
-- **Effect**: Controls border-radius
+Clamp ranges:
 
-#### 2.5 Gradients
+Token	Dark L bg	0.05–0.08 card	0.10–0.15 text	0.90–0.96
 
-- **Range**: `0` (Solid) to `5` (Complex)
-- **Effect**: Controls background gradient intensity and direction
-- **Levels**:
-  - 0: Solid
-  - 1: Subtle Vertical
-  - 2: Medium Vertical
-  - 3: Subtle Diagonal
-  - 4: Medium Diagonal
-  - 5: Vivid/Complex
+Foreground tokens recomputed for contrast.
 
-#### 2.6 Saturation
+Test: Toggling modes preserves brand identity.
 
-- **Range**: `-5` (Mono) to `+5` (Vivid)
-- **Default**: `0` (Normal)
-- **Effect**: Shifts color saturation relative to base hue
+⸻
 
-#### 2.7 Brightness
+Step 6 — Scoring & Rejection Engine
 
-- **Range**: `-5` (Dark) to `+5` (Bright)
-- **Default**: `0` (Normal)
-- **Effect**: Compresses color dynamic range toward dark or light
+Hard Rejects: •	Any text contrast < 4.5:1 •	Out-of-gamut after clamp •	Primary
+too close to danger/warn •	Insufficient separation: •	deltaE(primary, accent) <
+X •	deltaE(bg, card) < Y
 
-#### 2.8 Contrast
+Soft Scores: •	Contrast headroom •	Harmony consistency •	Chroma balance •	UI
+usability •	Aesthetic bias
 
-- **Range**: `-5` (Soft) to `+5` (Max)
-- **Default**: `0` (Normal)
-- **Effect**: Controls light/dark text separation from background
+Pick highest score.
 
----
+Test: Top palette stable across reruns with same seed.
 
-### 3. Swatch Strip (Collapsible)
+⸻
 
-**Location**: Below options panel, above preview\
-**Toggle**: Click the Palette (🎨) button in header\
-**Layout**: 10 columns on desktop (lg), 5 on tablet (sm), 2 on mobile
+Step 7 — Seeded Generation & History
 
-#### 3.1 Compact Swatch Design
+Each palette stores:
 
-Each swatch displays:
+seed, mode, baseHue, fullPaletteJSON
 
-- **Header Row**: Token name (uppercase) + Lock / unlock icon
-- **Light/Dark Side-by-Side**: Two color rectangles showing light and dark
-  values
-- **Color Values**: Displayed inside each swatch with auto-contrasting text
+Spacebar regeneration is fully reproducible.
 
-#### 3.2 Swatch Interactions
+Test: Same seed = identical palette.
 
-- **Click on Swatch**: Copies color value to clipboard
-- **Click Unlock Icon**: Turns unlock icon into lock icon and locks color to
-  prevent change
-- **Click Lock Icon**: Turns lock icon into unlock icon and unlocks color to
-  allow change
-- **Hover**: Scales slightly with shadow for visual feedback
+⸻
 
-#### 3.3 Token Display Order
+Step 8 — UI Validation Scenes
 
-1. `bg`
-2. `card`
-3. `text`
-4. `textMuted`
-5. `textOnColor`
-6. `primary`
-7. `secondary`
-8. `accent`
-9. `good`
-10. `bad`
+Both previews render: •	Typography scale •	Button states •	Inputs •	Cards
+•	Alerts •	Tabs, nav, footer •	Gradients & shadows
 
----
+Automated screenshot diff detects regressions.
 
-### 4. Preview Section (Split View)
+⸻
 
-**Location**: Main content area, takes remaining viewport height\
-**Layout**: Side-by-side (50%/50%) on desktop, stacked on mobile
+Step 9 — Export & Locking
 
-#### 4.1 Light Theme Preview (Left)
+Exports: •	CSS variables •	Tailwind config •	JSON tokens
 
-Displays sample UI components using the light theme colors.
+Locks: •	Base hue •	Neutral temperature •	Contrast level (AA/AAA)
 
-#### 4.2 Dark Theme Preview (Right)
+⸻
 
-Displays sample UI components using the dark theme colors.
+🧪 New Quality Guarantees
 
-#### 4.3 Preview Components (Both Sides)
+Rule	Guaranteed Contrast	WCAG AA+ Dark/Light Identity	Mathematical Brand
+Consistency	Hue preserved Visual Stability	Scored & tested
+Reproducibility	Seeded RNG
 
-##### 4.3.1 Theme Badge
+⸻
 
-- Pill badge showing "Light Theme Preview" or "Dark Theme Preview"
-- Uses `primary` color at 50% opacity with border and `card` color as background
+🧱 File Additions
 
-##### 4.3.2 Main Heading
+utils/ paletteEngine.ts scoringEngine.ts oklch.ts contrast.ts
 
-- "Taichi Theme Generator"
-- Shows text gradient effect when gradients slider > 0
+⸻
 
-##### 4.3.3 Description Paragraph
-
-- Uses `textMuted` for secondary text
-- Contains inline code badges for `primary`, `secondary`, `accent` tokens
-
-##### 4.3.4 Keyboard Hint
-
-- "Press Space to generate..." instruction
-- Uses `accent` color for the keyboard badge
-
-##### 4.3.5 Image Section (Hero Banner)
-
-- Large hero card with background image
-- Gradient overlays using `primary` and `accent`
-- "Premium Experience" badge using `secondary`
-- Main headline with colored text spans
-- Card float-up animation on hover
-
-##### 4.3.6 Actions Section
-
-Demonstrates button styles:
-
-- **Primary Button**: Uses `primary` color + gradient (if enabled)
-- **Secondary Button**: Uses `secondary` color
-- **Accent Button**: Uses `accent` color
-- **Outline Button**: Border-only with `card` background
-- **Error Button**: Uses `bad` color
-- **Success Button**: Uses `good` color
-- **Icon Buttons**: Settings and Bell icons
-
-##### 4.3.7 Input Fields Section
-
-- Email input with icon
-- Select dropdown
-- Checkbox and radio buttons
-- Volume/range slider
-
-##### 4.3.8 Cards Section
-
-- **Revenue Card**: Progress bar, stats, icon badge
-- **Profile Card**: Avatar, tags, action button
-
-##### 4.3.9 Feedback Section (Alerts)
-
-- Info alert using `secondary`
-- Error alert using `bad`
-- Success alert using `good`
-
-##### 4.3.10 Navigation Section
-
-- Tab navigation with active state
-- Breadcrumb navigation
-- Avatar badge
-
-##### 4.3.11 Footer
-
-- Brand section with logo
-- Link columns (Product, Resources, Legal)
-- Social icons
-- Copyright with version number
-
----
-
-### 5. History Panel (Collapsible)
-
-**Location**: Overlay from left side\
-**Toggle**: Click History (📜) button
-
-Contains:
-
-- Scrollable list of previous themes
-- Visual preview swatches for each
-- Click to restore theme
-- Clear history button
-
----
-
-### 6. Share Modal
-
-**Location**: Centered modal overlay\
-**Toggle**: Click Share (🔗) button
-
-Features:
-
-- Shareable URL containing theme seed and settings
-- Copy URL button
-- Social share options
-
----
-
-## Keyboard Shortcuts
-
-| Key            | Action                      |
-| -------------- | --------------------------- |
-| `Space`        | Generate new theme          |
-| `←` / `→`      | Navigate theme history      |
-| `Cmd/Ctrl + Z` | Undo (go to previous theme) |
-| `Cmd/Ctrl + C` | Copy theme URL              |
-
----
-
-## URL Parameters
-
-The application state is encoded in URL parameters for sharing:
-
-| Param  | Description                                |
-| ------ | ------------------------------------------ |
-| `mode` | Generation mode (random, monochrome, etc.) |
-| `seed` | Seed color hex value                       |
-| `sat`  | Saturation level (-5 to 5)                 |
-| `con`  | Contrast level (-5 to 5)                   |
-| `bri`  | Brightness level (-5 to 5)                 |
-| `bw`   | Border width (0-5)                         |
-| `sh`   | Shadow strength (0-5)                      |
-| `so`   | Shadow opacity (5-95)                      |
-| `gr`   | Gradient level (0-5)                       |
-| `rd`   | Radius level (0-5)                         |
-
----
-
-## Color Generation Algorithm
-
-### Base Hue Selection
-
-1. **Random Mode**: Completely random base hue
-2. **Harmony Modes**: Base hue with calculated complementary hues
-
-### Saturation Application
-
-- Level 0: Pure grayscale (0% saturation)
-- Level 1-4: Mapped to ranges 15-25%, 40-50%, 65-75%, 90-100%
-
-### Brightness Application
-
-**Implementation** (via `applyBrightness` function):
-
-- Applied to ALL color tokens
-- Shift amount = proportional to distance from 50% gray
-- Colors at 50% gray: no shift
-- Colors near 0% or 100%: maximum shift toward center
-
-**Level Effects**:
-
-- Level 1 (Dim): Bright colors compressed 50% toward gray
-- Level 2: Bright colors compressed 25% toward gray
-- Level 3 (Normal): No change
-- Level 4: Dark colors compressed 25% toward gray
-- Level 5 (Bright): Dark colors compressed 50% toward gray
-
-### Contrast Application
-
-- Calculates text lightness as offset from background
-- Higher contrast = greater offset
-- Ensures minimum readability even at extremes
-
----
-
-## Technical Stack
-
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS (via CDN)
-- **Icons**: Lucide React
-- **State**: React hooks (useState, useEffect, useCallback)
-- **Persistence**: LocalStorage for history
-- **URL Routing**: Browser History API
-
----
-
-## File Structure
-
-```
-/
-├── App.tsx                    # Main application component
-├── types.ts                   # TypeScript type definitions
-├── index.html                 # HTML entry with Tailwind config
-├── components/
-│   ├── PreviewSection.tsx     # Theme preview with UI components
-│   ├── SwatchStrip.tsx        # Color swatch grid
-│   └── ShareModal.tsx         # Share URL modal
-└── utils/
-    └── colorUtils.ts          # Color generation and conversion
-```
-
----
-
-## Known Issues / TODOs
-
-1. **Mobile Experience**: Preview sections are constrained on mobile; recommend
-   landscape or tablet.
-
----
-
-## Version History
-
-- **v25.12.1**: Added textMuted, textOnColor tokens; redesigned swatch strip;
-  added brightness slider
-- **v25.12.0**: Initial release with 8 swatch colors
+🏁 Version History Update •	v25.12.2 — Introduced OKLCH engine, deterministic
+dark mode, scoring & validation system

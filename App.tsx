@@ -5,10 +5,11 @@ import {
   Moon, Sun, SlidersHorizontal, ChevronUp, ChevronDown, Shuffle, PanelTopClose, PanelTopOpen, X, Menu
 } from 'lucide-react';
 import { ThemeTokens, DualTheme, GenerationMode, ColorFormat, DesignOptions, LockedColors } from './types';
-import { generateTheme, extractColorFromImage, formatColor } from './utils/colorUtils';
+import { generateTheme, extractPaletteFromImage, formatColor } from './utils/colorUtils';
 import PreviewSection from './components/PreviewSection';
 import SwatchStrip from './components/SwatchStrip';
 import ShareModal from './components/ShareModal';
+import ImagePickerModal from './components/ImagePickerModal';
 
 const MAX_HISTORY = 20;
 
@@ -84,6 +85,7 @@ const App: React.FC = () => {
 
   const [showMobileNotice, setShowMobileNotice] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   
   const [designOptions, setDesignOptions] = useState<DesignOptions>({
@@ -98,8 +100,6 @@ const App: React.FC = () => {
   });
   
   const [lockedColors, setLockedColors] = useState<LockedColors>({});
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize from URL or History
   useEffect(() => {
@@ -210,14 +210,15 @@ const App: React.FC = () => {
     seed?: string, 
     saturation?: number,
     contrast?: number,
-    brightness?: number
+    brightness?: number,
+    overridePalette?: string[]
   ) => {
     // If param is undefined, use current state.
     const sLevel = saturation !== undefined ? saturation : designOptions.saturationLevel;
     const cLevel = contrast !== undefined ? contrast : designOptions.contrastLevel;
     const bLevel = brightness !== undefined ? brightness : designOptions.brightnessLevel;
     
-    const { light, dark, seed: newSeed } = generateTheme(genMode, seed, sLevel, cLevel, bLevel);
+    const { light, dark, seed: newSeed } = generateTheme(genMode, seed, sLevel, cLevel, bLevel, overridePalette);
     
     // Preserve locked colors from current theme
     // Also lock related tokens when a base token is locked
@@ -349,16 +350,10 @@ const App: React.FC = () => {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      try {
-        const color = await extractColorFromImage(e.target.files[0]);
-        setMode('image');
-        generateNewTheme('analogous', color); // Use image color as seed
-      } catch (err) {
-        console.error(err);
-      }
-    }
+  const handleImageConfirm = (palette: string[]) => {
+    setMode('image');
+    generateNewTheme('analogous', undefined, undefined, undefined, undefined, palette); 
+    setShowImagePickerModal(false);
   };
 
   const exportTheme = () => {
@@ -565,21 +560,21 @@ const App: React.FC = () => {
               </button>
 
               <button 
-                onClick={() => fileInputRef.current?.click()} 
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
-                title="Pick from Image"
-              >
-                <ImageIcon size={18} />
-                <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
-              </button>
-
-              <button 
                 onClick={() => setShowHistory(!showHistory)} 
                 className={`p-1.5 rounded-lg transition-colors ${showHistory ? 'bg-current text-white/90' : 'hover:bg-white/10'}`}
                 style={showHistory ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
                 title="History"
               >
                 <History size={18} />
+              </button>
+
+              <button 
+                onClick={() => setShowImagePickerModal(true)} 
+                className={`p-1.5 rounded-lg transition-colors ${showImagePickerModal ? 'bg-current text-white/90' : 'hover:bg-white/10'}`}
+                style={showImagePickerModal ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
+                title="Pick from Image"
+              >
+                <ImageIcon size={18} />
               </button>
 
               <button 
@@ -685,21 +680,21 @@ const App: React.FC = () => {
               </button>
 
               <button 
-                onClick={() => { fileInputRef.current?.click(); setShowMobileMenu(false); }}
-                className="p-3 rounded-lg border transition-colors flex items-center justify-center gap-2"
-                style={{ borderColor: shellTheme.border }}
-              >
-                <ImageIcon size={18} />
-                <span className="text-sm font-medium">Image</span>
-              </button>
-
-              <button 
                 onClick={() => { setShowHistory(!showHistory); setShowMobileMenu(false); }}
                 className={`p-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${showHistory ? 'bg-current text-white' : 'border'}`}
                 style={showHistory ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : { borderColor: shellTheme.border }}
               >
                 <History size={18} />
                 <span className="text-sm font-medium">History</span>
+              </button>
+
+              <button 
+                onClick={() => { setShowImagePickerModal(true); setShowMobileMenu(false); }}
+                className={`p-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${showImagePickerModal ? 'bg-current text-white' : 'border'}`}
+                style={showImagePickerModal ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : { borderColor: shellTheme.border }}
+              >
+                <ImageIcon size={18} />
+                <span className="text-sm font-medium">Image</span>
               </button>
 
               <button 
@@ -997,7 +992,14 @@ const App: React.FC = () => {
         isOpen={showShareModal} 
         onClose={() => setShowShareModal(false)} 
         url={window.location.href}
-        theme={isDarkUI ? currentTheme.dark : currentTheme.light}
+        theme={currentTheme.light} // Use light theme for share modal UI
+      />
+
+      <ImagePickerModal
+        isOpen={showImagePickerModal}
+        onClose={() => setShowImagePickerModal(false)}
+        onConfirm={handleImageConfirm}
+        theme={currentTheme.dark} // Use dark theme for picker modal UI
       />
     </div>
   );
