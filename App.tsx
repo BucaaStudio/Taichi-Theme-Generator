@@ -92,7 +92,7 @@ const App: React.FC = () => {
     borderWidth: 1,
     shadowStrength: 3,
     shadowOpacity: 15,
-    gradientLevel: 0,
+    gradients: false,
     radius: 3,
     brightnessLevel: 0, 
     contrastLevel: 0, 
@@ -128,9 +128,9 @@ const App: React.FC = () => {
         next.radius = Math.floor(Math.random() * 6);
       }
       
-      // Gradient Level: 0-5
-      if (!lockedOptions.gradientLevel) {
-        next.gradientLevel = Math.floor(Math.random() * 6);
+      // Gradients: toggle randomly
+      if (!lockedOptions.gradients) {
+        next.gradients = Math.random() > 0.5;
       }
       
       // Saturation: -5 to 5
@@ -930,31 +930,30 @@ const App: React.FC = () => {
              </div>
            </div>
 
-           {/* Gradient Level */}
-           <div className="space-y-2">
-             <div className="flex justify-between items-center">
-               <div className="flex items-center gap-1.5">
-                 <button 
-                   onClick={() => toggleOptionLock('gradientLevel')}
-                   className={`p-0.5 rounded transition-colors ${lockedOptions.gradientLevel ? 'text-t-primary' : 'opacity-30 hover:opacity-60'}`}
-                   title={lockedOptions.gradientLevel ? 'Unlock' : 'Lock'}
-                 >
-                   {lockedOptions.gradientLevel ? <Lock size={10} /> : <Unlock size={10} />}
-                 </button>
-                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Gradients</label>
-               </div>
-               <span className="text-xs font-mono opacity-50">Lvl {designOptions.gradientLevel}</span>
+           {/* Gradients Toggle */}
+           <div className="space-y-2 flex flex-col justify-center">
+             <div className="flex items-center gap-1.5">
+               <button 
+                 onClick={() => toggleOptionLock('gradients')}
+                 className={`p-0.5 rounded transition-colors ${lockedOptions.gradients ? 'text-t-primary' : 'opacity-30 hover:opacity-60'}`}
+                 title={lockedOptions.gradients ? 'Unlock' : 'Lock'}
+               >
+                 {lockedOptions.gradients ? <Lock size={10} /> : <Unlock size={10} />}
+               </button>
+               <label className="flex items-center gap-2 cursor-pointer group">
+                 <input 
+                   type="checkbox" 
+                   checked={designOptions.gradients}
+                   onChange={(e) => setDesignOptions(prev => ({ ...prev, gradients: e.target.checked }))}
+                   className="w-4 h-4 rounded cursor-pointer"
+                   style={{ accentColor: shellTheme.primary }}
+                 />
+                 <span className="text-xs font-bold uppercase tracking-wider opacity-70 group-hover:opacity-100 transition-opacity">
+                   Gradients
+                 </span>
+               </label>
              </div>
-             <input 
-               type="range" min="0" max="5" step="1"
-               value={designOptions.gradientLevel}
-               onChange={(e) => updateOption('gradientLevel', parseInt(e.target.value))}
-               className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
-               style={{ accentColor: shellTheme.primary }}
-             />
-             <div className="flex justify-between text-[10px] opacity-40 px-0.5">
-               <span>None</span><span>Diag</span>
-             </div>
+             <p className="text-[10px] opacity-40">Apply to colored elements</p>
            </div>
 
            {/* Saturation Level */}

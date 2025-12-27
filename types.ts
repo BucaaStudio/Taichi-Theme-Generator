@@ -44,7 +44,7 @@ export interface DesignOptions {
   borderWidth: number;   // 0 - 5
   shadowStrength: number; // 0 - 5 (Size)
   shadowOpacity: number; // 0 - 100 (%)
-  gradientLevel: number; // 0 - 5
+  gradients: boolean;    // Apply gradients to colored elements
   radius: number;        // 0 - 5
   brightnessLevel: number; // -5 to 5, 0 is normal
   contrastLevel: number; // -5 to 5, 0 is normal
