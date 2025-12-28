@@ -297,6 +297,40 @@ interface StatusColors {
   warnFg: OklchColor;
 }
 
+const STATUS_GREEN_HUE = 140;
+const STATUS_RED_HUE = 0;
+const STATUS_GREEN_RANGE = 40;
+const STATUS_RED_RANGE = 32;
+
+const normalizeHue = (hue: number) => ((hue % 360) + 360) % 360;
+
+const clampHueToBand = (hue: number, center: number, maxDelta: number) => {
+  const diff = ((hue - center + 540) % 360) - 180;
+  if (Math.abs(diff) <= maxDelta) {
+    return normalizeHue(hue);
+  }
+  return normalizeHue(center + Math.sign(diff) * maxDelta);
+};
+
+const resolveStatusHues = (hues: number[]) => {
+  let goodHue = hues[3] ?? hues[0];
+  let badHue = hues[4] ?? hues[1] ?? hues[0];
+
+  const goodToGreen = hueDifference(goodHue, STATUS_GREEN_HUE);
+  const badToGreen = hueDifference(badHue, STATUS_GREEN_HUE);
+  const goodToRed = hueDifference(goodHue, STATUS_RED_HUE);
+  const badToRed = hueDifference(badHue, STATUS_RED_HUE);
+
+  if (badToGreen < goodToGreen || goodToRed < badToRed) {
+    [goodHue, badHue] = [badHue, goodHue];
+  }
+
+  return {
+    goodHue: clampHueToBand(goodHue, STATUS_GREEN_HUE, STATUS_GREEN_RANGE),
+    badHue: clampHueToBand(badHue, STATUS_RED_HUE, STATUS_RED_RANGE),
+  };
+};
+
 function constructStatusColors(
   hues: number[],
   bg: OklchColor,
@@ -304,19 +338,7 @@ function constructStatusColors(
   saturationLevel: number,
   brightnessLevel: number
 ): StatusColors {
-  // Good - prefer green-ish
-  let goodHue = hues[3];
-  let badHue = hues[4];
-  
-  // Swap if bad is closer to green than good
-  const goodToGreen = hueDifference(goodHue, 140);
-  const badToGreen = hueDifference(badHue, 140);
-  const goodToRed = hueDifference(goodHue, 0);
-  const badToRed = hueDifference(badHue, 0);
-  
-  if (badToGreen < goodToGreen || goodToRed < badToRed) {
-    [goodHue, badHue] = [badHue, goodHue];
-  }
+  const { goodHue, badHue } = resolveStatusHues(hues);
   
   // Saturation affects chroma of status colors
   const satNormalized = (saturationLevel + 5) / 10; // 0 to 1
@@ -738,10 +760,11 @@ export function generatePaletteDarkFirst(
   // Status colors for dark
   const statusC = 0.08 + satNormalized * 0.14;
   const statusL = 0.55 + brightnessLevel * 0.02;
+  const { goodHue, badHue } = resolveStatusHues(hues);
   
   const darkStatus = {
-    good: clampToSRGBGamut({ L: statusL, C: statusC, H: hues[3] }),
-    bad: clampToSRGBGamut({ L: statusL, C: statusC, H: hues[4] }),
+    good: clampToSRGBGamut({ L: statusL, C: statusC, H: goodHue }),
+    bad: clampToSRGBGamut({ L: statusL, C: statusC, H: badHue }),
     warn: clampToSRGBGamut({ L: statusL + 0.1, C: statusC * 0.9, H: 60 }),
   };
   

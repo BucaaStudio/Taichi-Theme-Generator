@@ -64,7 +64,7 @@ Visit [taichi.bucaastudio.com](https://taichi.bucaastudio.com) to try it out!
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/bluevisor/Taichi-Theme-Generator.git
+   git clone https://github.com/BucaaStudio/Taichi-Theme-Generator.git
    cd Taichi-Theme-Generator
    ```
 

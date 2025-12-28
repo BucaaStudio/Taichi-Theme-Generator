@@ -12,6 +12,7 @@ import ShareModal from './components/ShareModal';
 import ImagePickerModal from './components/ImagePickerModal';
 
 const MAX_HISTORY = 20;
+type WorkspaceTab = 'overview' | 'tokens' | 'delivery';
 
 // CSS Variable Injection Helper
 const getStyleVars = (tokens: ThemeTokens) => {
@@ -82,6 +83,8 @@ const App: React.FC = () => {
     return false;
   });
   const [showSwatches, setShowSwatches] = useState(false);
+  const [autoSyncPreview, setAutoSyncPreview] = useState(true);
+  const [syncedWorkspaceTab, setSyncedWorkspaceTab] = useState<WorkspaceTab>('overview');
 
   const [showMobileNotice, setShowMobileNotice] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -388,16 +391,28 @@ const App: React.FC = () => {
   // Keyboard shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && (e.target as HTMLElement).tagName !== 'INPUT') {
+      const target = e.target as HTMLElement | null;
+      const isEditable =
+        !!target &&
+        (target.isContentEditable ||
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT');
+
+      if ((e.code === 'Space' || e.key === 'Enter') && !isEditable) {
         e.preventDefault();
         // Randomize unlocked design options first
         randomizeDesignOptions();
         // Then generate new theme (will use the new options)
         generateNewTheme(mode);
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+      if (!isEditable && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
-        undo();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -472,6 +487,17 @@ const App: React.FC = () => {
       generateNewTheme(currentTheme.mode, currentTheme.seed, newSat, newCon);
     }
   };
+
+  const handleRandomize = useCallback(() => {
+    randomizeDesignOptions();
+    generateNewTheme(mode);
+  }, [randomizeDesignOptions, generateNewTheme, mode]);
+
+  const handleToggleSwatches = useCallback(() => setShowSwatches(prev => !prev), []);
+  const handleToggleOptions = useCallback(() => setShowOptions(prev => !prev), []);
+  const handleToggleHistory = useCallback(() => setShowHistory(prev => !prev), []);
+  const handleToggleTheme = useCallback(() => setIsDarkUI(prev => !prev), []);
+  const handleShare = useCallback(() => setShowShareModal(true), []);
   
 
 
@@ -554,8 +580,8 @@ const App: React.FC = () => {
                 <Undo size={16} />
               </button>
               <div className="w-px h-4 mx-1 bg-current opacity-20"></div>
-              <button onClick={redo} disabled={historyIndex >= history.length - 1} className="p-1.5 rounded-md disabled:opacity-30 transition-colors scale-x-[-1] hover:bg-white/10">
-                <Undo size={16} />
+              <button onClick={redo} disabled={historyIndex >= history.length - 1} className="p-1.5 rounded-md disabled:opacity-30 transition-colors hover:bg-white/10">
+                <Undo size={16} className="scale-x-[-1]" />
               </button>
             </div>
 
@@ -581,7 +607,7 @@ const App: React.FC = () => {
               <select 
                 value={mode} 
                 onChange={(e) => setMode(e.target.value as GenerationMode)}
-                className="text-sm rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 border cursor-pointer"
+                className="text-sm rounded-md px-2 py-1.5 focus:outline-none border cursor-pointer"
                 style={{ ...inputStyle, outlineColor: shellTheme.primary }}
               >
                 <option value="random">Random</option>
@@ -598,17 +624,13 @@ const App: React.FC = () => {
               <select 
                 value={format} 
                 onChange={(e) => setFormat(e.target.value as ColorFormat)}
-                className="text-sm rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 border cursor-pointer"
+                className="text-sm rounded-md px-2 py-1.5 focus:outline-none border cursor-pointer"
                 style={{ ...inputStyle, outlineColor: shellTheme.primary }}
               >
                 <option value="hex">HEX</option>
                 <option value="rgb">RGB</option>
-                <option value="cmyk">CMYK</option>
                 <option value="hsl">HSL</option>
-                <option value="lab">LAB</option>
-                <option value="lch">LCH</option>
                 <option value="oklch">OKLCH</option>
-                <option value="display-p3">Display P3</option>
               </select>
             </div>
 
@@ -699,7 +721,7 @@ const App: React.FC = () => {
               <select 
                 value={mode} 
                 onChange={(e) => setMode(e.target.value as GenerationMode)}
-                className="w-full text-sm rounded-md px-3 py-2 focus:outline-none focus:ring-2 border cursor-pointer"
+                className="w-full text-sm rounded-md px-3 py-2 focus:outline-none border cursor-pointer"
                 style={{ ...inputStyle, outlineColor: shellTheme.primary }}
               >
                 <option value="random">Random</option>
@@ -719,17 +741,13 @@ const App: React.FC = () => {
               <select 
                 value={format} 
                 onChange={(e) => setFormat(e.target.value as ColorFormat)}
-                className="w-full text-sm rounded-md px-3 py-2 focus:outline-none focus:ring-2 border cursor-pointer"
+                className="w-full text-sm rounded-md px-3 py-2 focus:outline-none border cursor-pointer"
                 style={{ ...inputStyle, outlineColor: shellTheme.primary }}
               >
                 <option value="hex">HEX</option>
                 <option value="rgb">RGB</option>
-                <option value="cmyk">CMYK</option>
                 <option value="hsl">HSL</option>
-                <option value="lab">LAB</option>
-                <option value="lch">LCH</option>
                 <option value="oklch">OKLCH</option>
-                <option value="display-p3">Display P3</option>
               </select>
             </div>
 
@@ -829,6 +847,19 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {showSwatches && (
+        <SwatchStrip 
+           light={currentTheme.light} 
+           dark={currentTheme.dark} 
+           format={format}
+           onFormatChange={setFormat}
+           isDarkUI={isDarkUI}
+           onUpdate={handleTokenUpdate}
+           lockedColors={lockedColors}
+           onToggleLock={toggleColorLock}
+        />
+      )}
+
       {showOptions && (
         <div 
           className="border-b px-4 py-4 shrink-0 shadow-inner z-40 relative space-y-4 transition-colors duration-500"
@@ -878,7 +909,7 @@ const App: React.FC = () => {
                  >
                    {lockedOptions.shadowStrength ? <Lock size={10} /> : <Unlock size={10} />}
                  </button>
-                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Shd Size</label>
+                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Shadow Size</label>
                </div>
                <span className="text-xs font-mono opacity-50">Lvl {designOptions.shadowStrength}</span>
              </div>
@@ -905,7 +936,7 @@ const App: React.FC = () => {
                  >
                    {lockedOptions.shadowOpacity ? <Lock size={10} /> : <Unlock size={10} />}
                  </button>
-                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Shd Opacity</label>
+                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Shadow Opacity</label>
                </div>
                <span className="text-xs font-mono opacity-50">{designOptions.shadowOpacity}%</span>
              </div>
@@ -1128,20 +1159,6 @@ const App: React.FC = () => {
       {/* --- Main Content Area (Sync Scroll) --- */}
       <div className="flex-1 overflow-y-auto relative scroll-smooth group">
         
-        {/* Sticky Swatches */}
-        {showSwatches && (
-        <SwatchStrip 
-           light={currentTheme.light} 
-           dark={currentTheme.dark} 
-           format={format}
-           onFormatChange={setFormat}
-           isDarkUI={isDarkUI}
-           onUpdate={handleTokenUpdate}
-           lockedColors={lockedColors}
-           onToggleLock={toggleColorLock}
-        />
-        )}
-
         {/* Split Preview */}
         <div className="flex flex-col md:flex-row min-h-[calc(100vh-140px)]">
           {/* Light Side */}
@@ -1149,7 +1166,24 @@ const App: React.FC = () => {
             className="w-full md:w-1/2 bg-t-bg transition-colors duration-500" 
             style={getStyleVars(currentTheme.light)}
           >
-             <PreviewSection themeName="Light" options={designOptions} onUpdateOption={updateOption} onOpenImagePicker={() => setShowImagePickerModal(true)} />
+             <PreviewSection
+               themeName="Light"
+               themeTokens={currentTheme.light}
+               options={designOptions}
+               onUpdateOption={updateOption}
+               onOpenImagePicker={() => setShowImagePickerModal(true)}
+               onRandomize={handleRandomize}
+               onExport={exportTheme}
+               onShare={handleShare}
+               onToggleSwatches={handleToggleSwatches}
+               onToggleOptions={handleToggleOptions}
+               onToggleHistory={handleToggleHistory}
+               onToggleTheme={handleToggleTheme}
+               autoSyncPreview={autoSyncPreview}
+               onAutoSyncPreviewChange={setAutoSyncPreview}
+               syncedWorkspaceTab={syncedWorkspaceTab}
+               onSyncedWorkspaceTabChange={setSyncedWorkspaceTab}
+             />
           </div>
 
           {/* Dark Side */}
@@ -1157,7 +1191,24 @@ const App: React.FC = () => {
             className="w-full md:w-1/2 bg-t-bg transition-colors duration-500" 
             style={getStyleVars(currentTheme.dark)}
           >
-             <PreviewSection themeName="Dark" options={designOptions} onUpdateOption={updateOption} onOpenImagePicker={() => setShowImagePickerModal(true)} />
+             <PreviewSection
+               themeName="Dark"
+               themeTokens={currentTheme.dark}
+               options={designOptions}
+               onUpdateOption={updateOption}
+               onOpenImagePicker={() => setShowImagePickerModal(true)}
+               onRandomize={handleRandomize}
+               onExport={exportTheme}
+               onShare={handleShare}
+               onToggleSwatches={handleToggleSwatches}
+               onToggleOptions={handleToggleOptions}
+               onToggleHistory={handleToggleHistory}
+               onToggleTheme={handleToggleTheme}
+               autoSyncPreview={autoSyncPreview}
+               onAutoSyncPreviewChange={setAutoSyncPreview}
+               syncedWorkspaceTab={syncedWorkspaceTab}
+               onSyncedWorkspaceTabChange={setSyncedWorkspaceTab}
+             />
           </div>
         </div>
 
