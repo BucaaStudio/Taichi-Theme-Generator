@@ -387,6 +387,23 @@ const App: React.FC = () => {
     }));
   }, []);
 
+  // Undo: go back in history
+  const undo = useCallback(() => {
+    // History is [Newest, ..., Oldest]
+    if (historyIndex < history.length - 1) {
+      setHistoryIndex(prev => prev + 1);
+      setCurrentTheme(history[historyIndex + 1]);
+    }
+  }, [historyIndex, history]);
+
+  // Redo: go forward in history
+  const redo = useCallback(() => {
+    if (historyIndex > 0) {
+      setHistoryIndex(prev => prev - 1);
+      setCurrentTheme(history[historyIndex - 1]);
+    }
+  }, [historyIndex, history]);
+
 
   // Keyboard shortcut
   useEffect(() => {
@@ -414,27 +431,20 @@ const App: React.FC = () => {
           undo();
         }
       }
+      // Arrow keys for history navigation (when not in editable fields)
+      if (!isEditable && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        undo();
+      }
+      if (!isEditable && e.key === 'ArrowRight') {
+        e.preventDefault();
+        redo();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, generateNewTheme, randomizeDesignOptions]);
+  }, [mode, generateNewTheme, randomizeDesignOptions, undo, redo]);
 
-  const undo = () => {
-    // Go back in time (increment index)
-    // History is [Newest, ..., Oldest]
-    if (historyIndex < history.length - 1) {
-      setHistoryIndex(prev => prev + 1);
-      setCurrentTheme(history[historyIndex + 1]);
-    }
-  };
-
-  const redo = () => {
-    // Go forward in time (decrement index)
-    if (historyIndex > 0) {
-      setHistoryIndex(prev => prev - 1);
-      setCurrentTheme(history[historyIndex - 1]);
-    }
-  };
 
   const handleImageConfirm = (palette: string[]) => {
     setMode('image');
