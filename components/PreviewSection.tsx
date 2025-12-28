@@ -1155,6 +1155,17 @@ const PreviewSection: React.FC<PreviewProps> = ({
           </div>
 
           <div className="flex items-center gap-6">
+            <a 
+              href="/api-docs.html" 
+              className="flex items-center gap-1.5 text-xs text-t-textMuted hover:text-t-primary transition-colors"
+              title="API Documentation"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 18 22 12 16 6"></polyline>
+                <polyline points="8 6 2 12 8 18"></polyline>
+              </svg>
+              API
+            </a>
             <a href="https://github.com/BucaaStudio/Taichi-Theme-Generator" target="_blank" rel="noopener noreferrer" className="text-t-textMuted hover:text-t-primary transition-colors">
               <Github size={20} />
             </a>
