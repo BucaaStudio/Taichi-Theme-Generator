@@ -177,44 +177,6 @@ endpoint will eventually support cross-device synchronization.
 
 ---
 
-### 4. Analytics
-
-View API usage statistics for the current serverless instance.
-
-**Endpoint:** `GET /api/analytics`
-
-**Note:** Stats are per-instance and reset on cold starts. For complete
-analytics, check Vercel's dashboard logs.
-
-#### Response
-
-```json
-{
-    "success": true,
-    "analytics": {
-        "totalRequests": 42,
-        "uptimeSeconds": 3600,
-        "requestsPerMinute": "0.70",
-        "endpoints": {
-            "/api/generate-theme": 30,
-            "/api/export-theme": 10,
-            "/api/theme-history": 2
-        },
-        "styles": {
-            "analogous": 15,
-            "triadic": 10,
-            "random": 5
-        },
-        "formats": {
-            "css": 8,
-            "json": 2
-        },
-        "errors": {},
-        "instanceStartTime": "2025-12-28T12:00:00.000Z"
-    }
-}
-```
-
 ## Error Codes
 
 | Code                  | Description                                      |
