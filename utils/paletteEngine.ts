@@ -85,6 +85,14 @@ const HARMONY_MODES: Record<string, HarmonyConfig> = {
   'triadic-split': { offsets: [0, 120, 150, 240, 270], chromaVariance: 0.2 },
 };
 
+function normalizeOverridePalette(overridePalette?: string[]): Array<string | null> | null {
+  if (!overridePalette || overridePalette.length !== 5) return null;
+  return overridePalette.map((color) => {
+    const trimmed = color ? color.trim() : '';
+    return trimmed ? trimmed : null;
+  });
+}
+
 // --- Neutral Foundation (Light Mode) ---
 
 interface NeutralFoundation {
@@ -585,12 +593,15 @@ export function generatePalette(
   // Initialize RNG
   const rngSeed = seedColor || `${Date.now()}-${Math.random()}`;
   const rng = new SeededRandom(rngSeed);
+  const normalizedOverrides = normalizeOverridePalette(overridePalette);
   
   // Determine base hue
   let baseHue: number;
   if (seedColor) {
     baseHue = toOklch(seedColor).H;
-  } else if (overridePalette && overridePalette.length > 0 && overridePalette[0]) {
+  } else if (normalizedOverrides?.[0]) {
+    baseHue = toOklch(normalizedOverrides[0]).H;
+  } else if (overridePalette && overridePalette[0]) {
     baseHue = toOklch(overridePalette[0]).H;
   } else {
     baseHue = rng.nextInt(0, 359);
@@ -610,10 +621,11 @@ export function generatePalette(
   const hues = harmony.offsets.map(offset => (baseHue + offset + 360) % 360);
   
   // Handle override palette
-  if (overridePalette && overridePalette.length === 5) {
+  if (normalizedOverrides) {
     for (let i = 0; i < 5; i++) {
-      if (overridePalette[i] && overridePalette[i] !== '') {
-        hues[i] = toOklch(overridePalette[i]).H;
+      const overrideColor = normalizedOverrides[i];
+      if (overrideColor) {
+        hues[i] = toOklch(overrideColor).H;
       }
     }
   }
@@ -627,6 +639,38 @@ export function generatePalette(
   
   // Step 3: Construct status colors - applies saturation, brightness
   const status = constructStatusColors(hues, neutrals.bg, rng, saturationLevel, brightnessLevel);
+
+  const [
+    primaryOverrideHex,
+    secondaryOverrideHex,
+    accentOverrideHex,
+    goodOverrideHex,
+    badOverrideHex
+  ] = normalizedOverrides ?? [];
+
+  if (primaryOverrideHex) {
+    brand.primary = toOklch(primaryOverrideHex);
+  }
+  if (secondaryOverrideHex) {
+    brand.secondary = toOklch(secondaryOverrideHex);
+  }
+  if (accentOverrideHex) {
+    brand.accent = toOklch(accentOverrideHex);
+  }
+  if (goodOverrideHex) {
+    status.good = toOklch(goodOverrideHex);
+  }
+  if (badOverrideHex) {
+    status.bad = toOklch(badOverrideHex);
+  }
+
+  const primaryHex = primaryOverrideHex || toHex(brand.primary);
+  const secondaryHex = secondaryOverrideHex || toHex(brand.secondary);
+  const accentHex = accentOverrideHex || toHex(brand.accent);
+  const goodHex = goodOverrideHex || toHex(status.good);
+  const badHex = badOverrideHex || toHex(status.bad);
+  const warnHex = toHex(status.warn);
+  const statusUsesOverrides = Boolean(goodOverrideHex || badOverrideHex);
   
   // Step 4: Assemble light theme
   const light: ThemeTokens = {
@@ -635,21 +679,21 @@ export function generatePalette(
     card2: toHex(neutrals.card2),
     text: toHex(neutrals.text),
     textMuted: toHex(neutrals.textMuted),
-    textOnColor: selectForegroundHex(toHex(brand.primary)),
-    primary: toHex(brand.primary),
-    primaryFg: selectForegroundHex(toHex(brand.primary)),
-    secondary: toHex(brand.secondary),
-    secondaryFg: selectForegroundHex(toHex(brand.secondary)),
-    accent: toHex(brand.accent),
-    accentFg: selectForegroundHex(toHex(brand.accent)),
+    textOnColor: selectForegroundHex(primaryHex),
+    primary: primaryHex,
+    primaryFg: selectForegroundHex(primaryHex),
+    secondary: secondaryHex,
+    secondaryFg: selectForegroundHex(secondaryHex),
+    accent: accentHex,
+    accentFg: selectForegroundHex(accentHex),
     border: toHex(neutrals.border),
     ring: toHex(clampToSRGBGamut({ L: 0.6, C: brand.primary.C, H: brand.primary.H })),
-    good: toHex(status.good),
-    goodFg: toHex(status.goodFg),
-    warn: toHex(status.warn),
-    warnFg: toHex(status.warnFg),
-    bad: toHex(status.bad),
-    badFg: toHex(status.badFg),
+    good: goodHex,
+    goodFg: statusUsesOverrides ? selectForegroundHex(goodHex) : toHex(status.goodFg),
+    warn: warnHex,
+    warnFg: statusUsesOverrides ? selectForegroundHex(warnHex) : toHex(status.warnFg),
+    bad: badHex,
+    badFg: statusUsesOverrides ? selectForegroundHex(badHex) : toHex(status.badFg),
   };
   
   // Step 5: Derive the other mode deterministically
@@ -694,12 +738,15 @@ export function generatePaletteDarkFirst(
   // Initialize RNG
   const rngSeed = seedColor || `${Date.now()}-${Math.random()}`;
   const rng = new SeededRandom(rngSeed);
+  const normalizedOverrides = normalizeOverridePalette(overridePalette);
   
   // Determine base hue
   let baseHue: number;
   if (seedColor) {
     baseHue = toOklch(seedColor).H;
-  } else if (overridePalette && overridePalette.length > 0 && overridePalette[0]) {
+  } else if (normalizedOverrides?.[0]) {
+    baseHue = toOklch(normalizedOverrides[0]).H;
+  } else if (overridePalette && overridePalette[0]) {
     baseHue = toOklch(overridePalette[0]).H;
   } else {
     baseHue = rng.nextInt(0, 359);
@@ -719,10 +766,11 @@ export function generatePaletteDarkFirst(
   const hues = harmony.offsets.map(offset => (baseHue + offset + 360) % 360);
   
   // Handle override palette
-  if (overridePalette && overridePalette.length === 5) {
+  if (normalizedOverrides) {
     for (let i = 0; i < 5; i++) {
-      if (overridePalette[i] && overridePalette[i] !== '') {
-        hues[i] = toOklch(overridePalette[i]).H;
+      const overrideColor = normalizedOverrides[i];
+      if (overrideColor) {
+        hues[i] = toOklch(overrideColor).H;
       }
     }
   }
@@ -767,6 +815,37 @@ export function generatePaletteDarkFirst(
     bad: clampToSRGBGamut({ L: statusL, C: statusC, H: badHue }),
     warn: clampToSRGBGamut({ L: statusL + 0.1, C: statusC * 0.9, H: 60 }),
   };
+
+  const [
+    primaryOverrideHex,
+    secondaryOverrideHex,
+    accentOverrideHex,
+    goodOverrideHex,
+    badOverrideHex
+  ] = normalizedOverrides ?? [];
+
+  if (primaryOverrideHex) {
+    darkBrand.primary = toOklch(primaryOverrideHex);
+  }
+  if (secondaryOverrideHex) {
+    darkBrand.secondary = toOklch(secondaryOverrideHex);
+  }
+  if (accentOverrideHex) {
+    darkBrand.accent = toOklch(accentOverrideHex);
+  }
+  if (goodOverrideHex) {
+    darkStatus.good = toOklch(goodOverrideHex);
+  }
+  if (badOverrideHex) {
+    darkStatus.bad = toOklch(badOverrideHex);
+  }
+
+  const primaryHex = primaryOverrideHex || toHex(darkBrand.primary);
+  const secondaryHex = secondaryOverrideHex || toHex(darkBrand.secondary);
+  const accentHex = accentOverrideHex || toHex(darkBrand.accent);
+  const goodHex = goodOverrideHex || toHex(darkStatus.good);
+  const badHex = badOverrideHex || toHex(darkStatus.bad);
+  const warnHex = toHex(darkStatus.warn);
   
   // Assemble dark theme
   const dark: ThemeTokens = {
@@ -775,21 +854,21 @@ export function generatePaletteDarkFirst(
     card2: toHex(darkNeutrals.card2),
     text: toHex(darkNeutrals.text),
     textMuted: toHex(darkNeutrals.textMuted),
-    textOnColor: selectForegroundHex(toHex(darkBrand.primary)),
-    primary: toHex(darkBrand.primary),
-    primaryFg: selectForegroundHex(toHex(darkBrand.primary)),
-    secondary: toHex(darkBrand.secondary),
-    secondaryFg: selectForegroundHex(toHex(darkBrand.secondary)),
-    accent: toHex(darkBrand.accent),
-    accentFg: selectForegroundHex(toHex(darkBrand.accent)),
+    textOnColor: selectForegroundHex(primaryHex),
+    primary: primaryHex,
+    primaryFg: selectForegroundHex(primaryHex),
+    secondary: secondaryHex,
+    secondaryFg: selectForegroundHex(secondaryHex),
+    accent: accentHex,
+    accentFg: selectForegroundHex(accentHex),
     border: toHex(darkNeutrals.border),
     ring: toHex(clampToSRGBGamut({ L: 0.5, C: darkBrand.primary.C * 0.8, H: darkBrand.primary.H })),
-    good: toHex(darkStatus.good),
-    goodFg: selectForegroundHex(toHex(darkStatus.good)),
-    warn: toHex(darkStatus.warn),
-    warnFg: selectForegroundHex(toHex(darkStatus.warn)),
-    bad: toHex(darkStatus.bad),
-    badFg: selectForegroundHex(toHex(darkStatus.bad)),
+    good: goodHex,
+    goodFg: selectForegroundHex(goodHex),
+    warn: warnHex,
+    warnFg: selectForegroundHex(warnHex),
+    bad: badHex,
+    badFg: selectForegroundHex(badHex),
   };
   
   // Derive light mode from dark

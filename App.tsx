@@ -576,11 +576,11 @@ const App: React.FC = () => {
           {/* Desktop: All Controls */}
           <div className="hidden md:flex items-center gap-4 overflow-x-auto no-scrollbar">
             <div className="flex items-center rounded-lg p-0.5 gap-0.5 shrink-0" style={{ backgroundColor: shellTheme.card2 }}>
-              <button onClick={undo} disabled={historyIndex <= 0} className="p-1.5 rounded-md disabled:opacity-30 transition-colors hover:bg-white/10">
+              <button onClick={undo} disabled={historyIndex >= history.length - 1} className="p-1.5 rounded-md disabled:opacity-30 transition-colors hover:bg-white/10">
                 <Undo size={16} />
               </button>
               <div className="w-px h-4 mx-1 bg-current opacity-20"></div>
-              <button onClick={redo} disabled={historyIndex >= history.length - 1} className="p-1.5 rounded-md disabled:opacity-30 transition-colors hover:bg-white/10">
+              <button onClick={redo} disabled={historyIndex <= 0} className="p-1.5 rounded-md disabled:opacity-30 transition-colors hover:bg-white/10">
                 <Undo size={16} className="scale-x-[-1]" />
               </button>
             </div>
@@ -862,9 +862,10 @@ const App: React.FC = () => {
 
       {showOptions && (
         <div 
-          className="border-b px-4 py-4 shrink-0 shadow-inner z-40 relative space-y-4 transition-colors duration-500"
+          className="border-b px-3 py-4 shrink-0 shadow-inner z-40 relative transition-colors duration-500"
           style={{ backgroundColor: shellTheme.bg, borderColor: shellTheme.border }}
         >
+          <div className="max-w-[1920px] mx-auto w-full space-y-4">
           {/* Row 1: Sliders */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-x-4 gap-y-4">
            {/* Border Width */}
@@ -1108,6 +1109,7 @@ const App: React.FC = () => {
                </span>
              </label>
            </div>
+          </div>
           </div>
         </div>
       )}

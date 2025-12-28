@@ -347,6 +347,9 @@ const PreviewSection: React.FC<PreviewProps> = ({
             <span className={`text-t-good ${tokenChipClass}`}>good</span>, and{' '}
             <span className={`text-t-bad ${tokenChipClass}`}>bad</span> colors across real UI components. Export CSS variables and share themes with your team.
           </p>
+          <p className="text-sm text-t-textMuted max-w-xl text-left pt-2">
+            Press [Space] to Generate a new theme
+          </p>
         </div>
         
         {/* Glass Edge */}
@@ -1138,7 +1141,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
           Taichi Theme Generator © 2025 | Bucaa Studio. All Rights Reserved. v25.12.2
         </p>
         <div className="flex items-center gap-4">
-          <a href="https://github.com/BucaaStudio" target="_blank" rel="noopener noreferrer" className="hover:text-t-primary transition-colors">
+          <a href="https://github.com/BucaaStudio/Taichi-Theme-Generator" target="_blank" rel="noopener noreferrer" className="hover:text-t-primary transition-colors">
             <Github size={18} />
           </a>
         </div>
