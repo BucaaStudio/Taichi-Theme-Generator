@@ -58,11 +58,25 @@ async function rateLimit(req: VercelRequest, max: number, windowMs: number) {
  *   "content": string,
  *   "filename": string
  * }
- */
+import { logAnalyticsEvent, maskIP } from './utils/analytics';
+
+function getClientIP(req: VercelRequest): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const ip = Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0];
+    return ip.trim();
+  }
+  return 'unknown';
+}
+
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
+  const startTime = Date.now();
+  const clientIP = getClientIP(req);
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -79,6 +93,17 @@ export default async function handler(
 
   // Only allow POST requests
   if (req.method !== 'POST') {
+    logAnalyticsEvent({
+      endpoint: '/api/export-theme',
+      method: req.method || 'UNKNOWN',
+      status: 405,
+      duration: Date.now() - startTime,
+      ip: maskIP(clientIP),
+      userAgent,
+      error: 'METHOD_NOT_ALLOWED',
+      timestamp: Date.now(),
+    });
+    
     return res.status(405).json({
       success: false,
       error: 'Method not allowed. Use POST.',
@@ -89,6 +114,17 @@ export default async function handler(
   // Apply rate limiting (15 requests per minute per IP)
   const rateLimitResult = await rateLimit(req, 15, 60000);
   if (!rateLimitResult.success) {
+    logAnalyticsEvent({
+      endpoint: '/api/export-theme',
+      method: 'POST',
+      status: 429,
+      duration: Date.now() - startTime,
+      ip: maskIP(clientIP),
+      userAgent,
+      error: 'RATE_LIMIT_EXCEEDED',
+      timestamp: Date.now(),
+    });
+    
     return res.status(429).json({
       success: false,
       error: 'Rate limit exceeded. Please try again later.',
@@ -102,6 +138,17 @@ export default async function handler(
 
     // Validate theme object
     if (!theme || typeof theme !== 'object') {
+      logAnalyticsEvent({
+        endpoint: '/api/export-theme',
+        method: 'POST',
+        status: 400,
+        duration: Date.now() - startTime,
+        ip: maskIP(clientIP),
+        userAgent,
+        error: 'INVALID_THEME',
+        timestamp: Date.now(),
+      });
+      
       return res.status(400).json({
         success: false,
         error: 'Invalid theme object',
@@ -112,6 +159,18 @@ export default async function handler(
     // Validate format
     const validFormats = ['css', 'json', 'tailwind', 'scss', 'less'];
     if (!validFormats.includes(format)) {
+      logAnalyticsEvent({
+        endpoint: '/api/export-theme',
+        method: 'POST',
+        status: 400,
+        duration: Date.now() - startTime,
+        ip: maskIP(clientIP),
+        userAgent,
+        format,
+        error: 'INVALID_FORMAT',
+        timestamp: Date.now(),
+      });
+      
       return res.status(400).json({
         success: false,
         error: `Invalid format. Must be one of: ${validFormats.join(', ')}`,
@@ -149,6 +208,18 @@ export default async function handler(
         filename = `${prefix}-theme.json`;
     }
 
+    // Log successful export
+    logAnalyticsEvent({
+      endpoint: '/api/export-theme',
+      method: 'POST',
+      status: 200,
+      duration: Date.now() - startTime,
+      ip: maskIP(clientIP),
+      userAgent,
+      format,
+      timestamp: Date.now(),
+    });
+
     return res.status(200).json({
       success: true,
       format,
@@ -158,6 +229,18 @@ export default async function handler(
 
   } catch (error) {
     console.error('Error exporting theme:', error);
+    
+    logAnalyticsEvent({
+      endpoint: '/api/export-theme',
+      method: 'POST',
+      status: 500,
+      duration: Date.now() - startTime,
+      ip: maskIP(clientIP),
+      userAgent,
+      error: 'INTERNAL_ERROR',
+      timestamp: Date.now(),
+    });
+    
     return res.status(500).json({
       success: false,
       error: 'Internal server error while exporting theme',

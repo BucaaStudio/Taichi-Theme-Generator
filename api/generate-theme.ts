@@ -244,10 +244,16 @@ function generateTheme(
 
 // --- API Handler ---
 
+import { logAnalyticsEvent, maskIP } from './utils/analytics';
+
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
+  const startTime = Date.now();
+  const clientIP = getClientIP(req);
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -263,6 +269,17 @@ export default async function handler(
   }
 
   if (req.method !== 'POST') {
+    logAnalyticsEvent({
+      endpoint: '/api/generate-theme',
+      method: req.method || 'UNKNOWN',
+      status: 405,
+      duration: Date.now() - startTime,
+      ip: maskIP(clientIP),
+      userAgent,
+      error: 'METHOD_NOT_ALLOWED',
+      timestamp: Date.now(),
+    });
+    
     return res.status(405).json({
       success: false,
       error: 'Method not allowed. Use POST.',
@@ -272,6 +289,17 @@ export default async function handler(
 
   const rateLimitResult = await rateLimit(req, 10, 60000);
   if (!rateLimitResult.success) {
+    logAnalyticsEvent({
+      endpoint: '/api/generate-theme',
+      method: 'POST',
+      status: 429,
+      duration: Date.now() - startTime,
+      ip: maskIP(clientIP),
+      userAgent,
+      error: 'RATE_LIMIT_EXCEEDED',
+      timestamp: Date.now(),
+    });
+    
     return res.status(429).json({
       success: false,
       error: 'Rate limit exceeded. Please try again later.',
@@ -295,6 +323,18 @@ export default async function handler(
     ];
     
     if (!validStyles.includes(style)) {
+      logAnalyticsEvent({
+        endpoint: '/api/generate-theme',
+        method: 'POST',
+        status: 400,
+        duration: Date.now() - startTime,
+        ip: maskIP(clientIP),
+        userAgent,
+        style,
+        error: 'INVALID_STYLE',
+        timestamp: Date.now(),
+      });
+      
       return res.status(400).json({
         success: false,
         error: `Invalid style. Must be one of: ${validStyles.join(', ')}`,
@@ -304,6 +344,18 @@ export default async function handler(
 
     const checkRange = (val: any) => typeof val === 'number' && val >= -5 && val <= 5;
     if (!checkRange(saturation) || !checkRange(contrast) || !checkRange(brightness)) {
+      logAnalyticsEvent({
+        endpoint: '/api/generate-theme',
+        method: 'POST',
+        status: 400,
+        duration: Date.now() - startTime,
+        ip: maskIP(clientIP),
+        userAgent,
+        style,
+        error: 'INVALID_PARAMETERS',
+        timestamp: Date.now(),
+      });
+      
       return res.status(400).json({
         success: false,
         error: 'Parameters saturation, contrast, and brightness must be numbers between -5 and 5.',
@@ -312,6 +364,18 @@ export default async function handler(
     }
 
     if (baseColor && !/^#[0-9A-F]{6}$/i.test(baseColor)) {
+      logAnalyticsEvent({
+        endpoint: '/api/generate-theme',
+        method: 'POST',
+        status: 400,
+        duration: Date.now() - startTime,
+        ip: maskIP(clientIP),
+        userAgent,
+        style,
+        error: 'INVALID_BASE_COLOR',
+        timestamp: Date.now(),
+      });
+      
       return res.status(400).json({
         success: false,
         error: 'Invalid baseColor format. Must be a hex color (e.g., #FF5733)',
@@ -327,6 +391,18 @@ export default async function handler(
       brightness
     );
 
+    // Log successful generation
+    logAnalyticsEvent({
+      endpoint: '/api/generate-theme',
+      method: 'POST',
+      status: 200,
+      duration: Date.now() - startTime,
+      ip: maskIP(clientIP),
+      userAgent,
+      style: result.mode,
+      timestamp: Date.now(),
+    });
+
     return res.status(200).json({
       success: true,
       light: result.light,
@@ -341,6 +417,18 @@ export default async function handler(
 
   } catch (error) {
     console.error('Error generating theme:', error);
+    
+    logAnalyticsEvent({
+      endpoint: '/api/generate-theme',
+      method: 'POST',
+      status: 500,
+      duration: Date.now() - startTime,
+      ip: maskIP(clientIP),
+      userAgent,
+      error: 'INTERNAL_ERROR',
+      timestamp: Date.now(),
+    });
+    
     return res.status(500).json({
       success: false,
       error: 'Internal server error while generating theme',
@@ -364,3 +452,4 @@ function getPhilosophy(style: string): string {
   
   return philosophies[style] || philosophies.random;
 }
+
