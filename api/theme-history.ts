@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Inline rate limiting
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
 function getClientIP(req: VercelRequest): string {
   const forwarded = req.headers['x-forwarded-for'];
   if (forwarded) {
@@ -10,6 +11,7 @@ function getClientIP(req: VercelRequest): string {
   }
   return 'unknown';
 }
+
 async function rateLimit(req: VercelRequest, max: number, windowMs: number) {
   const ip = getClientIP(req);
   const now = Date.now();
@@ -24,6 +26,7 @@ async function rateLimit(req: VercelRequest, max: number, windowMs: number) {
   }
   return { success: false, retryAfter: Math.ceil((entry.resetTime - now) / 1000) };
 }
+
 function getRateLimitStatus(req: VercelRequest, max: number) {
   const ip = getClientIP(req);
   const entry = rateLimitStore.get(ip);
@@ -34,6 +37,18 @@ function getRateLimitStatus(req: VercelRequest, max: number) {
   return { remaining: Math.max(0, max - entry.count), resetTime: entry.resetTime, total: max };
 }
 
+// Simple analytics logging (captured by Vercel logs)
+function logApiEvent(data: Record<string, any>) {
+  console.log(JSON.stringify({ type: 'api_analytics', ...data }));
+}
+
+function maskIP(ip: string): string {
+  if (ip === 'unknown') return ip;
+  const parts = ip.split('.');
+  if (parts.length === 4) return `${parts[0]}.${parts[1]}.*.*`;
+  return ip.substring(0, 8) + '...';
+}
+
 /**
  * API Endpoint: Get Theme History
  * 
@@ -41,34 +56,11 @@ function getRateLimitStatus(req: VercelRequest, max: number) {
  * 
  * Rate Limit: 20 requests per minute per IP
  * 
- * Query Parameters:
- * - limit: number (optional, default: 10, max: 50) - Number of themes to retrieve
- * - offset: number (optional, default: 0) - Pagination offset
- * 
- * Response (JSON):
- * {
- *   "success": true,
- *   "themes": [
- *     {
- *       "id": string,
- *       "theme": { ... },
- *       "metadata": { ... },
- *       "createdAt": number
- *     }
- *   ],
- *   "pagination": {
- *     "limit": number,
- *     "offset": number,
- *     "total": number
- *   }
- * }
- * 
  * Note: This is a placeholder implementation. In production, you would:
  * 1. Store themes in a database (e.g., Vercel KV, PostgreSQL)
  * 2. Associate themes with user sessions or accounts
  * 3. Implement proper pagination
-import { logAnalyticsEvent, maskIP } from './utils/analytics';
-
+ */
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -93,7 +85,7 @@ export default async function handler(
 
   // Only allow GET requests
   if (req.method !== 'GET') {
-    logAnalyticsEvent({
+    logApiEvent({
       endpoint: '/api/theme-history',
       method: req.method || 'UNKNOWN',
       status: 405,
@@ -114,7 +106,7 @@ export default async function handler(
   // Apply rate limiting (20 requests per minute per IP)
   const rateLimitResult = await rateLimit(req, 20, 60000);
   if (!rateLimitResult.success) {
-    logAnalyticsEvent({
+    logApiEvent({
       endpoint: '/api/theme-history',
       method: 'GET',
       status: 429,
@@ -145,7 +137,7 @@ export default async function handler(
     const offset = parseInt(req.query.offset as string) || 0;
 
     // Log successful request
-    logAnalyticsEvent({
+    logApiEvent({
       endpoint: '/api/theme-history',
       method: 'GET',
       status: 200,
@@ -170,7 +162,7 @@ export default async function handler(
   } catch (error) {
     console.error('Error fetching theme history:', error);
     
-    logAnalyticsEvent({
+    logApiEvent({
       endpoint: '/api/theme-history',
       method: 'GET',
       status: 500,
@@ -188,4 +180,3 @@ export default async function handler(
     });
   }
 }
-

@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Inline rate limiting
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
 function getClientIP(req: VercelRequest): string {
   const forwarded = req.headers['x-forwarded-for'];
   if (forwarded) {
@@ -10,6 +11,7 @@ function getClientIP(req: VercelRequest): string {
   }
   return 'unknown';
 }
+
 async function rateLimit(req: VercelRequest, max: number, windowMs: number) {
   const ip = getClientIP(req);
   const now = Date.now();
@@ -25,50 +27,25 @@ async function rateLimit(req: VercelRequest, max: number, windowMs: number) {
   return { success: false, retryAfter: Math.ceil((entry.resetTime - now) / 1000) };
 }
 
+// Simple analytics logging (captured by Vercel logs)
+function logApiEvent(data: Record<string, any>) {
+  console.log(JSON.stringify({ type: 'api_analytics', ...data }));
+}
+
+function maskIP(ip: string): string {
+  if (ip === 'unknown') return ip;
+  const parts = ip.split('.');
+  if (parts.length === 4) return `${parts[0]}.${parts[1]}.*.*`;
+  return ip.substring(0, 8) + '...';
+}
+
 /**
  * API Endpoint: Export Theme
  * 
  * Exports a theme in various formats (CSS, JSON, Tailwind config, etc.)
  * 
  * Rate Limit: 15 requests per minute per IP
- * 
- * Request Body (JSON):
- * {
- *   "theme": {
- *     "primary": string,
- *     "secondary": string,
- *     "accent": string,
- *     "background": string,
- *     "card": string,
- *     "text": string,
- *     "textSecondary": string,
- *     "border": string
- *   },
- *   "format": "css" | "json" | "tailwind" | "scss" | "less",
- *   "options": {
- *     "prefix": string (optional, default: "taichi"),
- *     "includeComments": boolean (optional, default: true)
- *   }
- * }
- * 
- * Response (JSON):
- * {
- *   "success": true,
- *   "format": string,
- *   "content": string,
- *   "filename": string
- * }
-import { logAnalyticsEvent, maskIP } from './utils/analytics';
-
-function getClientIP(req: VercelRequest): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (forwarded) {
-    const ip = Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0];
-    return ip.trim();
-  }
-  return 'unknown';
-}
-
+ */
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -93,7 +70,7 @@ export default async function handler(
 
   // Only allow POST requests
   if (req.method !== 'POST') {
-    logAnalyticsEvent({
+    logApiEvent({
       endpoint: '/api/export-theme',
       method: req.method || 'UNKNOWN',
       status: 405,
@@ -114,7 +91,7 @@ export default async function handler(
   // Apply rate limiting (15 requests per minute per IP)
   const rateLimitResult = await rateLimit(req, 15, 60000);
   if (!rateLimitResult.success) {
-    logAnalyticsEvent({
+    logApiEvent({
       endpoint: '/api/export-theme',
       method: 'POST',
       status: 429,
@@ -138,7 +115,7 @@ export default async function handler(
 
     // Validate theme object
     if (!theme || typeof theme !== 'object') {
-      logAnalyticsEvent({
+      logApiEvent({
         endpoint: '/api/export-theme',
         method: 'POST',
         status: 400,
@@ -159,7 +136,7 @@ export default async function handler(
     // Validate format
     const validFormats = ['css', 'json', 'tailwind', 'scss', 'less'];
     if (!validFormats.includes(format)) {
-      logAnalyticsEvent({
+      logApiEvent({
         endpoint: '/api/export-theme',
         method: 'POST',
         status: 400,
@@ -209,7 +186,7 @@ export default async function handler(
     }
 
     // Log successful export
-    logAnalyticsEvent({
+    logApiEvent({
       endpoint: '/api/export-theme',
       method: 'POST',
       status: 200,
@@ -230,7 +207,7 @@ export default async function handler(
   } catch (error) {
     console.error('Error exporting theme:', error);
     
-    logAnalyticsEvent({
+    logApiEvent({
       endpoint: '/api/export-theme',
       method: 'POST',
       status: 500,

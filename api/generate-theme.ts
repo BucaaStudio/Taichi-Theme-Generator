@@ -244,7 +244,18 @@ function generateTheme(
 
 // --- API Handler ---
 
-import { logAnalyticsEvent, maskIP } from './utils/analytics';
+// Simple analytics logging (captured by Vercel logs)
+function logApiEvent(data: Record<string, any>) {
+  console.log(JSON.stringify({ type: 'api_analytics', ...data }));
+}
+
+function maskIP(ip: string): string {
+  if (ip === 'unknown') return ip;
+  const parts = ip.split('.');
+  if (parts.length === 4) return `${parts[0]}.${parts[1]}.*.*`;
+  return ip.substring(0, 8) + '...';
+}
+
 
 export default async function handler(
   req: VercelRequest,
@@ -269,7 +280,7 @@ export default async function handler(
   }
 
   if (req.method !== 'POST') {
-    logAnalyticsEvent({
+    logApiEvent({
       endpoint: '/api/generate-theme',
       method: req.method || 'UNKNOWN',
       status: 405,
@@ -289,7 +300,7 @@ export default async function handler(
 
   const rateLimitResult = await rateLimit(req, 10, 60000);
   if (!rateLimitResult.success) {
-    logAnalyticsEvent({
+    logApiEvent({
       endpoint: '/api/generate-theme',
       method: 'POST',
       status: 429,
@@ -323,7 +334,7 @@ export default async function handler(
     ];
     
     if (!validStyles.includes(style)) {
-      logAnalyticsEvent({
+      logApiEvent({
         endpoint: '/api/generate-theme',
         method: 'POST',
         status: 400,
@@ -344,7 +355,7 @@ export default async function handler(
 
     const checkRange = (val: any) => typeof val === 'number' && val >= -5 && val <= 5;
     if (!checkRange(saturation) || !checkRange(contrast) || !checkRange(brightness)) {
-      logAnalyticsEvent({
+      logApiEvent({
         endpoint: '/api/generate-theme',
         method: 'POST',
         status: 400,
@@ -364,7 +375,7 @@ export default async function handler(
     }
 
     if (baseColor && !/^#[0-9A-F]{6}$/i.test(baseColor)) {
-      logAnalyticsEvent({
+      logApiEvent({
         endpoint: '/api/generate-theme',
         method: 'POST',
         status: 400,
@@ -392,7 +403,7 @@ export default async function handler(
     );
 
     // Log successful generation
-    logAnalyticsEvent({
+    logApiEvent({
       endpoint: '/api/generate-theme',
       method: 'POST',
       status: 200,
@@ -418,7 +429,7 @@ export default async function handler(
   } catch (error) {
     console.error('Error generating theme:', error);
     
-    logAnalyticsEvent({
+    logApiEvent({
       endpoint: '/api/generate-theme',
       method: 'POST',
       status: 500,
