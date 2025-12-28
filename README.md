@@ -183,21 +183,24 @@ generation and export.
 ### Quick Start
 
 ```javascript
-// Generate a Yin-Yang style theme
+// Generate an analogous theme
 const response = await fetch("/api/generate-theme", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    style: "yin-yang",
+    style: "analogous",
     baseColor: "#3B82F6",
+    saturation: 2,
   }),
 });
-const { theme, metadata } = await response.json();
+const { light, dark, metadata } = await response.json();
+// Returns 20 tokens for each theme (light + dark)
 ```
 
 ### Available Endpoints
 
-- **POST /api/generate-theme** - Generate Taichi-inspired themes (10 req/min)
+- **POST /api/generate-theme** - Generate balanced light/dark themes (10
+  req/min)
 - **POST /api/export-theme** - Export themes in multiple formats (15 req/min)
 - **GET /api/theme-history** - Retrieve theme history (20 req/min)
 
@@ -205,7 +208,6 @@ const { theme, metadata } = await response.json();
 
 - 📖 [Complete API Documentation](./API_DOCUMENTATION.md)
 - ⚡ [Quick Reference](./API_QUICK_REFERENCE.md)
-- 💻 [API Client Utilities](./utils/api-client.ts)
 
 All endpoints are rate-limited for Vercel's free tier and designed to be
 LLM-friendly.

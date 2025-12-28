@@ -8,7 +8,6 @@ import { ThemeTokens, GenerationMode } from '../types';
  */
 
 // Configuration
-// Using absolute URL if specified in env, otherwise fallback to relative /api
 const API_BASE_URL = typeof window !== 'undefined' && window.location.origin.includes('localhost')
   ? '/api'
   : (import.meta.env.VITE_API_URL || '/api');
@@ -17,13 +16,15 @@ export type Theme = ThemeTokens;
 
 export interface ThemeMetadata {
   style: string;
+  seed: string;
   timestamp: number;
   philosophy: string;
 }
 
 export interface GenerateThemeResponse {
   success: boolean;
-  theme?: Theme;
+  light?: Theme;
+  dark?: Theme;
   metadata?: ThemeMetadata;
   error?: string;
   code?: string;
@@ -43,19 +44,38 @@ export interface ExportThemeResponse {
 export type ThemeStyle = GenerationMode;
 export type ExportFormat = 'css' | 'scss' | 'less' | 'tailwind' | 'json';
 
+export interface GenerateThemeOptions {
+  style?: ThemeStyle;
+  baseColor?: string;
+  saturation?: number;  // -5 to 5
+  contrast?: number;    // -5 to 5
+  brightness?: number;  // -5 to 5
+}
+
 /**
  * Generate a new theme using the API
  * 
- * @param style - Theme generation style
- * @param baseColor - Optional base color in hex format
- * @param lockedColors - Optional array of color tokens to preserve
- * @returns Promise with theme data or error
+ * @param options - Theme generation options
+ * @returns Promise with light and dark themes or error
+ * 
+ * @example
+ * const result = await generateTheme({ style: 'analogous', baseColor: '#3B82F6' });
+ * if (result.success) {
+ *   console.log('Light theme:', result.light);
+ *   console.log('Dark theme:', result.dark);
+ * }
  */
 export async function generateTheme(
-  style: ThemeStyle = 'random',
-  baseColor?: string,
-  lockedColors?: string[]
+  options: GenerateThemeOptions = {}
 ): Promise<GenerateThemeResponse> {
+  const {
+    style = 'random',
+    baseColor,
+    saturation = 0,
+    contrast = 0,
+    brightness = 0
+  } = options;
+
   try {
     const response = await fetch(`${API_BASE_URL}/generate-theme`, {
       method: 'POST',
@@ -65,7 +85,9 @@ export async function generateTheme(
       body: JSON.stringify({
         style,
         baseColor,
-        lockedColors
+        saturation,
+        contrast,
+        brightness
       })
     });
 
@@ -192,10 +214,15 @@ export function getRateLimitMessage(retryAfter?: number): string {
  * 
  * function ThemeGenerator() {
  *   const handleGenerate = async () => {
- *     const result = await generateTheme('yin-yang', '#3B82F6');
+ *     const result = await generateTheme({ 
+ *       style: 'analogous', 
+ *       baseColor: '#3B82F6',
+ *       saturation: 2
+ *     });
  *     
- *     if (result.success && result.theme) {
- *       console.log('Generated theme:', result.theme);
+ *     if (result.success && result.light && result.dark) {
+ *       console.log('Light theme:', result.light);
+ *       console.log('Dark theme:', result.dark);
  *       console.log('Philosophy:', result.metadata?.philosophy);
  *     } else {
  *       console.error('Error:', result.error);
