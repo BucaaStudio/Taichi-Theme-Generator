@@ -29,8 +29,9 @@
   - Border width, shadow strength, roundness, and gradient controls
 - **Smart Color Formats** - Export in HEX, RGB, CMYK, HSL, LAB, LCH, OKLCH, or
   Display P3
-- **Image Color Extraction** - Replace the current palette with colors extracted
-  from an image
+- **Image Color Extraction** - Extract 10 colors from an image mapped to all
+  palette roles (bg, card, text, textMuted, textOnColor, primary, secondary,
+  accent, good, bad) with dark-mode-aware sorting
 - **History Management** - FIFO history with up to 20 saved themes
 - **Keyboard Shortcuts**
   - `Space` - Generate new theme
@@ -112,9 +113,13 @@ npm run preview
 ### Image Palette Import
 
 1. Open **Pick from Image** and upload/paste a screenshot or photo
-2. Adjust the 5 slots and toggle which ones to include
-3. Click **Import Selection** to replace the theme palette (unchecked slots
+2. The extractor produces **10 colors** in a 5x2 grid matching the palette
+   structure: BG, Card, Text, TextMuted, TextOnColor, Primary, Secondary,
+   Accent, Good, Bad
+3. Click any slot to select it, then click the image to pick a specific color
+4. Toggle checkboxes to choose which slots to import (unchecked slots
    regenerate)
+5. Click **Import Selection** to apply
 
 ### Color Palette Strip
 
@@ -122,8 +127,8 @@ npm run preview
 - Click the color name to **edit** the color manually
 - Switch between **HEX, RGB, CMYK, HSL, LAB, LCH, OKLCH, and Display P3**
   formats
-- View 8 key colors: bg, surface, text, primary, secondary, accent, success,
-  error
+- View 10 key colors: bg, card, text, textMuted, textOnColor, primary,
+  secondary, accent, good, bad
 
 ### Exporting Themes
 

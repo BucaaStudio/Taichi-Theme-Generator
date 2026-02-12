@@ -86,11 +86,38 @@ const HARMONY_MODES: Record<string, HarmonyConfig> = {
 };
 
 function normalizeOverridePalette(overridePalette?: string[]): Array<string | null> | null {
-  if (!overridePalette || overridePalette.length !== 5) return null;
+  if (!overridePalette || (overridePalette.length !== 5 && overridePalette.length !== 10)) return null;
   return overridePalette.map((color) => {
     const trimmed = color ? color.trim() : '';
     return trimmed ? trimmed : null;
   });
+}
+
+interface OverrideMap {
+  bg: string | null; card: string | null; text: string | null;
+  textMuted: string | null; textOnColor: string | null;
+  primary: string | null; secondary: string | null; accent: string | null;
+  good: string | null; bad: string | null;
+}
+
+function destructureOverrides(normalizedOverrides: Array<string | null> | null): OverrideMap {
+  const empty: OverrideMap = { bg: null, card: null, text: null, textMuted: null, textOnColor: null, primary: null, secondary: null, accent: null, good: null, bad: null };
+  if (!normalizedOverrides) return empty;
+  if (normalizedOverrides.length === 10) {
+    // 10-color: [bg, card, text, textMuted, textOnColor, primary, secondary, accent, good, bad]
+    return {
+      bg: normalizedOverrides[0], card: normalizedOverrides[1], text: normalizedOverrides[2],
+      textMuted: normalizedOverrides[3], textOnColor: normalizedOverrides[4],
+      primary: normalizedOverrides[5], secondary: normalizedOverrides[6], accent: normalizedOverrides[7],
+      good: normalizedOverrides[8], bad: normalizedOverrides[9],
+    };
+  }
+  // 5-color (legacy): [primary, secondary, accent, good, bad]
+  return {
+    ...empty,
+    primary: normalizedOverrides[0], secondary: normalizedOverrides[1], accent: normalizedOverrides[2],
+    good: normalizedOverrides[3], bad: normalizedOverrides[4],
+  };
 }
 
 // --- Neutral Foundation (Light Mode) ---
@@ -596,90 +623,106 @@ export function generatePalette(
   const normalizedOverrides = normalizeOverridePalette(overridePalette);
   
   // Determine base hue
+  // For 10-color overrides: primary is at index 5; for 5-color: primary is at index 0
+  const primaryIdx = normalizedOverrides && normalizedOverrides.length === 10 ? 5 : 0;
   let baseHue: number;
   if (seedColor) {
     baseHue = toOklch(seedColor).H;
-  } else if (normalizedOverrides?.[0]) {
-    baseHue = toOklch(normalizedOverrides[0]).H;
-  } else if (overridePalette && overridePalette[0]) {
-    baseHue = toOklch(overridePalette[0]).H;
+  } else if (normalizedOverrides?.[primaryIdx]) {
+    baseHue = toOklch(normalizedOverrides[primaryIdx]).H;
+  } else if (overridePalette && overridePalette[primaryIdx]) {
+    baseHue = toOklch(overridePalette[primaryIdx]).H;
   } else {
     baseHue = rng.nextInt(0, 359);
   }
-  
+
   // Select harmony mode
   let harmonyMode = mode;
   if (mode === 'random') {
     const modes: GenerationMode[] = [
-      'analogous', 'complementary', 'split-complementary', 
+      'analogous', 'complementary', 'split-complementary',
       'triadic', 'tetradic', 'compound', 'triadic-split'
     ];
     harmonyMode = rng.pick(modes);
   }
-  
+
   const harmony = HARMONY_MODES[harmonyMode] || HARMONY_MODES.analogous;
   const hues = harmony.offsets.map(offset => (baseHue + offset + 360) % 360);
-  
-  // Handle override palette
+
+  // Handle override palette - map override indices to hue indices
+  // 10-color layout: [bg(0), card(1), text(2), textMuted(3), textOnColor(4), primary(5), secondary(6), accent(7), good(8), bad(9)]
+  // 5-color layout: [primary(0), secondary(1), accent(2), good(3), bad(4)]
+  // Hue layout: [primary(0), secondary(1), accent(2), good(3), bad(4)]
   if (normalizedOverrides) {
-    for (let i = 0; i < 5; i++) {
-      const overrideColor = normalizedOverrides[i];
-      if (overrideColor) {
-        hues[i] = toOklch(overrideColor).H;
+    if (normalizedOverrides.length === 10) {
+      const overrideToHue: Record<number, number> = { 5: 0, 6: 1, 7: 2, 8: 3, 9: 4 };
+      for (const [oi, hi] of Object.entries(overrideToHue)) {
+        const overrideColor = normalizedOverrides[Number(oi)];
+        if (overrideColor) {
+          hues[hi] = toOklch(overrideColor).H;
+        }
+      }
+    } else {
+      for (let i = 0; i < 5; i++) {
+        const overrideColor = normalizedOverrides[i];
+        if (overrideColor) {
+          hues[i] = toOklch(overrideColor).H;
+        }
       }
     }
   }
-  
+
   // Step 1: Build neutral foundation (light mode) - applies all three levels
   const warmth = rng.nextFloat(-0.5, 0.5);
   const neutrals = buildNeutralFoundation(baseHue, warmth, contrastLevel, brightnessLevel, saturationLevel);
-  
+
   // Step 2: Construct brand colors - applies saturation, brightness, contrast
   const brand = constructBrandColors(hues, neutrals.bg, rng, saturationLevel, brightnessLevel, contrastLevel);
-  
+
   // Step 3: Construct status colors - applies saturation, brightness
   const status = constructStatusColors(hues, neutrals.bg, rng, saturationLevel, brightnessLevel);
 
-  const [
-    primaryOverrideHex,
-    secondaryOverrideHex,
-    accentOverrideHex,
-    goodOverrideHex,
-    badOverrideHex
-  ] = normalizedOverrides ?? [];
+  // Destructure overrides based on layout
+  // 10-color: [bg, card, text, textMuted, textOnColor, primary, secondary, accent, good, bad]
+  // 5-color (legacy): [primary, secondary, accent, good, bad]
+  const ov = destructureOverrides(normalizedOverrides);
 
-  if (primaryOverrideHex) {
-    brand.primary = toOklch(primaryOverrideHex);
+  if (ov.bg) neutrals.bg = toOklch(ov.bg);
+  if (ov.card) {
+    neutrals.card = toOklch(ov.card);
+    const cardOklch = toOklch(ov.card);
+    neutrals.card2 = clampToSRGBGamut({ L: Math.max(0, cardOklch.L - 0.03), C: cardOklch.C, H: cardOklch.H });
   }
-  if (secondaryOverrideHex) {
-    brand.secondary = toOklch(secondaryOverrideHex);
+  if (ov.text) {
+    neutrals.text = toOklch(ov.text);
+    if (!ov.textMuted) {
+      const textOklch = toOklch(ov.text);
+      neutrals.textMuted = clampToSRGBGamut({ L: Math.min(1, textOklch.L + 0.24), C: textOklch.C * 0.7, H: textOklch.H });
+    }
   }
-  if (accentOverrideHex) {
-    brand.accent = toOklch(accentOverrideHex);
-  }
-  if (goodOverrideHex) {
-    status.good = toOklch(goodOverrideHex);
-  }
-  if (badOverrideHex) {
-    status.bad = toOklch(badOverrideHex);
-  }
+  if (ov.textMuted) neutrals.textMuted = toOklch(ov.textMuted);
+  if (ov.primary) brand.primary = toOklch(ov.primary);
+  if (ov.secondary) brand.secondary = toOklch(ov.secondary);
+  if (ov.accent) brand.accent = toOklch(ov.accent);
+  if (ov.good) status.good = toOklch(ov.good);
+  if (ov.bad) status.bad = toOklch(ov.bad);
 
-  const primaryHex = primaryOverrideHex || toHex(brand.primary);
-  const secondaryHex = secondaryOverrideHex || toHex(brand.secondary);
-  const accentHex = accentOverrideHex || toHex(brand.accent);
-  const goodHex = goodOverrideHex || toHex(status.good);
-  const badHex = badOverrideHex || toHex(status.bad);
+  const primaryHex = ov.primary || toHex(brand.primary);
+  const secondaryHex = ov.secondary || toHex(brand.secondary);
+  const accentHex = ov.accent || toHex(brand.accent);
+  const goodHex = ov.good || toHex(status.good);
+  const badHex = ov.bad || toHex(status.bad);
   const warnHex = toHex(status.warn);
-  const statusUsesOverrides = Boolean(goodOverrideHex || badOverrideHex);
-  
+  const statusUsesOverrides = Boolean(ov.good || ov.bad);
+
   // Step 4: Assemble light theme
   const light: ThemeTokens = {
-    bg: toHex(neutrals.bg),
-    card: toHex(neutrals.card),
+    bg: ov.bg || toHex(neutrals.bg),
+    card: ov.card || toHex(neutrals.card),
     card2: toHex(neutrals.card2),
-    text: toHex(neutrals.text),
-    textMuted: toHex(neutrals.textMuted),
-    textOnColor: selectForegroundHex(primaryHex),
+    text: ov.text || toHex(neutrals.text),
+    textMuted: ov.textMuted || toHex(neutrals.textMuted),
+    textOnColor: ov.textOnColor || selectForegroundHex(primaryHex),
     primary: primaryHex,
     primaryFg: selectForegroundHex(primaryHex),
     secondary: secondaryHex,
@@ -741,49 +784,60 @@ export function generatePaletteDarkFirst(
   const normalizedOverrides = normalizeOverridePalette(overridePalette);
   
   // Determine base hue
+  const primaryIdx = normalizedOverrides && normalizedOverrides.length === 10 ? 5 : 0;
   let baseHue: number;
   if (seedColor) {
     baseHue = toOklch(seedColor).H;
-  } else if (normalizedOverrides?.[0]) {
-    baseHue = toOklch(normalizedOverrides[0]).H;
-  } else if (overridePalette && overridePalette[0]) {
-    baseHue = toOklch(overridePalette[0]).H;
+  } else if (normalizedOverrides?.[primaryIdx]) {
+    baseHue = toOklch(normalizedOverrides[primaryIdx]).H;
+  } else if (overridePalette && overridePalette[primaryIdx]) {
+    baseHue = toOklch(overridePalette[primaryIdx]).H;
   } else {
     baseHue = rng.nextInt(0, 359);
   }
-  
+
   // Select harmony mode
   let harmonyMode = mode;
   if (mode === 'random') {
     const modes: GenerationMode[] = [
-      'analogous', 'complementary', 'split-complementary', 
+      'analogous', 'complementary', 'split-complementary',
       'triadic', 'tetradic', 'compound', 'triadic-split'
     ];
     harmonyMode = rng.pick(modes);
   }
-  
+
   const harmony = HARMONY_MODES[harmonyMode] || HARMONY_MODES.analogous;
   const hues = harmony.offsets.map(offset => (baseHue + offset + 360) % 360);
-  
-  // Handle override palette
+
+  // Handle override palette hues
   if (normalizedOverrides) {
-    for (let i = 0; i < 5; i++) {
-      const overrideColor = normalizedOverrides[i];
-      if (overrideColor) {
-        hues[i] = toOklch(overrideColor).H;
+    if (normalizedOverrides.length === 10) {
+      const overrideToHue: Record<number, number> = { 5: 0, 6: 1, 7: 2, 8: 3, 9: 4 };
+      for (const [oi, hi] of Object.entries(overrideToHue)) {
+        const overrideColor = normalizedOverrides[Number(oi)];
+        if (overrideColor) {
+          hues[hi] = toOklch(overrideColor).H;
+        }
+      }
+    } else {
+      for (let i = 0; i < 5; i++) {
+        const overrideColor = normalizedOverrides[i];
+        if (overrideColor) {
+          hues[i] = toOklch(overrideColor).H;
+        }
       }
     }
   }
-  
+
   // Use dark neutral targets
   const warmth = rng.nextFloat(-0.5, 0.5);
   const darkTargets = NEUTRAL_TARGETS.dark;
-  
+
   // Apply brightness/contrast/saturation for dark mode
   const brightnessMod = brightnessLevel * 0.015;
   const contrastMod = contrastLevel * 0.012;
   const chromaMod = Math.max(0, saturationLevel * 0.003);
-  
+
   // Build dark neutral foundation directly
   const darkNeutrals = {
     bg: clampToSRGBGamut({ L: Math.max(0.03, darkTargets.bg - brightnessMod), C: chromaMod * 0.5, H: warmth > 0 ? 60 : 240 }),
@@ -793,68 +847,67 @@ export function generatePaletteDarkFirst(
     textMuted: clampToSRGBGamut({ L: Math.min(0.85, darkTargets.textMuted + brightnessMod * 0.2), C: chromaMod * 0.08, H: baseHue }),
     border: clampToSRGBGamut({ L: Math.min(0.40, darkTargets.border - brightnessMod * 0.2), C: chromaMod * 0.2, H: warmth > 0 ? 60 : 240 }),
   };
-  
+
   // Build brand colors for dark mode (higher lightness for visibility)
   const satNormalized = (saturationLevel + 5) / 10;
   const baseC = 0.02 + satNormalized * 0.20;
   const baseL = 0.58 + brightnessLevel * 0.02;
-  
+
   const darkBrand = {
     primary: clampToSRGBGamut({ L: baseL, C: baseC, H: hues[0] }),
     secondary: clampToSRGBGamut({ L: baseL - 0.05, C: baseC * 0.8, H: hues[1] }),
     accent: clampToSRGBGamut({ L: baseL + 0.05, C: baseC * 1.1, H: hues[2] }),
   };
-  
+
   // Status colors for dark
   const statusC = 0.08 + satNormalized * 0.14;
   const statusL = 0.55 + brightnessLevel * 0.02;
   const { goodHue, badHue } = resolveStatusHues(hues);
-  
+
   const darkStatus = {
     good: clampToSRGBGamut({ L: statusL, C: statusC, H: goodHue }),
     bad: clampToSRGBGamut({ L: statusL, C: statusC, H: badHue }),
     warn: clampToSRGBGamut({ L: statusL + 0.1, C: statusC * 0.9, H: 60 }),
   };
 
-  const [
-    primaryOverrideHex,
-    secondaryOverrideHex,
-    accentOverrideHex,
-    goodOverrideHex,
-    badOverrideHex
-  ] = normalizedOverrides ?? [];
+  // Destructure overrides (handles both 5-color and 10-color layouts)
+  const ov = destructureOverrides(normalizedOverrides);
 
-  if (primaryOverrideHex) {
-    darkBrand.primary = toOklch(primaryOverrideHex);
+  if (ov.bg) darkNeutrals.bg = toOklch(ov.bg);
+  if (ov.card) {
+    darkNeutrals.card = toOklch(ov.card);
+    const cardOklch = toOklch(ov.card);
+    darkNeutrals.card2 = clampToSRGBGamut({ L: Math.min(1, cardOklch.L + 0.03), C: cardOklch.C, H: cardOklch.H });
   }
-  if (secondaryOverrideHex) {
-    darkBrand.secondary = toOklch(secondaryOverrideHex);
+  if (ov.text) {
+    darkNeutrals.text = toOklch(ov.text);
+    if (!ov.textMuted) {
+      const textOklch = toOklch(ov.text);
+      darkNeutrals.textMuted = clampToSRGBGamut({ L: Math.max(0, textOklch.L - 0.24), C: textOklch.C * 0.7, H: textOklch.H });
+    }
   }
-  if (accentOverrideHex) {
-    darkBrand.accent = toOklch(accentOverrideHex);
-  }
-  if (goodOverrideHex) {
-    darkStatus.good = toOklch(goodOverrideHex);
-  }
-  if (badOverrideHex) {
-    darkStatus.bad = toOklch(badOverrideHex);
-  }
+  if (ov.textMuted) darkNeutrals.textMuted = toOklch(ov.textMuted);
+  if (ov.primary) darkBrand.primary = toOklch(ov.primary);
+  if (ov.secondary) darkBrand.secondary = toOklch(ov.secondary);
+  if (ov.accent) darkBrand.accent = toOklch(ov.accent);
+  if (ov.good) darkStatus.good = toOklch(ov.good);
+  if (ov.bad) darkStatus.bad = toOklch(ov.bad);
 
-  const primaryHex = primaryOverrideHex || toHex(darkBrand.primary);
-  const secondaryHex = secondaryOverrideHex || toHex(darkBrand.secondary);
-  const accentHex = accentOverrideHex || toHex(darkBrand.accent);
-  const goodHex = goodOverrideHex || toHex(darkStatus.good);
-  const badHex = badOverrideHex || toHex(darkStatus.bad);
+  const primaryHex = ov.primary || toHex(darkBrand.primary);
+  const secondaryHex = ov.secondary || toHex(darkBrand.secondary);
+  const accentHex = ov.accent || toHex(darkBrand.accent);
+  const goodHex = ov.good || toHex(darkStatus.good);
+  const badHex = ov.bad || toHex(darkStatus.bad);
   const warnHex = toHex(darkStatus.warn);
-  
+
   // Assemble dark theme
   const dark: ThemeTokens = {
-    bg: toHex(darkNeutrals.bg),
-    card: toHex(darkNeutrals.card),
+    bg: ov.bg || toHex(darkNeutrals.bg),
+    card: ov.card || toHex(darkNeutrals.card),
     card2: toHex(darkNeutrals.card2),
-    text: toHex(darkNeutrals.text),
-    textMuted: toHex(darkNeutrals.textMuted),
-    textOnColor: selectForegroundHex(primaryHex),
+    text: ov.text || toHex(darkNeutrals.text),
+    textMuted: ov.textMuted || toHex(darkNeutrals.textMuted),
+    textOnColor: ov.textOnColor || selectForegroundHex(primaryHex),
     primary: primaryHex,
     primaryFg: selectForegroundHex(primaryHex),
     secondary: secondaryHex,

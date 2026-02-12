@@ -8,14 +8,20 @@ interface ImagePickerModalProps {
   onClose: () => void;
   onConfirm: (palette: string[]) => void;
   theme: ThemeTokens;
+  isDark?: boolean;
 }
 
-const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, onConfirm, theme }) => {
+const SLOT_COUNT = 10;
+// Order matches the color palette UI (SwatchStrip)
+const SLOT_LABELS = ['BG', 'Card', 'Text', 'TextMuted', 'TextOnClr', 'Primary', 'Secondary', 'Accent', 'Good', 'Bad'];
+const DEFAULT_CHECKED = new Array(SLOT_COUNT).fill(true);
+
+const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, onConfirm, theme, isDark = false }) => {
   const [mounted, setMounted] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [extractedPalette, setExtractedPalette] = useState<string[]>([]);
-  const [checkedSlots, setCheckedSlots] = useState<boolean[]>([true, true, true, true, true]);
+  const [checkedSlots, setCheckedSlots] = useState<boolean[]>(DEFAULT_CHECKED);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -27,7 +33,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
       setPreviewUrl(null);
       setExtractedPalette([]);
       setSelectedIndex(0);
-      setCheckedSlots([true, true, true, true, true]);
+      setCheckedSlots([...DEFAULT_CHECKED]);
     } else {
       setTimeout(() => setMounted(false), 300);
     }
@@ -58,11 +64,10 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
       reader.onload = (e) => setPreviewUrl(e.target?.result as string);
       reader.readAsDataURL(file);
 
-      // Extract exactly 5 colors
-      const palette = await extractPaletteFromImage(file);
-      setExtractedPalette(palette.slice(0, 5));
+      const palette = await extractPaletteFromImage(file, isDark);
+      setExtractedPalette(palette.slice(0, SLOT_COUNT));
       setSelectedIndex(0);
-      setCheckedSlots([true, true, true, true, true]);
+      setCheckedSlots([...DEFAULT_CHECKED]);
     } catch (err) {
       console.error('Error processing image:', err);
     } finally {
@@ -91,7 +96,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
     const rect = canvas.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * canvas.width;
     const y = ((e.clientY - rect.top) / rect.height) * canvas.height;
-    
+
     const ctx = canvas.getContext('2d');
     if (ctx) {
       const data = ctx.getImageData(x, y, 1, 1).data;
@@ -99,14 +104,12 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
       const g = data[1];
       const b = data[2];
       const hex = '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
-      
-      // Update ONLY the selected color in the 5-color palette
+
       setExtractedPalette(prev => {
         const next = [...prev];
         next[selectedIndex] = hex;
         return next;
       });
-      // Auto-check if we pick a color
       const nextChecked = [...checkedSlots];
       nextChecked[selectedIndex] = true;
       setCheckedSlots(nextChecked);
@@ -121,19 +124,6 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
   };
 
   const handleConfirm = () => {
-    // Only send the hex values for checked slots, or null/empty if unchecked?
-    // The requirement says "import checked ones". 
-    // If overridePalette expects exactly 5, we should probably pass all 5 but 
-    // use a fallback for unchecked ones, or modify generateTheme to handle partials.
-    // Based on previous prompt "all 5 should be imported and used as base colors",
-    // and this prompt "import checked ones", I will send the palette 
-    // where unchecked colors are replaced with something that tells generateTheme
-    // to generate them instead.
-    
-    // Simplest: just send the 5-color array. For now I'll send ALL 5 if they are visible.
-    // If the user meant "only change the theme colors corresponding to checked slots", 
-    // that's more complex. I'll stick to sending the 5-color palette of checked colors.
-    
     const paletteToImport = extractedPalette.map((c, i) => checkedSlots[i] ? c : '');
     onConfirm(paletteToImport);
   };
@@ -160,11 +150,11 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
   if (!mounted && !isOpen) return null;
 
   return (
-    <div 
+    <div
       className={`fixed inset-0 z-[110] flex items-center justify-center p-4 transition-all duration-300 ${isOpen ? 'bg-black/40 backdrop-blur-sm opacity-100' : 'bg-black/0 backdrop-blur-none opacity-0 pointer-events-none'}`}
       onClick={onClose}
     >
-      <div 
+      <div
         className={`w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-300 flex flex-col max-h-[90vh] ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}
         style={{ backgroundColor: theme.card, color: theme.text, borderColor: theme.border, borderWidth: 1 }}
         onClick={e => e.stopPropagation()}
@@ -184,9 +174,9 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
           </button>
         </div>
 
-        <div className="p-8 overflow-y-auto flex-1 flex flex-col no-scrollbar">
+        <div className="p-6 overflow-y-auto flex-1 flex flex-col no-scrollbar">
           {!previewUrl ? (
-            <div 
+            <div
               className={`flex-1 min-h-[350px] border-2 border-dashed rounded-3xl flex flex-col items-center justify-center p-8 transition-all relative ${dragActive ? 'scale-[1.02]' : 'opacity-80'}`}
               style={{ borderColor: dragActive ? theme.primary : theme.border, backgroundColor: theme.card2 }}
               onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
@@ -196,7 +186,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
               </div>
               <h3 className="text-lg font-bold mb-2 text-center">Drop image here, paste, or browse</h3>
               <p className="text-sm opacity-60 text-center mb-8 max-w-xs">Upload a screenshot or photo to generate a theme based on its colors.</p>
-              <button 
+              <button
                 onClick={() => fileInputRef.current?.click()}
                 className="px-6 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-lg"
                 style={{ backgroundColor: theme.primary, color: theme.primaryFg }}
@@ -211,7 +201,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
               </div>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-5">
               <div className="relative rounded-2xl overflow-hidden border shadow-inner group" style={{ borderColor: theme.border }}>
                 <canvas ref={canvasRef} onClick={handleCanvasClick} className="w-full h-auto cursor-crosshair block" />
                 <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
@@ -225,16 +215,16 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase opacity-50 tracking-wider">
                     <Sparkles size={12} />
-                    Current Palette (Checked are imported)
+                    Extracted Palette (Checked are imported)
                   </div>
                 </div>
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-5 gap-2">
                   {extractedPalette.map((color, idx) => (
                     <div key={`${color}-${idx}`} className="relative group">
                       <button
                         onClick={() => setSelectedIndex(idx)}
-                        className={`w-full h-20 rounded-xl transition-all relative overflow-hidden ${selectedIndex === idx ? 'ring-4 ring-offset-2 scale-95 shadow-xl' : 'hover:scale-105 hover:shadow-md'} ${!checkedSlots[idx] ? 'opacity-40 grayscale-[0.5]' : ''}`}
-                        style={{ 
+                        className={`w-full h-14 rounded-lg transition-all relative overflow-hidden border ${selectedIndex === idx ? 'ring-3 ring-offset-2 scale-95 shadow-xl' : 'hover:scale-105 hover:shadow-md'} ${!checkedSlots[idx] ? 'opacity-40 grayscale-[0.5]' : ''}`}
+                        style={{
                           backgroundColor: color,
                           borderColor: theme.border,
                           // @ts-ignore
@@ -242,21 +232,19 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
                           outlineColor: theme.primary
                         }}
                       >
-                        <div className={`absolute bottom-0 left-0 right-0 py-1 text-[10px] font-bold text-center ${selectedIndex === idx ? 'bg-black/40 text-white' : 'bg-black/10 text-white opacity-0 group-hover:opacity-100'}`}>
-                          Slot {idx + 1}
+                        <div className={`absolute bottom-0 left-0 right-0 py-0.5 text-[9px] font-bold text-center ${selectedIndex === idx ? 'bg-black/40 text-white' : 'bg-black/10 text-white opacity-0 group-hover:opacity-100'}`}>
+                          {SLOT_LABELS[idx]}
                         </div>
                       </button>
-                      
-                      {/* Checkbox Overlay */}
-                      <button 
+                      <button
                         onClick={(e) => toggleSlot(idx, e)}
-                        className="absolute -top-2 -right-2 w-7 h-7 bg-white rounded-full shadow-lg border flex items-center justify-center transition-all active:scale-90 hover:bg-gray-50 z-10"
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white rounded-full shadow-lg border flex items-center justify-center transition-all active:scale-90 hover:bg-gray-50 z-10"
                         style={{ color: checkedSlots[idx] ? theme.primary : '#ccc', borderColor: theme.border }}
                       >
-                        {checkedSlots[idx] ? <CheckSquare size={16} fill="currentColor" className="text-white" /> : <Square size={16} />}
+                        {checkedSlots[idx] ? <CheckSquare size={12} fill="currentColor" className="text-white" /> : <Square size={12} />}
                         {checkedSlots[idx] && (
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <Check size={14} className="text-white" style={{ color: checkedSlots[idx] ? theme.primaryFg : 'transparent' }} />
+                                <Check size={10} className="text-white" style={{ color: checkedSlots[idx] ? theme.primaryFg : 'transparent' }} />
                             </div>
                         )}
                       </button>
@@ -264,19 +252,19 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
                   ))}
                 </div>
               </div>
-              
-              <div className="flex items-center justify-between p-6 rounded-2xl border" style={{ backgroundColor: theme.card2, borderColor: theme.border }}>
+
+              <div className="flex items-center justify-between p-5 rounded-2xl border" style={{ backgroundColor: theme.card2, borderColor: theme.border }}>
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-xl shadow-lg border-2 border-white/20" style={{ backgroundColor: extractedPalette[selectedIndex] }} />
+                  <div className="w-12 h-12 rounded-xl shadow-lg border-2 border-white/20" style={{ backgroundColor: extractedPalette[selectedIndex] }} />
                   <div>
-                    <h4 className="font-bold text-sm uppercase opacity-50 tracking-wider">Slot {selectedIndex + 1}</h4>
-                    <p className="text-2xl font-mono font-bold">{extractedPalette[selectedIndex]}</p>
+                    <h4 className="font-bold text-xs uppercase opacity-50 tracking-wider">{SLOT_LABELS[selectedIndex]}</h4>
+                    <p className="text-xl font-mono font-bold">{extractedPalette[selectedIndex]}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-3">
                   <button onClick={() => setPreviewUrl(null)} className="px-5 py-2.5 rounded-xl font-bold transition-all hover:bg-black/5">Reset</button>
-                  <button 
+                  <button
                     onClick={handleConfirm}
                     disabled={checkedSlots.every(s => !s) || isProcessing}
                     className="px-8 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-black/10 disabled:opacity-50"

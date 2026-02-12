@@ -1238,6 +1238,7 @@ const App: React.FC = () => {
         onClose={() => setShowImagePickerModal(false)}
         onConfirm={handleImageConfirm}
         theme={currentTheme.dark} // Use dark theme for picker modal UI
+        isDark={isDarkUI}
       />
     </div>
   );

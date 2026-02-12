@@ -236,7 +236,7 @@ export function generateTheme(
   );
 }
 
-export async function extractPaletteFromImage(file: File): Promise<string[]> {
+export async function extractPaletteFromImage(file: File, isDark: boolean = false): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -262,25 +262,88 @@ export async function extractPaletteFromImage(file: File): Promise<string[]> {
             const [r, g, b] = key.split(',').map(Number);
             return { r, g, b, hsl: rgbToHsl(r, g, b) };
           });
+
+        // Extract 10 colors matching palette structure:
+        // [primary, secondary, accent, good, warn, bad, bg, card, text, border]
+        const TARGET_COUNT = 10;
         const palette: string[] = [];
-        const minHueDiff = 20;
+        const minHueDiff = 15;
         for (const c of sortedColors) {
-          if (palette.length >= 5) break;
+          if (palette.length >= TARGET_COUNT) break;
           const isTooSimilar = palette.some(existingHex => {
             const extHsl = hexToHsl(existingHex);
             const hueDiff = Math.min(Math.abs(extHsl.h - c.hsl.h), 360 - Math.abs(extHsl.h - c.hsl.h));
-            return hueDiff < minHueDiff && Math.abs(extHsl.s - c.hsl.s) < 20 && Math.abs(extHsl.l - c.hsl.l) < 20;
+            return hueDiff < minHueDiff && Math.abs(extHsl.s - c.hsl.s) < 15 && Math.abs(extHsl.l - c.hsl.l) < 15;
           });
           if (!isTooSimilar) palette.push(hslToHex(c.hsl.h, c.hsl.s, c.hsl.l));
         }
-        if (palette.length < 5) {
+        if (palette.length < TARGET_COUNT) {
           for (const c of sortedColors) {
-            if (palette.length >= 5) break;
+            if (palette.length >= TARGET_COUNT) break;
             const hex = hslToHex(c.hsl.h, c.hsl.s, c.hsl.l);
             if (!palette.includes(hex)) palette.push(hex);
           }
         }
-        resolve(palette.length > 0 ? palette : ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']);
+
+        // Sort extracted colors into semantic slots by HSL properties.
+        // Slot order matches palette UI: [bg, card, text, textMuted, textOnColor, primary, secondary, accent, good, bad]
+        const colorObjs = palette.map(hex => ({ hex, hsl: hexToHsl(hex) }));
+        const chromatic = colorObjs.filter(c => c.hsl.s > 20);
+        const neutral = colorObjs.filter(c => c.hsl.s <= 20);
+
+        // Sort chromatic by hue for diverse assignment
+        chromatic.sort((a, b) => a.hsl.h - b.hsl.h);
+        // Sort neutrals for semantic assignment based on mode
+        // Light mode: bg=lightest, card=next, text=darkest, textMuted=mid-dark
+        // Dark mode:  bg=darkest, card=next-dark, text=lightest, textMuted=mid-light
+        if (isDark) {
+          neutral.sort((a, b) => a.hsl.l - b.hsl.l); // darkest first
+        } else {
+          neutral.sort((a, b) => b.hsl.l - a.hsl.l); // lightest first
+        }
+
+        const slots: string[] = new Array(TARGET_COUNT).fill('');
+
+        // Neutral slots: bg(0)=most extreme, card(1)=next, then assign text/textMuted
+        // from the opposite end of the lightness spectrum
+        if (neutral.length >= 4) {
+          slots[0] = neutral[0].hex; // bg: lightest (light) or darkest (dark)
+          slots[1] = neutral[1].hex; // card: next
+          slots[2] = neutral[neutral.length - 1].hex; // text: opposite end
+          slots[3] = neutral[neutral.length - 2].hex; // textMuted: near text
+          // textOnColor(4) filled from remaining
+        } else {
+          for (let i = 0; i < 5 && i < neutral.length; i++) {
+            slots[i] = neutral[i].hex;
+          }
+        }
+        // Brand slots: primary(5), secondary(6), accent(7)
+        for (let i = 0; i < 3 && i < chromatic.length; i++) {
+          slots[5 + i] = chromatic[i].hex;
+        }
+        // Status slots: good(8), bad(9)
+        for (let i = 0; i < 2 && i + 3 < chromatic.length; i++) {
+          slots[8 + i] = chromatic[i + 3].hex;
+        }
+
+        // Fill any remaining empty slots with leftover colors
+        const used = new Set(slots.filter(Boolean));
+        const remaining = colorObjs.filter(c => !used.has(c.hex));
+        for (let i = 0; i < TARGET_COUNT; i++) {
+          if (!slots[i] && remaining.length > 0) {
+            slots[i] = remaining.shift()!.hex;
+          }
+        }
+
+        // Final fallback for any still-empty slots
+        const fallback = isDark
+          ? ['#0f172a', '#1e293b', '#f8fafc', '#94a3b8', '#ffffff', '#3b82f6', '#10b981', '#f59e0b', '#22c55e', '#ef4444']
+          : ['#f8fafc', '#f1f5f9', '#1e293b', '#64748b', '#ffffff', '#3b82f6', '#10b981', '#f59e0b', '#22c55e', '#ef4444'];
+        for (let i = 0; i < TARGET_COUNT; i++) {
+          if (!slots[i]) slots[i] = fallback[i];
+        }
+
+        resolve(slots);
       };
       img.src = event.target?.result as string;
     };
