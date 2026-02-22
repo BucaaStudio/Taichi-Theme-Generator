@@ -595,7 +595,22 @@ const App: React.FC = () => {
         };
       }
 
-      return { ...prev, splitAdjustments: false };
+      const sharedBrightness = Math.round((prev.lightBrightnessLevel + prev.darkBrightnessLevel) / 2);
+      const sharedContrast = Math.round((prev.lightContrastLevel + prev.darkContrastLevel) / 2);
+      const sharedSaturation = Math.round((prev.lightSaturationLevel + prev.darkSaturationLevel) / 2);
+      return {
+        ...prev,
+        splitAdjustments: false,
+        brightnessLevel: sharedBrightness,
+        contrastLevel: sharedContrast,
+        saturationLevel: sharedSaturation,
+        lightBrightnessLevel: sharedBrightness,
+        lightContrastLevel: sharedContrast,
+        lightSaturationLevel: sharedSaturation,
+        darkBrightnessLevel: sharedBrightness,
+        darkContrastLevel: sharedContrast,
+        darkSaturationLevel: sharedSaturation,
+      };
     });
   }, []);
 
@@ -615,7 +630,35 @@ const App: React.FC = () => {
     const nextValue = key === 'borderWidth'
       ? Math.min(Math.max(value, 0), 2)
       : value;
-    setDesignOptions(prev => ({ ...prev, [key]: nextValue }));
+
+    const sharedMap: Partial<Record<keyof DesignOptions, keyof DesignOptions>> = {
+      lightSaturationLevel: 'saturationLevel',
+      darkSaturationLevel: 'saturationLevel',
+      lightBrightnessLevel: 'brightnessLevel',
+      darkBrightnessLevel: 'brightnessLevel',
+      lightContrastLevel: 'contrastLevel',
+      darkContrastLevel: 'contrastLevel',
+    };
+
+    setDesignOptions(prev => {
+      const normalizedKey = (!prev.splitAdjustments && sharedMap[key]) ? sharedMap[key]! : key;
+      const next = { ...prev, [normalizedKey]: nextValue };
+
+      // When split is off, force shared + per-mode levels to stay in lockstep.
+      if (!next.splitAdjustments) {
+        const s = Number(next.saturationLevel);
+        const c = Number(next.contrastLevel);
+        const b = Number(next.brightnessLevel);
+        next.lightSaturationLevel = s;
+        next.darkSaturationLevel = s;
+        next.lightContrastLevel = c;
+        next.darkContrastLevel = c;
+        next.lightBrightnessLevel = b;
+        next.darkBrightnessLevel = b;
+      }
+
+      return next;
+    });
     // Color adjustment regeneration is handled by the useEffect dependency array
   }, [setSplitAdjustments]);
 
