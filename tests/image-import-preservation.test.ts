@@ -15,7 +15,20 @@ const IMPORTED_KEYS = [
   'bad',
 ] as const;
 
-const IMAGE_PALETTE = [
+const LIGHT_IMAGE_PALETTE = [
+  '#ece8df',
+  '#d9d0c3',
+  '#2b231d',
+  '#6f5f52',
+  '#fffaf2',
+  '#b04040',
+  '#ad8f7d',
+  '#d4c6a3',
+  '#9aa57a',
+  '#7a6f95',
+];
+
+const DARK_IMAGE_PALETTE = [
   '#222222',
   '#2f484a',
   '#9a7f82',
@@ -29,13 +42,13 @@ const IMAGE_PALETTE = [
 ];
 
 describe('Image import preservation', () => {
-  it('keeps all 10 imported slots exact in light-first mode across slider extremes', () => {
-    const high = generateTheme('image', '#006fa8', 5, -1, 5, IMAGE_PALETTE, false);
-    const low = generateTheme('image', '#006fa8', -5, 5, -5, IMAGE_PALETTE, false);
+  it('keeps all 10 imported slots exact in light-first mode across slider extremes for light palettes', () => {
+    const high = generateTheme('image', '#006fa8', 5, -1, 5, LIGHT_IMAGE_PALETTE, false);
+    const low = generateTheme('image', '#006fa8', -5, 5, -5, LIGHT_IMAGE_PALETTE, false);
 
     for (let i = 0; i < IMPORTED_KEYS.length; i++) {
       const key = IMPORTED_KEYS[i];
-      const expected = IMAGE_PALETTE[i];
+      const expected = LIGHT_IMAGE_PALETTE[i];
       expect(high.light[key]).toBe(expected);
       expect(low.light[key]).toBe(expected);
     }
@@ -54,16 +67,35 @@ describe('Image import preservation', () => {
   });
 
   it('keeps all 10 imported slots exact in dark-first mode', () => {
-    const generated = generateTheme('image', '#006fa8', 3, 2, -3, IMAGE_PALETTE, true);
+    const generated = generateTheme('image', '#006fa8', 3, 2, -3, DARK_IMAGE_PALETTE, true);
 
     for (let i = 0; i < IMPORTED_KEYS.length; i++) {
       const key = IMPORTED_KEYS[i];
-      expect(generated.dark[key]).toBe(IMAGE_PALETTE[i]);
+      expect(generated.dark[key]).toBe(DARK_IMAGE_PALETTE[i]);
+    }
+  });
+
+  it('applies imports to explicit dark source side when requested', () => {
+    const generated = generateTheme('image', '#006fa8', -3, -5, -3, DARK_IMAGE_PALETTE, false, undefined, undefined, undefined, 'dark');
+
+    for (let i = 0; i < IMPORTED_KEYS.length; i++) {
+      const key = IMPORTED_KEYS[i];
+      expect(generated.dark[key]).toBe(DARK_IMAGE_PALETTE[i]);
+    }
+    expect(generated.light.bg).not.toBe(DARK_IMAGE_PALETTE[0]);
+  });
+
+  it('defaults import source side to light when darkFirst is off', () => {
+    const generated = generateTheme('image', '#006fa8', -3, -5, -3, DARK_IMAGE_PALETTE, false);
+
+    for (let i = 0; i < IMPORTED_KEYS.length; i++) {
+      const key = IMPORTED_KEYS[i];
+      expect(generated.light[key]).toBe(DARK_IMAGE_PALETTE[i]);
     }
   });
 
   it('derives textOnColor from primary when slot is unchecked', () => {
-    const withGap = [...IMAGE_PALETTE];
+    const withGap = [...LIGHT_IMAGE_PALETTE];
     withGap[4] = ''; // textOnColor unchecked
 
     const generated = generateTheme('image', '#006fa8', 2, 0, 1, withGap, false);
@@ -72,7 +104,7 @@ describe('Image import preservation', () => {
 
     for (const i of [0, 1, 2, 3, 5, 6, 7, 8, 9]) {
       const key = IMPORTED_KEYS[i];
-      expect(generated.light[key]).toBe(IMAGE_PALETTE[i]);
+      expect(generated.light[key]).toBe(LIGHT_IMAGE_PALETTE[i]);
     }
   });
 });

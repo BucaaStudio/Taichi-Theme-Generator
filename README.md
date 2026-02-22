@@ -126,6 +126,8 @@ npm run preview
    regenerate)
 5. Click **Import Selection** to apply
    - Imported slots remain exact in the source theme
+   - Source side is explicit and deterministic: Light source when **Dark First**
+     is off, Dark source when **Dark First** is on
    - The remaining tokens are derived from the imported foundation
 
 ### Color Palette Strip

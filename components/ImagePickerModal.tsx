@@ -155,11 +155,11 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-300 flex flex-col max-h-[90vh] ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}
+        className={`w-full max-w-[1200px] rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-300 flex flex-col max-h-[94vh] ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}
         style={{ backgroundColor: theme.card, color: theme.text, borderColor: theme.border, borderWidth: 1 }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-6 border-b flex items-center justify-between shrink-0" style={{ borderColor: theme.border }}>
+        <div className="p-5 md:p-6 border-b flex items-center justify-between shrink-0" style={{ borderColor: theme.border }}>
           <div className="flex items-center gap-3">
              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm" style={{ backgroundColor: theme.primary, color: theme.primaryFg }}>
                  <ImageIcon size={24} />
@@ -174,10 +174,10 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto flex-1 flex flex-col no-scrollbar">
+        <div className="p-5 md:p-6 overflow-y-auto flex-1 flex flex-col no-scrollbar">
           {!previewUrl ? (
             <div
-              className={`flex-1 min-h-[350px] border-2 border-dashed rounded-3xl flex flex-col items-center justify-center p-8 transition-all relative ${dragActive ? 'scale-[1.02]' : 'opacity-80'}`}
+              className={`flex-1 min-h-[350px] md:min-h-[420px] border-2 border-dashed rounded-3xl flex flex-col items-center justify-center p-8 transition-all relative ${dragActive ? 'scale-[1.02]' : 'opacity-80'}`}
               style={{ borderColor: dragActive ? theme.primary : theme.border, backgroundColor: theme.card2 }}
               onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
             >
@@ -201,78 +201,86 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
               </div>
             </div>
           ) : (
-            <div className="space-y-5">
-              <div className="relative rounded-2xl overflow-hidden border shadow-inner group" style={{ borderColor: theme.border }}>
-                <canvas ref={canvasRef} onClick={handleCanvasClick} className="w-full h-auto cursor-crosshair block" />
-                <div className="absolute top-4 left-4 backdrop-blur-md text-xs px-3 py-1.5 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5" style={{ backgroundColor: `${theme.bg}D9`, color: theme.text }}>
-                  <MousePointer2 size={12} />
-                  Click image to pick color for selected slot
-                </div>
-              </div>
-
-              {/* Palette Editor */}
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.35fr)_minmax(340px,1fr)] gap-5 lg:gap-6">
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase opacity-50 tracking-wider">
-                    <Sparkles size={12} />
-                    Extracted Palette (Checked are imported)
+                <div className="relative rounded-2xl overflow-hidden border shadow-inner group" style={{ borderColor: theme.border }}>
+                  <canvas ref={canvasRef} onClick={handleCanvasClick} className="w-full h-auto max-h-[56vh] cursor-crosshair block object-contain" />
+                  <div className="absolute top-4 left-4 backdrop-blur-md text-xs px-3 py-1.5 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5" style={{ backgroundColor: `${theme.bg}D9`, color: theme.text }}>
+                    <MousePointer2 size={12} />
+                    Click image to pick color for selected slot
                   </div>
                 </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {extractedPalette.map((color, idx) => (
-                    <div key={`${color}-${idx}`} className="relative group">
-                      <button
-                        onClick={() => setSelectedIndex(idx)}
-                        className={`w-full h-14 rounded-lg transition-all relative overflow-hidden border ${selectedIndex === idx ? 'ring-3 ring-offset-2 scale-95 shadow-xl' : 'hover:scale-105 hover:shadow-md'} ${!checkedSlots[idx] ? 'opacity-40 grayscale-[0.5]' : ''}`}
-                        style={{
-                          backgroundColor: color,
-                          borderColor: theme.border,
-                          // @ts-ignore
-                          '--ring-offset-color': theme.card,
-                          outlineColor: theme.primary
-                        }}
-                      >
-                        <div className={`absolute bottom-0 left-0 right-0 py-0.5 text-[9px] font-bold text-center ${selectedIndex === idx ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} style={{ backgroundColor: `${theme.bg}99`, color: theme.text }}>
-                          {SLOT_LABELS[idx]}
-                        </div>
-                      </button>
-                      <button
-                        onClick={(e) => toggleSlot(idx, e)}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full shadow-lg border flex items-center justify-center transition-all active:scale-90 hover-themed z-10"
-                        style={{ backgroundColor: theme.card, color: checkedSlots[idx] ? theme.primary : theme.textMuted, borderColor: theme.border }}
-                      >
-                        {checkedSlots[idx] ? <CheckSquare size={12} fill="currentColor" /> : <Square size={12} />}
-                        {checkedSlots[idx] && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <Check size={10} style={{ color: theme.primaryFg }} />
-                            </div>
-                        )}
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-xs opacity-55 px-1">Tip: click a color slot on the right, then click this image to replace it.</p>
               </div>
 
-              <div className="flex items-center justify-between p-5 rounded-2xl border" style={{ backgroundColor: theme.card2, borderColor: theme.border }}>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl shadow-lg border-2" style={{ backgroundColor: extractedPalette[selectedIndex], borderColor: `${theme.border}40` }} />
-                  <div>
-                    <h4 className="font-bold text-xs uppercase opacity-50 tracking-wider">{SLOT_LABELS[selectedIndex]}</h4>
-                    <p className="text-xl font-mono font-bold">{extractedPalette[selectedIndex]}</p>
+              <div className="space-y-4 lg:max-h-[56vh] lg:overflow-y-auto lg:pr-1 no-scrollbar">
+                {/* Palette Editor */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase opacity-50 tracking-wider">
+                      <Sparkles size={12} />
+                      Extracted Palette (Checked are imported)
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-5 gap-2">
+                    {extractedPalette.map((color, idx) => (
+                      <div key={`${color}-${idx}`} className="relative group">
+                        <button
+                          onClick={() => setSelectedIndex(idx)}
+                          className={`w-full h-14 rounded-lg transition-all relative overflow-hidden border ${selectedIndex === idx ? 'ring-3 ring-offset-2 scale-95 shadow-xl' : 'hover:scale-105 hover:shadow-md'} ${!checkedSlots[idx] ? 'opacity-40 grayscale-[0.5]' : ''}`}
+                          style={{
+                            backgroundColor: color,
+                            borderColor: theme.border,
+                            // @ts-ignore
+                            '--ring-offset-color': theme.card,
+                            outlineColor: theme.primary
+                          }}
+                        >
+                          <div
+                            className="absolute top-0 left-0 right-0 py-0.5 text-[9px] font-bold text-center tracking-wide"
+                            style={{ backgroundColor: `${theme.bg}B3`, color: theme.text }}
+                          >
+                            {SLOT_LABELS[idx]}
+                          </div>
+                        </button>
+                        <button
+                          onClick={(e) => toggleSlot(idx, e)}
+                          className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full shadow-lg border flex items-center justify-center transition-all active:scale-90 hover-themed z-10"
+                          style={{ backgroundColor: theme.card, color: checkedSlots[idx] ? theme.primary : theme.textMuted, borderColor: theme.border }}
+                        >
+                          {checkedSlots[idx] ? <CheckSquare size={12} fill="currentColor" /> : <Square size={12} />}
+                          {checkedSlots[idx] && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                  <Check size={10} style={{ color: theme.primaryFg }} />
+                              </div>
+                          )}
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="flex gap-3">
-                  <button onClick={() => setPreviewUrl(null)} className="px-5 py-2.5 rounded-xl font-bold transition-all hover-themed">Reset</button>
-                  <button
-                    onClick={handleConfirm}
-                    disabled={checkedSlots.every(s => !s) || isProcessing}
-                    className="px-8 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-lg disabled:opacity-50"
-                    style={{ backgroundColor: theme.primary, color: theme.primaryFg }}
-                  >
-                    <Check size={20} />
-                    Import Selection
-                  </button>
+                <div className="p-4 rounded-2xl border space-y-4" style={{ backgroundColor: theme.card2, borderColor: theme.border }}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl shadow-lg border-2" style={{ backgroundColor: extractedPalette[selectedIndex], borderColor: `${theme.border}40` }} />
+                    <div>
+                      <h4 className="font-bold text-xs uppercase opacity-50 tracking-wider">{SLOT_LABELS[selectedIndex]}</h4>
+                      <p className="text-xl font-mono font-bold">{extractedPalette[selectedIndex]}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button onClick={() => setPreviewUrl(null)} className="px-5 py-2.5 rounded-xl font-bold transition-all hover-themed">Reset</button>
+                    <button
+                      onClick={handleConfirm}
+                      disabled={checkedSlots.every(s => !s) || isProcessing}
+                      className="px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg disabled:opacity-50"
+                      style={{ backgroundColor: theme.primary, color: theme.primaryFg }}
+                    >
+                      <Check size={20} />
+                      Import Selection
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

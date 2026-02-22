@@ -13,6 +13,7 @@ import ImagePickerModal from './components/ImagePickerModal';
 
 const MAX_HISTORY = 20;
 type WorkspaceTab = 'overview' | 'tokens' | 'delivery';
+type ImportSourceSide = 'light' | 'dark';
 
 // CSS Variable Injection Helper
 const getStyleVars = (tokens: ThemeTokens) => {
@@ -91,6 +92,7 @@ const App: React.FC = () => {
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [imageOverridePalette, setImageOverridePalette] = useState<string[] | null>(null);
+  const [imageImportSourceSide, setImageImportSourceSide] = useState<ImportSourceSide | null>(null);
   
   const [designOptions, setDesignOptions] = useState<DesignOptions>({
     borderWidth: 1,
@@ -338,7 +340,8 @@ const App: React.FC = () => {
     saturation?: number,
     contrast?: number,
     brightness?: number,
-    overridePalette?: string[]
+    overridePalette?: string[],
+    overrideImportSourceSide?: ImportSourceSide
   ) => {
     // Compute effective adjustment levels
     // When split is on, use per-mode values; otherwise use shared values
@@ -366,10 +369,14 @@ const App: React.FC = () => {
 
     const effectiveOverridePalette =
       overridePalette ?? (genMode === 'image' ? (imageOverridePalette ?? undefined) : undefined);
+    const effectiveImportSourceSide =
+      genMode === 'image'
+        ? (overrideImportSourceSide ?? imageImportSourceSide ?? (designOptions.darkFirst ? 'dark' : 'light'))
+        : undefined;
 
     const { light, dark, seed: newSeed } = generateTheme(
       genMode, seed, lightSat, lightCon, lightBri, effectiveOverridePalette, designOptions.darkFirst,
-      darkSat, darkCon, darkBri
+      darkSat, darkCon, darkBri, effectiveImportSourceSide
     );
     
     // Preserve locked colors from current theme
@@ -438,7 +445,7 @@ const App: React.FC = () => {
       designOptions.darkFirst, designOptions.splitAdjustments,
       designOptions.lightBrightnessLevel, designOptions.lightContrastLevel, designOptions.lightSaturationLevel,
       designOptions.darkBrightnessLevel, designOptions.darkContrastLevel, designOptions.darkSaturationLevel,
-      lockedColors, currentTheme, imageOverridePalette]);
+      lockedColors, currentTheme, imageOverridePalette, imageImportSourceSide]);
 
   // Update a single token (manual edit)
   const handleTokenUpdate = useCallback((side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => {
@@ -536,9 +543,11 @@ const App: React.FC = () => {
 
 
   const handleImageConfirm = (palette: string[]) => {
+    const importSourceSide: ImportSourceSide = designOptions.darkFirst ? 'dark' : 'light';
     setImageOverridePalette(palette);
+    setImageImportSourceSide(importSourceSide);
     handleModeChange('image');
-    generateNewTheme('image', undefined, undefined, undefined, undefined, palette); 
+    generateNewTheme('image', undefined, undefined, undefined, undefined, palette, importSourceSide); 
     setShowImagePickerModal(false);
   };
 
@@ -546,6 +555,7 @@ const App: React.FC = () => {
     setMode(nextMode);
     if (nextMode !== 'image') {
       setImageOverridePalette(null);
+      setImageImportSourceSide(null);
     }
   }, []);
 
@@ -1567,7 +1577,8 @@ const App: React.FC = () => {
         onClose={() => setShowImagePickerModal(false)}
         onConfirm={handleImageConfirm}
         theme={currentTheme.dark} // Use dark theme for picker modal UI
-        isDark={isDarkUI}
+        // Extraction slot ordering follows generation source mode, not shell theme.
+        isDark={designOptions.darkFirst}
       />
     </div>
   );

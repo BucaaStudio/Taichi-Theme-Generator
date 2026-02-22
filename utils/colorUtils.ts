@@ -631,7 +631,8 @@ export function generateTheme(
   darkFirst: boolean = false,
   darkSaturationLevel?: number,
   darkContrastLevel?: number,
-  darkBrightnessLevel?: number
+  darkBrightnessLevel?: number,
+  imageImportSourceSide?: 'light' | 'dark'
 ): { light: ThemeTokens, dark: ThemeTokens, seed: string, mode: GenerationMode } {
   // Generate the base palette at neutral levels.
   // Brightness/contrast/saturation are applied in one adjustment stage below.
@@ -670,7 +671,8 @@ export function generateTheme(
   // The other 10 tokens are derived from those imported slots.
   const importedSlots = parseImageOverrides(overridePalette);
   if (Object.keys(importedSlots).length > 0) {
-    if (darkFirst) {
+    const importSourceSide = imageImportSourceSide ?? (darkFirst ? 'dark' : 'light');
+    if (importSourceSide === 'dark') {
       dark = deriveThemeFromImportedSlots(dark, importedSlots);
       light = enforceCompanionParity(dark, light, { strength: parityStrength });
     } else {
