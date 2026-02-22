@@ -443,6 +443,102 @@ interface ParityOptions {
   strength?: number;
 }
 
+function tokenSurfaceContrast(theme: ThemeTokens, key: keyof ThemeTokens): number {
+  const token = theme[key];
+  const bgRatio = contrastRatio(token, theme.bg);
+  const cardRatio = contrastRatio(token, theme.card);
+  return Math.min(bgRatio, cardRatio);
+}
+
+function fitContrastTowardTarget(
+  color: { L: number; C: number; H: number },
+  bgHex: string,
+  targetRatio: number
+): { L: number; C: number; H: number } {
+  const bg = toOklch(bgHex);
+  const base = clampToSRGBGamut(color);
+  const baseHex = toHex(base);
+  const baseRatio = contrastRatio(baseHex, bgHex);
+  if (!Number.isFinite(targetRatio) || targetRatio <= 0 || Math.abs(baseRatio - targetRatio) < 0.02) {
+    return base;
+  }
+
+  // Move along the lightness axis only. This keeps hue/chroma identity stable.
+  const increaseContrast = baseRatio < targetRatio;
+  const boundaryL = increaseContrast ? (base.L >= bg.L ? 0.97 : 0.03) : bg.L;
+
+  let best = base;
+  let bestDelta = Math.abs(baseRatio - targetRatio);
+
+  // Fixed sampling is robust to gamut warping and avoids oscillation.
+  for (let i = 1; i <= 48; i++) {
+    const t = i / 48;
+    const sampled = clampToSRGBGamut({
+      L: base.L + (boundaryL - base.L) * t,
+      C: base.C,
+      H: base.H,
+    });
+    const ratio = contrastRatio(toHex(sampled), bgHex);
+    const delta = Math.abs(ratio - targetRatio);
+    if (delta < bestDelta) {
+      best = sampled;
+      bestDelta = delta;
+    }
+  }
+
+  return best;
+}
+
+function harmonizeSemanticContrastBetweenModes(
+  light: ThemeTokens,
+  dark: ThemeTokens,
+  strength: number
+): { light: ThemeTokens; dark: ThemeTokens } {
+  const tunedLight: ThemeTokens = { ...light };
+  const tunedDark: ThemeTokens = { ...dark };
+  const keys = ['primary', 'secondary', 'accent', 'good', 'warn', 'bad', 'ring'] as const;
+  const balance = Math.max(0, Math.min(1, strength * 0.85));
+  if (balance <= 0) return { light: tunedLight, dark: tunedDark };
+
+  for (const key of keys) {
+    const lightRatio = tokenSurfaceContrast(tunedLight, key);
+    const darkRatio = tokenSurfaceContrast(tunedDark, key);
+
+    // Shared perceptual target:
+    // - geometric mean keeps both sides moving toward each other
+    // - clamped band prevents over-inked light colors and blown-out dark colors
+    const sharedTarget = Math.max(2.7, Math.min(6.2, Math.sqrt(lightRatio * darkRatio)));
+    const targetLight = lightRatio + (sharedTarget - lightRatio) * balance;
+    const targetDark = darkRatio + (sharedTarget - darkRatio) * balance;
+
+    tunedLight[key] = toHex(
+      fitContrastTowardTarget(toOklch(tunedLight[key]), tunedLight.bg, targetLight)
+    );
+    tunedDark[key] = toHex(
+      fitContrastTowardTarget(toOklch(tunedDark[key]), tunedDark.bg, targetDark)
+    );
+  }
+
+  // Keep foreground tokens coherent with any semantic color changes.
+  tunedLight.textOnColor = selectForegroundHex(tunedLight.primary);
+  tunedLight.primaryFg = selectForegroundHex(tunedLight.primary);
+  tunedLight.secondaryFg = selectForegroundHex(tunedLight.secondary);
+  tunedLight.accentFg = selectForegroundHex(tunedLight.accent);
+  tunedLight.goodFg = selectForegroundHex(tunedLight.good);
+  tunedLight.warnFg = selectForegroundHex(tunedLight.warn);
+  tunedLight.badFg = selectForegroundHex(tunedLight.bad);
+
+  tunedDark.textOnColor = selectForegroundHex(tunedDark.primary);
+  tunedDark.primaryFg = selectForegroundHex(tunedDark.primary);
+  tunedDark.secondaryFg = selectForegroundHex(tunedDark.secondary);
+  tunedDark.accentFg = selectForegroundHex(tunedDark.accent);
+  tunedDark.goodFg = selectForegroundHex(tunedDark.good);
+  tunedDark.warnFg = selectForegroundHex(tunedDark.warn);
+  tunedDark.badFg = selectForegroundHex(tunedDark.bad);
+
+  return { light: tunedLight, dark: tunedDark };
+}
+
 const IMAGE_SLOT_KEYS = [
   'bg',
   'card',
@@ -678,6 +774,17 @@ export function generateTheme(
     } else {
       light = deriveThemeFromImportedSlots(light, importedSlots);
       dark = enforceCompanionParity(light, dark, { strength: parityStrength });
+    }
+  } else {
+    // Semantic contrast balancing is only needed in stronger contrast profiles.
+    // Keeping it gated avoids dampening normal brightness response at defaults.
+    const contrastIntensity = Math.max(Math.abs(contrastLevel), Math.abs(dCon));
+    const balanceGate = Math.max(0, contrastIntensity - 2) / 3; // 0 at <=2, 1 at 5
+    const balanceStrength = parityStrength * Math.max(0, Math.min(1, balanceGate));
+    if (balanceStrength > 0.01) {
+      const balanced = harmonizeSemanticContrastBetweenModes(light, dark, balanceStrength);
+      light = balanced.light;
+      dark = balanced.dark;
     }
   }
 

@@ -149,4 +149,26 @@ describe('Adjustment response', () => {
       }
     }
   });
+
+  it('keeps light/dark semantic contrast feel aligned in extreme high-contrast dark-brightness cases', () => {
+    const { light, dark } = generateTheme('random', '#a8372a', -4, 5, -4, undefined, false);
+    const keys: Array<'primary' | 'secondary' | 'accent'> = ['primary', 'secondary', 'accent'];
+
+    for (const key of keys) {
+      const lightRatio = Math.min(
+        contrastRatio(light[key], light.bg),
+        contrastRatio(light[key], light.card)
+      );
+      const darkRatio = Math.min(
+        contrastRatio(dark[key], dark.bg),
+        contrastRatio(dark[key], dark.card)
+      );
+      const delta = Math.abs(lightRatio - darkRatio);
+      if (delta > 2.1) {
+        throw new Error(
+          `Semantic contrast mismatch key=${key} light=${lightRatio.toFixed(2)} dark=${darkRatio.toFixed(2)} delta=${delta.toFixed(2)}`
+        );
+      }
+    }
+  });
 });
