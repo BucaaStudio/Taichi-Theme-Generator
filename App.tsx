@@ -637,7 +637,7 @@ const App: React.FC = () => {
 
             <button 
               onClick={() => setShowSwatches(!showSwatches)}
-              className={`p-2 rounded-lg transition-colors ${showSwatches ? '' : 'hover-themed'}`}
+              className={`p-2 rounded-lg transition-colors shrink-0 ${showSwatches ? '' : 'hover-themed'}`}
               style={showSwatches ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
               title="Color Palette"
             >
@@ -646,7 +646,7 @@ const App: React.FC = () => {
 
             <button 
               onClick={() => setShowOptions(!showOptions)}
-              className={`p-2 rounded-lg transition-colors ${showOptions ? '' : 'hover-themed'}`}
+              className={`p-2 rounded-lg transition-colors shrink-0 ${showOptions ? '' : 'hover-themed'}`}
               style={showOptions ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
               title="Design Options"
             >
@@ -720,7 +720,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-2 shrink-0">
               <button 
                 onClick={() => setShowSwatches(!showSwatches)}
-                className={`p-1.5 rounded-lg transition-colors ${showSwatches ? '' : 'hover-themed'}`}
+                className={`p-1.5 rounded-lg transition-colors shrink-0 ${showSwatches ? '' : 'hover-themed'}`}
                 style={showSwatches ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
                 title="Color Palette"
               >
@@ -729,7 +729,7 @@ const App: React.FC = () => {
 
               <button 
                 onClick={() => setShowOptions(!showOptions)}
-                className={`p-1.5 rounded-lg transition-colors ${showOptions ? '' : 'hover-themed'}`}
+                className={`p-1.5 rounded-lg transition-colors shrink-0 ${showOptions ? '' : 'hover-themed'}`}
                 style={showOptions ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
                 title="Design Options"
               >
@@ -1064,9 +1064,44 @@ const App: React.FC = () => {
 
           {/* Row 2: Color Adjustments */}
           <div className="pt-2 border-t space-y-3" style={{ borderColor: `${shellTheme.border}60` }}>
-           <div className="flex items-center gap-2">
-             <label className="text-xs font-bold uppercase tracking-wider opacity-70">Color Adjustments</label>
-           </div>
+            <div className="flex items-center justify-between gap-4">
+              <label className="text-xs font-bold uppercase tracking-wider opacity-70">Color Adjustments</label>
+              
+              {/* Split Light / Dark Toggle - Moved here for better access */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setDesignOptions(prev => {
+                      if (!prev.splitAdjustments) {
+                        return {
+                          ...prev,
+                          splitAdjustments: true,
+                          lightBrightnessLevel: prev.brightnessLevel,
+                          lightContrastLevel: prev.contrastLevel,
+                          lightSaturationLevel: prev.saturationLevel,
+                          darkBrightnessLevel: prev.brightnessLevel,
+                          darkContrastLevel: prev.contrastLevel,
+                          darkSaturationLevel: prev.saturationLevel,
+                        };
+                      }
+                      return { ...prev, splitAdjustments: false };
+                    });
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <span
+                    className="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors duration-200"
+                    style={{ backgroundColor: designOptions.splitAdjustments ? shellTheme.primary : `${shellTheme.text}30` }}
+                  >
+                    <span className={`inline-block h-2.5 w-2.5 rounded-full shadow transition-transform duration-200 ${designOptions.splitAdjustments ? 'translate-x-[14px]' : 'translate-x-[2px]'}`} style={{ backgroundColor: designOptions.splitAdjustments ? shellTheme.primaryFg : shellTheme.bg }} />
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">
+                    Split Light / Dark
+                  </span>
+                </button>
+              </div>
+            </div>
 
            {/* Shared sliders (when split is off) */}
            {!designOptions.splitAdjustments && (
@@ -1106,8 +1141,8 @@ const App: React.FC = () => {
                        onClick={() => toggleOptionLock('brightnessLevel')}
                        className={`p-0.5 rounded transition-all ${lockedOptions.brightnessLevel ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                        title={lockedOptions.brightnessLevel ? 'Unlock' : 'Lock'}
-                     >
-                       {lockedOptions.brightnessLevel ? <Lock size={10} /> : <Unlock size={10} />}
+                 >
+                   {lockedOptions.brightnessLevel ? <Lock size={10} /> : <Unlock size={10} />}
                      </button>
                      <label className="text-xs font-bold uppercase tracking-wider opacity-70">Brightness</label>
                    </div>
@@ -1336,40 +1371,6 @@ const App: React.FC = () => {
              </button>
            </div>
 
-           {/* Split Light / Dark Toggle */}
-           <div className="flex items-center gap-2">
-             <button
-               onClick={() => {
-                 setDesignOptions(prev => {
-                   if (!prev.splitAdjustments) {
-                     return {
-                       ...prev,
-                       splitAdjustments: true,
-                       lightBrightnessLevel: prev.brightnessLevel,
-                       lightContrastLevel: prev.contrastLevel,
-                       lightSaturationLevel: prev.saturationLevel,
-                       darkBrightnessLevel: prev.brightnessLevel,
-                       darkContrastLevel: prev.contrastLevel,
-                       darkSaturationLevel: prev.saturationLevel,
-                     };
-                   }
-                   return { ...prev, splitAdjustments: false };
-                 });
-               }}
-               onMouseDown={(e) => e.preventDefault()}
-               className="flex items-center gap-2 cursor-pointer"
-             >
-               <span
-                 className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
-                 style={{ backgroundColor: designOptions.splitAdjustments ? shellTheme.primary : `${shellTheme.text}30` }}
-               >
-                 <span className={`inline-block h-3.5 w-3.5 rounded-full shadow transition-transform duration-200 ${designOptions.splitAdjustments ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: designOptions.splitAdjustments ? shellTheme.primaryFg : shellTheme.bg }} />
-               </span>
-               <span className="text-xs font-bold uppercase tracking-wider opacity-70">
-                 Split Light / Dark
-               </span>
-             </button>
-           </div>
           </div>
           </div>
         </div>
