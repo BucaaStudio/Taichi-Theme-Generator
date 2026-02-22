@@ -1238,7 +1238,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
             >
               Bucaa Studio
             </a>
-            . All Rights Reserved. v26.2.1
+            . All Rights Reserved. v{__APP_VERSION__}
           </p>
         </div>
       </footer>
