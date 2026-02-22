@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+node scripts/bump-version.mjs
+
+git add package.json
+
+exit 0
