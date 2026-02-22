@@ -12,11 +12,13 @@ POST /api/generate-theme
 
 ```json
 {
-    "style": "random",
+    "mode": "random",
     "baseColor": "#3B82F6",
-    "saturation": 0,
-    "contrast": 0,
-    "brightness": 0
+    "saturationLevel": 0,
+    "contrastLevel": 0,
+    "brightnessLevel": 0,
+    "darkFirst": false,
+    "splitAdjustments": false
 }
 ```
 
@@ -28,10 +30,18 @@ POST /api/generate-theme
     "light": {/* 20 tokens */},
     "dark": {/* 20 tokens */},
     "metadata": {
+        "mode": "analogous",
         "style": "analogous",
         "seed": "#3B82F6",
         "timestamp": 1703376000000,
-        "philosophy": "..."
+        "philosophy": "...",
+        "options": {
+            "darkFirst": false,
+            "splitAdjustments": false,
+            "saturationLevel": 0,
+            "contrastLevel": 0,
+            "brightnessLevel": 0
+        }
     }
 }
 ```
@@ -74,7 +84,7 @@ POST /api/export-theme
 
 ---
 
-## Harmony Styles (`style`)
+## Harmony Modes (`mode` or `style`)
 
 - `monochrome`
 - `analogous`
@@ -119,8 +129,9 @@ const response = await fetch("/api/generate-theme", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-        style: "analogous",
-        saturation: 2,
+        mode: "analogous",
+        saturationLevel: 2,
+        darkFirst: true,
     }),
 });
 const { light, dark } = await response.json();

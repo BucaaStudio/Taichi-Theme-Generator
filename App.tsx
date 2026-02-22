@@ -148,6 +148,9 @@ const App: React.FC = () => {
         next.darkFirst = Math.random() > 0.5;
       }
 
+      // Split mode itself is never randomized; it only changes via its toggle.
+      next.splitAdjustments = prev.splitAdjustments;
+
       // Color adjustments: randomize per-mode or shared based on split state
       if (prev.splitAdjustments) {
         if (!lockedOptions.saturationLevel) {
@@ -561,13 +564,46 @@ const App: React.FC = () => {
      a.click();
   };
 
-  const updateOption = (key: keyof DesignOptions, value: number) => {
+  const setSplitAdjustments = useCallback((enabled: boolean) => {
+    setDesignOptions(prev => {
+      if (enabled === prev.splitAdjustments) return prev;
+
+      if (enabled) {
+        return {
+          ...prev,
+          splitAdjustments: true,
+          lightBrightnessLevel: prev.brightnessLevel,
+          lightContrastLevel: prev.contrastLevel,
+          lightSaturationLevel: prev.saturationLevel,
+          darkBrightnessLevel: prev.brightnessLevel,
+          darkContrastLevel: prev.contrastLevel,
+          darkSaturationLevel: prev.saturationLevel,
+        };
+      }
+
+      return { ...prev, splitAdjustments: false };
+    });
+  }, []);
+
+  const updateOption = useCallback((key: keyof DesignOptions, value: number | boolean) => {
+    if (key === 'splitAdjustments') {
+      if (typeof value === 'boolean') {
+        setSplitAdjustments(value);
+      }
+      return;
+    }
+
+    if (typeof value === 'boolean') {
+      setDesignOptions(prev => ({ ...prev, [key]: value }));
+      return;
+    }
+
     const nextValue = key === 'borderWidth'
       ? Math.min(Math.max(value, 0), 2)
       : value;
     setDesignOptions(prev => ({ ...prev, [key]: nextValue }));
     // Color adjustment regeneration is handled by the useEffect dependency array
-  };
+  }, [setSplitAdjustments]);
 
   const handleRandomize = useCallback(() => {
     randomizeDesignOptions();
@@ -1064,44 +1100,7 @@ const App: React.FC = () => {
 
           {/* Row 2: Color Adjustments */}
           <div className="pt-2 border-t space-y-3" style={{ borderColor: `${shellTheme.border}60` }}>
-            <div className="flex items-center justify-between gap-4">
-              <label className="text-xs font-bold uppercase tracking-wider opacity-70">Color Adjustments</label>
-              
-              {/* Split Light / Dark Toggle - Moved here for better access */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setDesignOptions(prev => {
-                      if (!prev.splitAdjustments) {
-                        return {
-                          ...prev,
-                          splitAdjustments: true,
-                          lightBrightnessLevel: prev.brightnessLevel,
-                          lightContrastLevel: prev.contrastLevel,
-                          lightSaturationLevel: prev.saturationLevel,
-                          darkBrightnessLevel: prev.brightnessLevel,
-                          darkContrastLevel: prev.contrastLevel,
-                          darkSaturationLevel: prev.saturationLevel,
-                        };
-                      }
-                      return { ...prev, splitAdjustments: false };
-                    });
-                  }}
-                  onMouseDown={(e) => e.preventDefault()}
-                  className="flex items-center gap-2 cursor-pointer"
-                >
-                  <span
-                    className="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors duration-200"
-                    style={{ backgroundColor: designOptions.splitAdjustments ? shellTheme.primary : `${shellTheme.text}30` }}
-                  >
-                    <span className={`inline-block h-2.5 w-2.5 rounded-full shadow transition-transform duration-200 ${designOptions.splitAdjustments ? 'translate-x-[14px]' : 'translate-x-[2px]'}`} style={{ backgroundColor: designOptions.splitAdjustments ? shellTheme.primaryFg : shellTheme.bg }} />
-                  </span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">
-                    Split Light / Dark
-                  </span>
-                </button>
-              </div>
-            </div>
+            <label className="text-xs font-bold uppercase tracking-wider opacity-70">Color Adjustments</label>
 
            {/* Shared sliders (when split is off) */}
            {!designOptions.splitAdjustments && (
@@ -1367,6 +1366,25 @@ const App: React.FC = () => {
                </span>
                <span className="text-xs font-bold uppercase tracking-wider opacity-70">
                  Gradients
+               </span>
+             </button>
+           </div>
+
+           {/* Split Light / Dark Toggle */}
+           <div className="flex items-center gap-2 group/opt">
+             <button
+               onClick={() => setSplitAdjustments(!designOptions.splitAdjustments)}
+               onMouseDown={(e) => e.preventDefault()}
+               className="flex items-center gap-2 cursor-pointer"
+             >
+               <span
+                 className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
+                 style={{ backgroundColor: designOptions.splitAdjustments ? shellTheme.primary : `${shellTheme.text}30` }}
+               >
+                 <span className={`inline-block h-3.5 w-3.5 rounded-full shadow transition-transform duration-200 ${designOptions.splitAdjustments ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: designOptions.splitAdjustments ? shellTheme.primaryFg : shellTheme.bg }} />
+               </span>
+               <span className="text-xs font-bold uppercase tracking-wider opacity-70">
+                 Split Light / Dark
                </span>
              </button>
            </div>

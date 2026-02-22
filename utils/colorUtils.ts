@@ -322,7 +322,7 @@ export function generateTheme(
   darkSaturationLevel?: number,
   darkContrastLevel?: number,
   darkBrightnessLevel?: number
-): { light: ThemeTokens, dark: ThemeTokens, seed: string } {
+): { light: ThemeTokens, dark: ThemeTokens, seed: string, mode: GenerationMode } {
   // Generate base palette at zero adjustments (clean base)
   const base = paletteEngineGenerateTheme(
     mode,
@@ -341,6 +341,7 @@ export function generateTheme(
     light: applyAdjustments(base.light, brightnessLevel, contrastLevel, saturationLevel),
     dark: applyAdjustments(base.dark, dBri, dCon, dSat),
     seed: base.seed,
+    mode: base.mode,
   };
 }
 

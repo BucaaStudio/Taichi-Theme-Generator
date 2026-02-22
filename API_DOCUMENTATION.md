@@ -40,23 +40,34 @@ Generate a pair of balanced Light and Dark themes based on color harmony rules.
 
 ```json
 {
-    "style": "random", // Optional: harmony mode
-    "baseColor": "#3B82F6", // Optional: hex color to seed the palette
-    "saturation": 0, // Optional: -5 to 5 (grayscale to vivid)
-    "contrast": 0, // Optional: -5 to 5 (soft to high contrast)
-    "brightness": 0 // Optional: -5 to 5 (darker to lighter)
+    "mode": "random", // Optional: harmony mode (alias: style)
+    "baseColor": "#3B82F6", // Optional: hex color seed (alias: seed)
+    "saturationLevel": 0, // Optional: -5 to 5 (aliases: saturation, sat)
+    "contrastLevel": 0, // Optional: -5 to 5 (aliases: contrast, con)
+    "brightnessLevel": 0, // Optional: -5 to 5 (aliases: brightness, bri)
+    "darkFirst": false, // Optional: use dark-first generation
+    "splitAdjustments": false, // Optional: separate light/dark adjustments
+    "lightSaturationLevel": 0, // Optional when splitAdjustments=true
+    "lightContrastLevel": 0,
+    "lightBrightnessLevel": 0,
+    "darkSaturationLevel": 0,
+    "darkContrastLevel": 0,
+    "darkBrightnessLevel": 0
 }
 ```
 
 #### Parameters
 
-| Parameter    | Type   | Default  | Range    | Description                                        |
-| ------------ | ------ | -------- | -------- | -------------------------------------------------- |
-| `style`      | string | `random` | See list | Color harmony mode (e.g., `analogous`, `triadic`). |
-| `baseColor`  | string | random   | Hex      | Influence the primary hue of the palette.          |
-| `saturation` | number | `0`      | -5 to 5  | Global saturation adjustment for all colors.       |
-| `contrast`   | number | `0`      | -5 to 5  | Distance between background and text/tokens.       |
-| `brightness` | number | `0`      | -5 to 5  | Global lightness shift for the foundation.         |
+| Parameter              | Type    | Default  | Range    | Description                                                         |
+| ---------------------- | ------- | -------- | -------- | ------------------------------------------------------------------- |
+| `mode` (`style`)       | string  | `random` | See list | Color harmony mode (e.g., `analogous`, `triadic`).                 |
+| `baseColor` (`seed`)   | string  | random   | Hex      | Influence the primary hue of the palette.                          |
+| `saturationLevel`      | number  | `0`      | -5 to 5  | Shared saturation adjustment (aliases: `saturation`, `sat`).       |
+| `contrastLevel`        | number  | `0`      | -5 to 5  | Shared contrast adjustment (aliases: `contrast`, `con`).           |
+| `brightnessLevel`      | number  | `0`      | -5 to 5  | Shared brightness adjustment (aliases: `brightness`, `bri`).       |
+| `darkFirst`            | boolean | `false`  | -        | Generate dark mode as the source palette, then derive light mode.  |
+| `splitAdjustments`     | boolean | `false`  | -        | Enable separate light/dark adjustment values.                      |
+| `light*` / `dark*`     | number  | shared   | -5 to 5  | Per-mode levels used only when `splitAdjustments` is `true`.       |
 
 #### Response
 
@@ -110,10 +121,18 @@ Returns both `light` and `dark` theme variants.
         "badFg": "#000000"
     },
     "metadata": {
+        "mode": "analogous",
         "style": "analogous",
         "seed": "#3B82F6",
         "timestamp": 1703376000000,
-        "philosophy": "Harmony found in nature by choosing neighboring colors on the wheel."
+        "philosophy": "Harmony found in nature by choosing neighboring colors on the wheel.",
+        "options": {
+            "darkFirst": false,
+            "splitAdjustments": false,
+            "saturationLevel": 0,
+            "contrastLevel": 0,
+            "brightnessLevel": 0
+        }
     }
 }
 ```

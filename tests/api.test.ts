@@ -216,6 +216,54 @@ describe('API Test Suite', () => {
       await delay(DELAY_BETWEEN_TESTS);
     });
 
+    it('should accept mode as alias for style', async () => {
+      const response = await apiRequest('/generate-theme', {
+        method: 'POST',
+        body: JSON.stringify({
+          mode: 'tetradic',
+          baseColor: '#10B981'
+        }),
+      });
+      
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      
+      expect(data.success).toBe(true);
+      expect(data.metadata.mode).toBe('tetradic');
+      expect(data.metadata.style).toBe('tetradic');
+      
+      await delay(DELAY_BETWEEN_TESTS);
+    });
+
+    it('should accept split adjustments and darkFirst options', async () => {
+      const response = await apiRequest('/generate-theme', {
+        method: 'POST',
+        body: JSON.stringify({
+          mode: 'analogous',
+          baseColor: '#3B82F6',
+          darkFirst: true,
+          splitAdjustments: true,
+          lightSaturationLevel: 1,
+          lightContrastLevel: 0,
+          lightBrightnessLevel: 1,
+          darkSaturationLevel: -1,
+          darkContrastLevel: 1,
+          darkBrightnessLevel: -1
+        }),
+      });
+      
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      
+      expect(data.success).toBe(true);
+      expect(data.metadata.options.darkFirst).toBe(true);
+      expect(data.metadata.options.splitAdjustments).toBe(true);
+      expect(data.metadata.options.lightBrightnessLevel).toBe(1);
+      expect(data.metadata.options.darkBrightnessLevel).toBe(-1);
+      
+      await delay(DELAY_BETWEEN_TESTS);
+    });
+
     it('should reject invalid style', async () => {
       const response = await apiRequest('/generate-theme', {
         method: 'POST',
@@ -537,6 +585,7 @@ describe('API Test Suite', () => {
       expect(data.code).toBe('INVALID_THEME');
       
       await delay(DELAY_BETWEEN_TESTS);
+    });
   });
 
   describe('3. CORS Support', () => {

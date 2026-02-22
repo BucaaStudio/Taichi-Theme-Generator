@@ -8,6 +8,16 @@ import {
 import { DesignOptions, ThemeTokens } from '../types';
 
 type WorkspaceTab = 'overview' | 'tokens' | 'delivery';
+type AdjustmentOptionKey =
+  | 'saturationLevel'
+  | 'brightnessLevel'
+  | 'contrastLevel'
+  | 'lightSaturationLevel'
+  | 'lightBrightnessLevel'
+  | 'lightContrastLevel'
+  | 'darkSaturationLevel'
+  | 'darkBrightnessLevel'
+  | 'darkContrastLevel';
 
 interface PreviewProps {
   themeName: string;
@@ -193,6 +203,16 @@ const PreviewSection: React.FC<PreviewProps> = ({
   const ringChipClass = 'font-semibold px-1.5 py-0.5 rounded bg-t-text/10 ring-1 ring-[var(--ring)]';
   const isAutoSync = autoSyncPreview ?? true;
   const activeWorkspaceTab = isAutoSync && syncedWorkspaceTab ? syncedWorkspaceTab : localWorkspaceTab;
+  const isDarkPanel = themeName === 'Dark';
+  const saturationKey: AdjustmentOptionKey = options.splitAdjustments
+    ? (isDarkPanel ? 'darkSaturationLevel' : 'lightSaturationLevel')
+    : 'saturationLevel';
+  const brightnessKey: AdjustmentOptionKey = options.splitAdjustments
+    ? (isDarkPanel ? 'darkBrightnessLevel' : 'lightBrightnessLevel')
+    : 'brightnessLevel';
+  const contrastKey: AdjustmentOptionKey = options.splitAdjustments
+    ? (isDarkPanel ? 'darkContrastLevel' : 'lightContrastLevel')
+    : 'contrastLevel';
 
   useEffect(() => {
     if (isAutoSync && syncedWorkspaceTab) {
@@ -458,7 +478,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
               className="w-full flex items-center justify-between p-4 hover:bg-t-card2 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${rClass} ${gradientSecondary} flex items-center justify-center text-t-secondaryFg`}>
+                <div className={`w-10 h-10 shrink-0 ${rClass} ${gradientSecondary} flex items-center justify-center text-t-secondaryFg`}>
                   <Sliders size={20} />
                 </div>
                 <div className="text-left">
@@ -472,28 +492,30 @@ const PreviewSection: React.FC<PreviewProps> = ({
             {expandedSections.adjust && (
               <div className="border-t border-themed p-6 space-y-6">
                 <p className="text-sm text-t-textMuted">
-                  These sliders affect how colors are generated. Changes apply in real-time.
+                  {options.splitAdjustments
+                    ? `These sliders control ${themeName.toLowerCase()} mode only. Changes apply in real-time.`
+                    : 'These sliders affect how colors are generated. Changes apply in real-time.'}
                 </p>
                 
                 {onUpdateOption ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <ControlledSlider 
                       rClass={rClass}
-                      label="Saturation" 
-                      value={options.saturationLevel}
-                      onChange={(v) => onUpdateOption('saturationLevel', v)}
+                      label={options.splitAdjustments ? `Saturation (${themeName})` : 'Saturation'}
+                      value={options[saturationKey]}
+                      onChange={(v) => onUpdateOption(saturationKey, v)}
                     />
                     <ControlledSlider 
                       rClass={rClass}
-                      label="Brightness" 
-                      value={options.brightnessLevel}
-                      onChange={(v) => onUpdateOption('brightnessLevel', v)}
+                      label={options.splitAdjustments ? `Brightness (${themeName})` : 'Brightness'}
+                      value={options[brightnessKey]}
+                      onChange={(v) => onUpdateOption(brightnessKey, v)}
                     />
                     <ControlledSlider 
                       rClass={rClass}
-                      label="Contrast" 
-                      value={options.contrastLevel}
-                      onChange={(v) => onUpdateOption('contrastLevel', v)}
+                      label={options.splitAdjustments ? `Contrast (${themeName})` : 'Contrast'}
+                      value={options[contrastKey]}
+                      onChange={(v) => onUpdateOption(contrastKey, v)}
                     />
                   </div>
                 ) : (
@@ -532,6 +554,23 @@ const PreviewSection: React.FC<PreviewProps> = ({
                     <div className="text-left">
                       <span className="text-sm font-medium text-t-text group-hover:text-t-primary transition-colors">Gradients</span>
                       <p className="text-xs text-t-textMuted">Apply gradients to colored elements</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => onUpdateOption?.('splitAdjustments', !options.splitAdjustments)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    className="basis-full flex items-center gap-3 cursor-pointer group"
+                  >
+                    <span
+                      className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200"
+                      style={{ backgroundColor: options.splitAdjustments ? themeTokens.primary : `${themeTokens.text}30` }}
+                    >
+                      <span className={`inline-block h-4 w-4 rounded-full shadow transition-transform duration-200 ${options.splitAdjustments ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: options.splitAdjustments ? themeTokens.primaryFg : themeTokens.bg }} />
+                    </span>
+                    <div className="text-left">
+                      <span className="text-sm font-medium text-t-text group-hover:text-t-primary transition-colors">Split Light / Dark</span>
+                      <p className="text-xs text-t-textMuted">Use independent adjustments per mode</p>
                     </div>
                   </button>
                 </div>

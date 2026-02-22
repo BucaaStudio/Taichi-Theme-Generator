@@ -15,10 +15,25 @@ const API_BASE_URL = typeof window !== 'undefined' && window.location.origin.inc
 export type Theme = ThemeTokens;
 
 export interface ThemeMetadata {
+  mode?: string;
   style: string;
   seed: string;
   timestamp: number;
+  colorSpace?: string;
   philosophy: string;
+  options?: {
+    darkFirst?: boolean;
+    splitAdjustments?: boolean;
+    saturationLevel?: number;
+    contrastLevel?: number;
+    brightnessLevel?: number;
+    lightSaturationLevel?: number;
+    lightContrastLevel?: number;
+    lightBrightnessLevel?: number;
+    darkSaturationLevel?: number;
+    darkContrastLevel?: number;
+    darkBrightnessLevel?: number;
+  };
 }
 
 export interface GenerateThemeResponse {
@@ -45,11 +60,24 @@ export type ThemeStyle = GenerationMode;
 export type ExportFormat = 'css' | 'scss' | 'less' | 'tailwind' | 'json';
 
 export interface GenerateThemeOptions {
+  mode?: ThemeStyle;
   style?: ThemeStyle;
   baseColor?: string;
-  saturation?: number;  // -5 to 5
-  contrast?: number;    // -5 to 5
-  brightness?: number;  // -5 to 5
+  seed?: string;
+  saturationLevel?: number;  // -5 to 5
+  contrastLevel?: number;    // -5 to 5
+  brightnessLevel?: number;  // -5 to 5
+  saturation?: number;       // Legacy alias
+  contrast?: number;         // Legacy alias
+  brightness?: number;       // Legacy alias
+  darkFirst?: boolean;
+  splitAdjustments?: boolean;
+  lightSaturationLevel?: number;
+  lightContrastLevel?: number;
+  lightBrightnessLevel?: number;
+  darkSaturationLevel?: number;
+  darkContrastLevel?: number;
+  darkBrightnessLevel?: number;
 }
 
 /**
@@ -59,7 +87,7 @@ export interface GenerateThemeOptions {
  * @returns Promise with light and dark themes or error
  * 
  * @example
- * const result = await generateTheme({ style: 'analogous', baseColor: '#3B82F6' });
+ * const result = await generateTheme({ mode: 'analogous', baseColor: '#3B82F6' });
  * if (result.success) {
  *   console.log('Light theme:', result.light);
  *   console.log('Dark theme:', result.dark);
@@ -69,26 +97,55 @@ export async function generateTheme(
   options: GenerateThemeOptions = {}
 ): Promise<GenerateThemeResponse> {
   const {
-    style = 'random',
+    mode,
+    style,
     baseColor,
-    saturation = 0,
-    contrast = 0,
-    brightness = 0
+    seed,
+    saturationLevel,
+    contrastLevel,
+    brightnessLevel,
+    saturation,
+    contrast,
+    brightness,
+    darkFirst = false,
+    splitAdjustments = false,
+    lightSaturationLevel,
+    lightContrastLevel,
+    lightBrightnessLevel,
+    darkSaturationLevel,
+    darkContrastLevel,
+    darkBrightnessLevel
   } = options;
 
+  const resolvedMode = mode ?? style ?? 'random';
+  const resolvedSeed = baseColor ?? seed;
+  const resolvedSaturation = saturationLevel ?? saturation ?? 0;
+  const resolvedContrast = contrastLevel ?? contrast ?? 0;
+  const resolvedBrightness = brightnessLevel ?? brightness ?? 0;
+
   try {
+    const payload = {
+      mode: resolvedMode,
+      baseColor: resolvedSeed,
+      saturationLevel: resolvedSaturation,
+      contrastLevel: resolvedContrast,
+      brightnessLevel: resolvedBrightness,
+      darkFirst,
+      splitAdjustments,
+      lightSaturationLevel: lightSaturationLevel ?? resolvedSaturation,
+      lightContrastLevel: lightContrastLevel ?? resolvedContrast,
+      lightBrightnessLevel: lightBrightnessLevel ?? resolvedBrightness,
+      darkSaturationLevel: darkSaturationLevel ?? resolvedSaturation,
+      darkContrastLevel: darkContrastLevel ?? resolvedContrast,
+      darkBrightnessLevel: darkBrightnessLevel ?? resolvedBrightness
+    };
+
     const response = await fetch(`${API_BASE_URL}/generate-theme`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        style,
-        baseColor,
-        saturation,
-        contrast,
-        brightness
-      })
+      body: JSON.stringify(payload)
     });
 
     const data = await response.json();
@@ -214,10 +271,10 @@ export function getRateLimitMessage(retryAfter?: number): string {
  * 
  * function ThemeGenerator() {
  *   const handleGenerate = async () => {
- *     const result = await generateTheme({ 
- *       style: 'analogous', 
+ *     const result = await generateTheme({
+ *       mode: 'analogous',
  *       baseColor: '#3B82F6',
- *       saturation: 2
+ *       saturationLevel: 2
  *     });
  *     
  *     if (result.success && result.light && result.dark) {

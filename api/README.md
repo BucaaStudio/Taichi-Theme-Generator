@@ -42,10 +42,14 @@ vercel dev
 curl -X POST http://localhost:3000/api/generate-theme \
   -H "Content-Type: application/json" \
   -d '{
-    "style": "analogous", 
+    "mode": "analogous",
     "baseColor": "#3B82F6",
-    "saturation": 2,
-    "contrast": 1
+    "saturationLevel": 2,
+    "contrastLevel": 1,
+    "darkFirst": true,
+    "splitAdjustments": true,
+    "lightBrightnessLevel": 1,
+    "darkBrightnessLevel": -1
   }'
 ```
 

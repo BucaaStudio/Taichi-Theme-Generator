@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { generateTheme as sharedGenerateTheme } from '../utils/colorUtils';
 
 /**
  * Taichi Theme Generator API
@@ -35,6 +36,30 @@ async function rateLimit(req: VercelRequest, max: number, windowMs: number) {
   }
   
   return { success: false, retryAfter: Math.ceil((entry.resetTime - now) / 1000) };
+}
+
+function parseBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value > 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
+function parseLevel(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function inRange(value: number): boolean {
+  return Number.isFinite(value) && value >= -5 && value <= 5;
 }
 
 // --- OKLCH Color Space ---
@@ -407,50 +432,100 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { style = 'random', baseColor, saturation = 0, contrast = 0, brightness = 0 } = req.body || {};
+    const body = req.body || {};
+    const mode = typeof body.mode === 'string'
+      ? body.mode
+      : (typeof body.style === 'string' ? body.style : 'random');
 
     const validStyles = [
-      'monochrome', 'analogous', 'complementary', 'split-complementary', 
+      'monochrome', 'analogous', 'complementary', 'split-complementary',
       'triadic', 'tetradic', 'compound', 'triadic-split', 'random'
     ];
-    
-    if (!validStyles.includes(style)) {
+
+    if (!validStyles.includes(mode)) {
       return res.status(400).json({
         success: false,
-        error: `Invalid style. Must be one of: ${validStyles.join(', ')}`,
+        error: `Invalid mode/style. Must be one of: ${validStyles.join(', ')}`,
         code: 'INVALID_STYLE'
       });
     }
 
-    const checkRange = (val: any) => typeof val === 'number' && val >= -5 && val <= 5;
-    if (!checkRange(saturation) || !checkRange(contrast) || !checkRange(brightness)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Parameters saturation, contrast, and brightness must be numbers between -5 and 5.',
-        code: 'INVALID_PARAMETERS'
-      });
-    }
+    const baseColor = typeof body.baseColor === 'string'
+      ? body.baseColor
+      : (typeof body.seed === 'string' ? body.seed : undefined);
 
     if (baseColor && !/^#[0-9A-F]{6}$/i.test(baseColor)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid baseColor format. Must be a hex color (e.g., #FF5733)',
+        error: 'Invalid baseColor/seed format. Must be a hex color (e.g., #FF5733)',
         code: 'INVALID_BASE_COLOR'
       });
     }
 
-    const result = generateTheme(style as GenerationMode, baseColor, saturation, contrast, brightness);
+    const splitAdjustments = parseBoolean(body.splitAdjustments ?? body.split, false);
+    const darkFirst = parseBoolean(body.darkFirst, false);
+
+    const saturation = parseLevel(body.saturationLevel ?? body.saturation ?? body.sat, 0);
+    const contrast = parseLevel(body.contrastLevel ?? body.contrast ?? body.con, 0);
+    const brightness = parseLevel(body.brightnessLevel ?? body.brightness ?? body.bri, 0);
+
+    const lightSaturation = parseLevel(body.lightSaturationLevel ?? body.lsat, saturation);
+    const lightContrast = parseLevel(body.lightContrastLevel ?? body.lcon, contrast);
+    const lightBrightness = parseLevel(body.lightBrightnessLevel ?? body.lbri, brightness);
+
+    const darkSaturation = parseLevel(body.darkSaturationLevel ?? body.dsat, saturation);
+    const darkContrast = parseLevel(body.darkContrastLevel ?? body.dcon, contrast);
+    const darkBrightness = parseLevel(body.darkBrightnessLevel ?? body.dbri, brightness);
+
+    const levelsToValidate = splitAdjustments
+      ? [lightSaturation, lightContrast, lightBrightness, darkSaturation, darkContrast, darkBrightness]
+      : [saturation, contrast, brightness];
+
+    if (!levelsToValidate.every(inRange)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Adjustment levels must be numbers between -5 and 5.',
+        code: 'INVALID_PARAMETERS'
+      });
+    }
+
+    const result = sharedGenerateTheme(
+      mode as GenerationMode,
+      baseColor,
+      splitAdjustments ? lightSaturation : saturation,
+      splitAdjustments ? lightContrast : contrast,
+      splitAdjustments ? lightBrightness : brightness,
+      undefined,
+      darkFirst,
+      splitAdjustments ? darkSaturation : saturation,
+      splitAdjustments ? darkContrast : contrast,
+      splitAdjustments ? darkBrightness : brightness
+    );
 
     return res.status(200).json({
       success: true,
       light: result.light,
       dark: result.dark,
       metadata: {
+        mode: result.mode,
         style: result.mode,
         seed: result.seed,
         timestamp: Date.now(),
         colorSpace: 'OKLCH',
-        philosophy: getPhilosophy(result.mode)
+        philosophy: getPhilosophy(result.mode),
+        options: {
+          darkFirst,
+          splitAdjustments,
+          saturationLevel: saturation,
+          contrastLevel: contrast,
+          brightnessLevel: brightness,
+          lightSaturationLevel: splitAdjustments ? lightSaturation : saturation,
+          lightContrastLevel: splitAdjustments ? lightContrast : contrast,
+          lightBrightnessLevel: splitAdjustments ? lightBrightness : brightness,
+          darkSaturationLevel: splitAdjustments ? darkSaturation : saturation,
+          darkContrastLevel: splitAdjustments ? darkContrast : contrast,
+          darkBrightnessLevel: splitAdjustments ? darkBrightness : brightness,
+        }
       }
     });
 

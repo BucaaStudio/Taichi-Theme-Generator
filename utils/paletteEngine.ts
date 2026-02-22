@@ -963,7 +963,7 @@ export function generateTheme(
   brightnessLevel: number = 0,
   overridePalette?: string[],
   darkFirst: boolean = false
-): { light: ThemeTokens; dark: ThemeTokens; seed: string } {
+): { light: ThemeTokens; dark: ThemeTokens; seed: string; mode: GenerationMode } {
   const result = darkFirst
     ? generatePaletteDarkFirst(mode, seedColor, saturationLevel, contrastLevel, brightnessLevel, overridePalette)
     : generatePalette(mode, seedColor, saturationLevel, contrastLevel, brightnessLevel, overridePalette);
@@ -972,6 +972,7 @@ export function generateTheme(
     light: result.light,
     dark: result.dark,
     seed: result.seed,
+    mode: result.mode,
   };
 }
 

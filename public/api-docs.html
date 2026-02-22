@@ -398,7 +398,7 @@
                         <th>Description</th>
                     </tr>
                     <tr>
-                        <td><span class="param-name">style</span></td>
+                        <td><span class="param-name">mode</span> (<code>style</code>)</td>
                         <td><span class="param-type">string</span></td>
                         <td>
                             Harmony mode: <code>random</code>, <code
@@ -412,19 +412,29 @@
                         <td>Hex color seed, e.g. <code>#3B82F6</code></td>
                     </tr>
                     <tr>
-                        <td><span class="param-name">saturation</span></td>
+                        <td><span class="param-name">saturationLevel</span></td>
                         <td><span class="param-type">number?</span></td>
-                        <td>-5 to 5. Adjust color vibrancy.</td>
+                        <td>-5 to 5. Shared vibrancy adjustment (aliases: <code>saturation</code>, <code>sat</code>).</td>
                     </tr>
                     <tr>
-                        <td><span class="param-name">contrast</span></td>
+                        <td><span class="param-name">contrastLevel</span></td>
                         <td><span class="param-type">number?</span></td>
-                        <td>-5 to 5. Adjust light/dark separation.</td>
+                        <td>-5 to 5. Shared contrast adjustment (aliases: <code>contrast</code>, <code>con</code>).</td>
                     </tr>
                     <tr>
-                        <td><span class="param-name">brightness</span></td>
+                        <td><span class="param-name">brightnessLevel</span></td>
                         <td><span class="param-type">number?</span></td>
-                        <td>-5 to 5. Global lightness shift.</td>
+                        <td>-5 to 5. Shared brightness adjustment (aliases: <code>brightness</code>, <code>bri</code>).</td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">darkFirst</span></td>
+                        <td><span class="param-type">boolean?</span></td>
+                        <td>Generate dark mode as the source palette, then derive light mode.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">splitAdjustments</span></td>
+                        <td><span class="param-type">boolean?</span></td>
+                        <td>Enable separate light/dark adjustment levels.</td>
                     </tr>
                 </table>
 
@@ -434,9 +444,13 @@
 curl -X POST https://taichi.bucaastudio.com/api/generate-theme \
   -H "Content-Type: application/json" \
   -d '{
-    "style": "analogous",
+    "mode": "analogous",
     "baseColor": "#3B82F6",
-    "saturation": 2
+    "saturationLevel": 2,
+    "darkFirst": true,
+    "splitAdjustments": true,
+    "lightBrightnessLevel": 1,
+    "darkBrightnessLevel": -1
   }'</pre
                 >
 
@@ -448,10 +462,15 @@ curl -X POST https://taichi.bucaastudio.com/api/generate-theme \
   "light": { "bg": "#f4f5f9", "primary": "#3d6fc2", ... },
   "dark": { "bg": "#0a0b0d", "primary": "#5e8ad4", ... },
   "metadata": {
+    "mode": "analogous",
     "style": "analogous",
     "seed": "#3B82F6",
     "colorSpace": "OKLCH",
-    "philosophy": "Harmony found in nature..."
+    "philosophy": "Harmony found in nature...",
+    "options": {
+      "darkFirst": true,
+      "splitAdjustments": true
+    }
   }
 }</pre
                 >
@@ -538,7 +557,7 @@ curl -X POST https://taichi.bucaastudio.com/api/export-theme \
                 <div class="token">badFg</div>
             </div>
 
-            <h2>Harmony Styles</h2>
+            <h2>Harmony Modes</h2>
             <table class="param-table">
                 <tr>
                     <th>Style</th>
@@ -627,7 +646,7 @@ curl -X POST https://taichi.bucaastudio.com/api/export-theme \
 
             <footer>
                 <p>
-                    Taichi Theme Generator API © 2025 ·
+                    Taichi Theme Generator API © 2025 ~ 2026·
                     <a href="https://www.bucaastudio.com/">Bucaa Studio</a> ·
                     <a
                         href="https://github.com/BucaaStudio/Taichi-Theme-Generator"
