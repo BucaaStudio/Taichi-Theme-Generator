@@ -154,7 +154,7 @@ const CompactSwatch: React.FC<CompactSwatchProps> = ({
   const darkShort = getShortValue(darkHex, format);
 
   return (
-    <div className="flex flex-col rounded-lg overflow-hidden border border-t-border group/token transition-all hover:scale-[1.02] hover:shadow-md">
+    <div className="flex flex-col rounded-lg overflow-hidden border border-themed group/token transition-all hover:scale-[1.02] hover:shadow-md">
       {/* Header with token name and lock */}
       <div className="flex items-center justify-between px-2 py-1 bg-t-card text-[9px] font-bold uppercase tracking-wider text-t-text/70">
         <span className="truncate">{tokenKey}</span>
@@ -267,7 +267,7 @@ const SwatchStrip: React.FC<SwatchStripProps> = ({ light, dark, format, isDarkUI
 
   return (
     <div 
-      className="sticky top-0 z-40 backdrop-blur-md border-b border-t-border py-2 px-3 shadow-sm transition-colors duration-300"
+      className="sticky top-0 z-40 backdrop-blur-md border-b border-themed py-2 px-3 shadow-sm transition-colors duration-300"
       style={styleVars}
     >
       <div className="max-w-[1920px] mx-auto w-full">

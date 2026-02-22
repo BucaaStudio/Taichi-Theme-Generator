@@ -155,7 +155,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-300 flex flex-col max-h-[90vh] ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}
+        className={`w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-300 flex flex-col max-h-[90vh] ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}
         style={{ backgroundColor: theme.card, color: theme.text, borderColor: theme.border, borderWidth: 1 }}
         onClick={e => e.stopPropagation()}
       >
@@ -169,7 +169,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
                 <p className="text-sm opacity-60 font-medium">Extract palette from colors</p>
              </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-black/5 transition-colors" style={{ color: theme.textMuted }}>
+          <button onClick={onClose} className="p-2 rounded-full hover-themed transition-colors" style={{ color: theme.textMuted }}>
             <X size={24} />
           </button>
         </div>
@@ -204,7 +204,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
             <div className="space-y-5">
               <div className="relative rounded-2xl overflow-hidden border shadow-inner group" style={{ borderColor: theme.border }}>
                 <canvas ref={canvasRef} onClick={handleCanvasClick} className="w-full h-auto cursor-crosshair block" />
-                <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
+                <div className="absolute top-4 left-4 backdrop-blur-md text-xs px-3 py-1.5 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5" style={{ backgroundColor: `${theme.bg}D9`, color: theme.text }}>
                   <MousePointer2 size={12} />
                   Click image to pick color for selected slot
                 </div>
@@ -232,19 +232,19 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
                           outlineColor: theme.primary
                         }}
                       >
-                        <div className={`absolute bottom-0 left-0 right-0 py-0.5 text-[9px] font-bold text-center ${selectedIndex === idx ? 'bg-black/40 text-white' : 'bg-black/10 text-white opacity-0 group-hover:opacity-100'}`}>
+                        <div className={`absolute bottom-0 left-0 right-0 py-0.5 text-[9px] font-bold text-center ${selectedIndex === idx ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} style={{ backgroundColor: `${theme.bg}99`, color: theme.text }}>
                           {SLOT_LABELS[idx]}
                         </div>
                       </button>
                       <button
                         onClick={(e) => toggleSlot(idx, e)}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white rounded-full shadow-lg border flex items-center justify-center transition-all active:scale-90 hover:bg-gray-50 z-10"
-                        style={{ color: checkedSlots[idx] ? theme.primary : '#ccc', borderColor: theme.border }}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full shadow-lg border flex items-center justify-center transition-all active:scale-90 hover-themed z-10"
+                        style={{ backgroundColor: theme.card, color: checkedSlots[idx] ? theme.primary : theme.textMuted, borderColor: theme.border }}
                       >
-                        {checkedSlots[idx] ? <CheckSquare size={12} fill="currentColor" className="text-white" /> : <Square size={12} />}
+                        {checkedSlots[idx] ? <CheckSquare size={12} fill="currentColor" /> : <Square size={12} />}
                         {checkedSlots[idx] && (
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <Check size={10} className="text-white" style={{ color: checkedSlots[idx] ? theme.primaryFg : 'transparent' }} />
+                                <Check size={10} style={{ color: theme.primaryFg }} />
                             </div>
                         )}
                       </button>
@@ -255,7 +255,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
 
               <div className="flex items-center justify-between p-5 rounded-2xl border" style={{ backgroundColor: theme.card2, borderColor: theme.border }}>
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl shadow-lg border-2 border-white/20" style={{ backgroundColor: extractedPalette[selectedIndex] }} />
+                  <div className="w-12 h-12 rounded-xl shadow-lg border-2" style={{ backgroundColor: extractedPalette[selectedIndex], borderColor: `${theme.border}40` }} />
                   <div>
                     <h4 className="font-bold text-xs uppercase opacity-50 tracking-wider">{SLOT_LABELS[selectedIndex]}</h4>
                     <p className="text-xl font-mono font-bold">{extractedPalette[selectedIndex]}</p>
@@ -263,11 +263,11 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({ isOpen, onClose, on
                 </div>
 
                 <div className="flex gap-3">
-                  <button onClick={() => setPreviewUrl(null)} className="px-5 py-2.5 rounded-xl font-bold transition-all hover:bg-black/5">Reset</button>
+                  <button onClick={() => setPreviewUrl(null)} className="px-5 py-2.5 rounded-xl font-bold transition-all hover-themed">Reset</button>
                   <button
                     onClick={handleConfirm}
                     disabled={checkedSlots.every(s => !s) || isProcessing}
-                    className="px-8 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-black/10 disabled:opacity-50"
+                    className="px-8 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-lg disabled:opacity-50"
                     style={{ backgroundColor: theme.primary, color: theme.primaryFg }}
                   >
                     <Check size={20} />

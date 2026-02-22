@@ -25,7 +25,7 @@ import {
   generateScale,
   hexToRgb,
 } from './oklch';
-import { contrastRatio, selectForegroundHex, adjustForContrast, meetsWCAG } from './contrast';
+import { contrastRatio, selectForeground, selectForegroundHex, adjustForContrast, meetsWCAG } from './contrast';
 import { evaluatePalette, selectBestPalette, ScoredPalette } from './scoringEngine';
 
 // --- Seeded Random ---
@@ -388,11 +388,11 @@ function constructStatusColors(
   
   return {
     good,
-    goodFg: { L: 1, C: 0, H: goodHue },
+    goodFg: selectForeground(good),
     bad,
-    badFg: { L: 1, C: 0, H: badHue },
+    badFg: selectForeground(bad),
     warn,
-    warnFg: { L: 0.1, C: 0, H: 60 },
+    warnFg: selectForeground(warn),
   };
 }
 

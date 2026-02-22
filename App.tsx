@@ -40,30 +40,30 @@ const getStyleVars = (tokens: ThemeTokens) => {
   } as React.CSSProperties;
 };
 
-// Custom Taichi (Yin Yang) Icon
-const TaichiIcon = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
-  <svg 
-    width={size} 
-    height={size} 
-    viewBox="0 0 24 24" 
-    fill="none" 
+// Custom Taichi (Yin Yang) Icon — themed via lightColor / darkColor props
+const TaichiIcon = ({ size = 24, className = "", lightColor = "white", darkColor = "black" }: { size?: number, className?: string, lightColor?: string, darkColor?: string }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
     className={className}
   >
-    {/* Outer circle */}
-    <circle cx="12" cy="12" r="10" fill="white" stroke="none" />
-    
+    {/* Outer circle (light half) */}
+    <circle cx="12" cy="12" r="10" fill={lightColor} stroke="none" />
+
     {/* Dark half with S-curve */}
-    <path 
-      d="M12 2 A10 10 0 0 1 12 22 A5 5 0 0 1 12 12 A5 5 0 0 0 12 2" 
-      fill="black" 
+    <path
+      d="M12 2 A10 10 0 0 1 12 22 A5 5 0 0 1 12 12 A5 5 0 0 0 12 2"
+      fill={darkColor}
       stroke="none"
     />
-    
-    {/* Light eye (in dark half) - positioned like a fish eye */}
-    <circle cx="15" cy="7" r="1.8" fill="white" stroke="none" />
-    
-    {/* Dark eye (in light half) - positioned like a fish eye */}
-    <circle cx="9" cy="17" r="1.8" fill="black" stroke="none" />
+
+    {/* Light eye (in dark half) */}
+    <circle cx="15" cy="7" r="1.8" fill={lightColor} stroke="none" />
+
+    {/* Dark eye (in light half) */}
+    <circle cx="9" cy="17" r="1.8" fill={darkColor} stroke="none" />
   </svg>
 );
 
@@ -97,10 +97,17 @@ const App: React.FC = () => {
     shadowOpacity: 15,
     gradients: false,
     radius: 3,
-    brightnessLevel: 0, 
-    contrastLevel: 0, 
+    brightnessLevel: 0,
+    contrastLevel: 0,
     saturationLevel: 0,
-    darkFirst: false
+    darkFirst: false,
+    splitAdjustments: false,
+    lightBrightnessLevel: 0,
+    lightContrastLevel: 0,
+    lightSaturationLevel: 0,
+    darkBrightnessLevel: 0,
+    darkContrastLevel: 0,
+    darkSaturationLevel: 0,
   });
   
   const [lockedColors, setLockedColors] = useState<LockedColors>({});
@@ -136,24 +143,35 @@ const App: React.FC = () => {
         next.gradients = Math.random() > 0.5;
       }
       
-      // Saturation: -5 to 5
-      if (!lockedOptions.saturationLevel) {
-        next.saturationLevel = Math.floor(Math.random() * 11) - 5;
-      }
-      
-      // Brightness: -5 to 5
-      if (!lockedOptions.brightnessLevel) {
-        next.brightnessLevel = Math.floor(Math.random() * 11) - 5;
-      }
-      
-      // Contrast: -5 to 5
-      if (!lockedOptions.contrastLevel) {
-        next.contrastLevel = Math.floor(Math.random() * 11) - 5;
-      }
-      
       // Dark First: toggle randomly
       if (!lockedOptions.darkFirst) {
         next.darkFirst = Math.random() > 0.5;
+      }
+
+      // Color adjustments: randomize per-mode or shared based on split state
+      if (prev.splitAdjustments) {
+        if (!lockedOptions.saturationLevel) {
+          next.lightSaturationLevel = Math.floor(Math.random() * 11) - 5;
+          next.darkSaturationLevel = Math.floor(Math.random() * 11) - 5;
+        }
+        if (!lockedOptions.brightnessLevel) {
+          next.lightBrightnessLevel = Math.floor(Math.random() * 11) - 5;
+          next.darkBrightnessLevel = Math.floor(Math.random() * 11) - 5;
+        }
+        if (!lockedOptions.contrastLevel) {
+          next.lightContrastLevel = Math.floor(Math.random() * 11) - 5;
+          next.darkContrastLevel = Math.floor(Math.random() * 11) - 5;
+        }
+      } else {
+        if (!lockedOptions.saturationLevel) {
+          next.saturationLevel = Math.floor(Math.random() * 11) - 5;
+        }
+        if (!lockedOptions.brightnessLevel) {
+          next.brightnessLevel = Math.floor(Math.random() * 11) - 5;
+        }
+        if (!lockedOptions.contrastLevel) {
+          next.contrastLevel = Math.floor(Math.random() * 11) - 5;
+        }
       }
       
       return next;
@@ -189,6 +207,15 @@ const App: React.FC = () => {
         : undefined;
       const rd = params.get('rd') ? parseInt(params.get('rd')!) : undefined;
 
+      // Split adjustment params
+      const split = params.get('split') === '1';
+      const lsat = params.get('lsat') ? parseInt(params.get('lsat')!) : 0;
+      const lcon = params.get('lcon') ? parseInt(params.get('lcon')!) : 0;
+      const lbri = params.get('lbri') ? parseInt(params.get('lbri')!) : 0;
+      const dsat = params.get('dsat') ? parseInt(params.get('dsat')!) : 0;
+      const dcon = params.get('dcon') ? parseInt(params.get('dcon')!) : 0;
+      const dbri = params.get('dbri') ? parseInt(params.get('dbri')!) : 0;
+
       // Update options if present
       setDesignOptions(prev => ({
         ...prev,
@@ -199,7 +226,14 @@ const App: React.FC = () => {
         radius: rd ?? prev.radius,
         brightnessLevel: bri ?? prev.brightnessLevel,
         contrastLevel: con ?? prev.contrastLevel,
-        saturationLevel: sat ?? prev.saturationLevel
+        saturationLevel: sat ?? prev.saturationLevel,
+        splitAdjustments: split,
+        lightBrightnessLevel: split ? lbri : (bri ?? prev.brightnessLevel),
+        lightContrastLevel: split ? lcon : (con ?? prev.contrastLevel),
+        lightSaturationLevel: split ? lsat : (sat ?? prev.saturationLevel),
+        darkBrightnessLevel: split ? dbri : (bri ?? prev.brightnessLevel),
+        darkContrastLevel: split ? dcon : (con ?? prev.contrastLevel),
+        darkSaturationLevel: split ? dsat : (sat ?? prev.saturationLevel),
       }));
 
       // Generate Theme directly with these params
@@ -231,15 +265,26 @@ const App: React.FC = () => {
     const params = new URLSearchParams();
     params.set('mode', currentTheme.mode);
     params.set('seed', currentTheme.seed);
-    params.set('sat', designOptions.saturationLevel.toString());
-    params.set('con', designOptions.contrastLevel.toString());
-    params.set('bri', designOptions.brightnessLevel.toString());
     params.set('bw', designOptions.borderWidth.toString());
     params.set('sh', designOptions.shadowStrength.toString());
     params.set('so', designOptions.shadowOpacity.toString());
     params.set('gr', designOptions.gradients ? '1' : '0');
     params.set('rd', designOptions.radius.toString());
-    
+
+    if (designOptions.splitAdjustments) {
+      params.set('split', '1');
+      params.set('lsat', designOptions.lightSaturationLevel.toString());
+      params.set('lcon', designOptions.lightContrastLevel.toString());
+      params.set('lbri', designOptions.lightBrightnessLevel.toString());
+      params.set('dsat', designOptions.darkSaturationLevel.toString());
+      params.set('dcon', designOptions.darkContrastLevel.toString());
+      params.set('dbri', designOptions.darkBrightnessLevel.toString());
+    } else {
+      params.set('sat', designOptions.saturationLevel.toString());
+      params.set('con', designOptions.contrastLevel.toString());
+      params.set('bri', designOptions.brightnessLevel.toString());
+    }
+
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState(null, '', newUrl);
   }, [currentTheme, designOptions]);
@@ -263,7 +308,12 @@ const App: React.FC = () => {
       generateNewTheme(currentTheme.mode, currentTheme.seed);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [designOptions.saturationLevel, designOptions.contrastLevel, designOptions.brightnessLevel, designOptions.darkFirst]);
+  }, [
+    designOptions.saturationLevel, designOptions.contrastLevel, designOptions.brightnessLevel,
+    designOptions.darkFirst, designOptions.splitAdjustments,
+    designOptions.lightBrightnessLevel, designOptions.lightContrastLevel, designOptions.lightSaturationLevel,
+    designOptions.darkBrightnessLevel, designOptions.darkContrastLevel, designOptions.darkSaturationLevel,
+  ]);
 
   // Listen for system theme changes
   useEffect(() => {
@@ -277,19 +327,41 @@ const App: React.FC = () => {
   }, []);
 
   const generateNewTheme = useCallback((
-    genMode: GenerationMode, 
-    seed?: string, 
+    genMode: GenerationMode,
+    seed?: string,
     saturation?: number,
     contrast?: number,
     brightness?: number,
     overridePalette?: string[]
   ) => {
-    // If param is undefined, use current state.
-    const sLevel = saturation !== undefined ? saturation : designOptions.saturationLevel;
-    const cLevel = contrast !== undefined ? contrast : designOptions.contrastLevel;
-    const bLevel = brightness !== undefined ? brightness : designOptions.brightnessLevel;
-    
-    const { light, dark, seed: newSeed } = generateTheme(genMode, seed, sLevel, cLevel, bLevel, overridePalette, designOptions.darkFirst);
+    // Compute effective adjustment levels
+    // When split is on, use per-mode values; otherwise use shared values
+    let lightSat: number, lightCon: number, lightBri: number;
+    let darkSat: number, darkCon: number, darkBri: number;
+
+    if (designOptions.splitAdjustments) {
+      lightSat = designOptions.lightSaturationLevel;
+      lightCon = designOptions.lightContrastLevel;
+      lightBri = designOptions.lightBrightnessLevel;
+      darkSat = designOptions.darkSaturationLevel;
+      darkCon = designOptions.darkContrastLevel;
+      darkBri = designOptions.darkBrightnessLevel;
+    } else {
+      const sLevel = saturation !== undefined ? saturation : designOptions.saturationLevel;
+      const cLevel = contrast !== undefined ? contrast : designOptions.contrastLevel;
+      const bLevel = brightness !== undefined ? brightness : designOptions.brightnessLevel;
+      lightSat = sLevel;
+      lightCon = cLevel;
+      lightBri = bLevel;
+      darkSat = sLevel;
+      darkCon = cLevel;
+      darkBri = bLevel;
+    }
+
+    const { light, dark, seed: newSeed } = generateTheme(
+      genMode, seed, lightSat, lightCon, lightBri, overridePalette, designOptions.darkFirst,
+      darkSat, darkCon, darkBri
+    );
     
     // Preserve locked colors from current theme
     // Also lock related tokens when a base token is locked
@@ -353,7 +425,11 @@ const App: React.FC = () => {
     // New items are always at index 0
     setHistoryIndex(0);
     setCurrentTheme(newTheme);
-  }, [historyIndex, designOptions.saturationLevel, designOptions.contrastLevel, designOptions.brightnessLevel, designOptions.darkFirst, lockedColors, currentTheme]);
+  }, [historyIndex, designOptions.saturationLevel, designOptions.contrastLevel, designOptions.brightnessLevel,
+      designOptions.darkFirst, designOptions.splitAdjustments,
+      designOptions.lightBrightnessLevel, designOptions.lightContrastLevel, designOptions.lightSaturationLevel,
+      designOptions.darkBrightnessLevel, designOptions.darkContrastLevel, designOptions.darkSaturationLevel,
+      lockedColors, currentTheme]);
 
   // Update a single token (manual edit)
   const handleTokenUpdate = useCallback((side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => {
@@ -418,6 +494,10 @@ const App: React.FC = () => {
 
       if ((e.code === 'Space' || e.key === 'Enter') && !isEditable) {
         e.preventDefault();
+        // Blur any focused button so the browser focus ring disappears
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
         // Randomize unlocked design options first
         randomizeDesignOptions();
         // Then generate new theme (will use the new options)
@@ -485,17 +565,8 @@ const App: React.FC = () => {
     const nextValue = key === 'borderWidth'
       ? Math.min(Math.max(value, 0), 2)
       : value;
-    setDesignOptions(prev => {
-      const next = { ...prev, [key]: nextValue };
-      return next;
-    });
-
-    // If changing color generation params, regenerate
-    if ((key === 'contrastLevel' || key === 'saturationLevel') && currentTheme) {
-      const newSat = key === 'saturationLevel' ? nextValue : undefined;
-      const newCon = key === 'contrastLevel' ? nextValue : undefined;
-      generateNewTheme(currentTheme.mode, currentTheme.seed, newSat, newCon);
-    }
+    setDesignOptions(prev => ({ ...prev, [key]: nextValue }));
+    // Color adjustment regeneration is handled by the useEffect dependency array
   };
 
   const handleRandomize = useCallback(() => {
@@ -511,7 +582,7 @@ const App: React.FC = () => {
   
 
 
-  if (!currentTheme) return <div className="h-screen flex items-center justify-center bg-gray-900 text-white">Loading...</div>;
+  if (!currentTheme) return <div className="h-screen flex items-center justify-center bg-gray-900 text-gray-100">Loading...</div>;
 
   // Derive Shell Colors from the current theme + isDarkUI state
   const shellTheme = isDarkUI ? currentTheme.dark : currentTheme.light;
@@ -546,7 +617,7 @@ const App: React.FC = () => {
           {/* Left: Logo */}
           <div className="flex items-center gap-2 shrink-0">
             <div className="w-8 h-8 rounded-lg shadow-sm flex items-center justify-center" style={{ backgroundColor: shellTheme.primary }}>
-              <TaichiIcon size={24} />
+              <TaichiIcon size={24} lightColor={shellTheme.primaryFg} darkColor={shellTheme.primary} />
             </div>
             <h1 className="font-bold text-lg hidden md:block">Taichi Theme Generator</h1>
           </div>
@@ -555,7 +626,7 @@ const App: React.FC = () => {
           <div className="md:hidden flex items-center gap-2">
             <button 
               onClick={() => { randomizeDesignOptions(); generateNewTheme(mode); }}
-              className="text-white rounded-lg font-medium shadow-md transition-all active:transform active:scale-95 flex items-center overflow-hidden"
+              className="rounded-lg font-medium shadow-md transition-all active:transform active:scale-95 flex items-center overflow-hidden"
               style={{ backgroundColor: shellTheme.primary, color: shellTheme.primaryFg }}
             >
               <div className="px-3 py-2 flex items-center gap-1.5">
@@ -565,8 +636,8 @@ const App: React.FC = () => {
             </button>
 
             <button 
-              onClick={() => setShowSwatches(!showSwatches)} 
-              className={`p-2 rounded-lg transition-colors ${showSwatches ? 'bg-current text-white' : 'hover:bg-white/10'}`}
+              onClick={() => setShowSwatches(!showSwatches)}
+              className={`p-2 rounded-lg transition-colors ${showSwatches ? '' : 'hover-themed'}`}
               style={showSwatches ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
               title="Color Palette"
             >
@@ -574,8 +645,8 @@ const App: React.FC = () => {
             </button>
 
             <button 
-              onClick={() => setShowOptions(!showOptions)} 
-              className={`p-2 rounded-lg transition-colors ${showOptions ? 'bg-current text-white' : 'hover:bg-white/10'}`}
+              onClick={() => setShowOptions(!showOptions)}
+              className={`p-2 rounded-lg transition-colors ${showOptions ? '' : 'hover-themed'}`}
               style={showOptions ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
               title="Design Options"
             >
@@ -586,11 +657,11 @@ const App: React.FC = () => {
           {/* Desktop: All Controls */}
           <div className="hidden md:flex items-center gap-4 overflow-x-auto no-scrollbar">
             <div className="flex items-center rounded-lg p-0.5 gap-0.5 shrink-0" style={{ backgroundColor: shellTheme.card2 }}>
-              <button onClick={undo} disabled={historyIndex >= history.length - 1} className="p-1.5 rounded-md disabled:opacity-30 transition-colors hover:bg-white/10">
+              <button onClick={undo} disabled={historyIndex >= history.length - 1} className="p-1.5 rounded-md disabled:opacity-30 transition-colors hover-themed">
                 <Undo size={16} />
               </button>
-              <div className="w-px h-4 mx-1 bg-current opacity-20"></div>
-              <button onClick={redo} disabled={historyIndex <= 0} className="p-1.5 rounded-md disabled:opacity-30 transition-colors hover:bg-white/10">
+              <div className="w-px h-4 mx-1" style={{ backgroundColor: shellTheme.border }}></div>
+              <button onClick={redo} disabled={historyIndex <= 0} className="p-1.5 rounded-md disabled:opacity-30 transition-colors hover-themed">
                 <Undo size={16} className="scale-x-[-1]" />
               </button>
             </div>
@@ -598,7 +669,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-2 shrink-0">
               <button 
                 onClick={() => { randomizeDesignOptions(); generateNewTheme(mode); }}
-                className="text-white rounded-md font-medium shadow-md transition-all active:transform active:scale-95 flex items-center overflow-hidden group"
+                className="rounded-md font-medium shadow-md transition-all active:transform active:scale-95 flex items-center overflow-hidden group"
                 style={{ backgroundColor: shellTheme.primary, color: shellTheme.primaryFg }}
               >
                 <div className="pl-3 pr-2 py-1.5 flex items-center gap-2">
@@ -606,7 +677,7 @@ const App: React.FC = () => {
                   <span className="font-semibold text-sm">Generate</span>
                 </div>
                 <div className="pr-1.5 py-1">
-                  <div className="bg-black/20 text-current text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
+                  <div className="text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm" style={{ backgroundColor: `${shellTheme.primaryFg}20` }}>
                     Space
                   </div>
                 </div>
@@ -644,12 +715,12 @@ const App: React.FC = () => {
               </select>
             </div>
 
-            <div className="h-6 w-px mx-1 bg-current opacity-20"></div>
+            <div className="h-6 w-px mx-1" style={{ backgroundColor: shellTheme.border }}></div>
 
             <div className="flex items-center gap-2 shrink-0">
               <button 
-                onClick={() => setShowSwatches(!showSwatches)} 
-                className={`p-1.5 rounded-lg transition-colors ${showSwatches ? 'bg-current text-white/90' : 'hover:bg-white/10'}`}
+                onClick={() => setShowSwatches(!showSwatches)}
+                className={`p-1.5 rounded-lg transition-colors ${showSwatches ? '' : 'hover-themed'}`}
                 style={showSwatches ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
                 title="Color Palette"
               >
@@ -657,8 +728,8 @@ const App: React.FC = () => {
               </button>
 
               <button 
-                onClick={() => setShowOptions(!showOptions)} 
-                className={`p-1.5 rounded-lg transition-colors ${showOptions ? 'bg-current text-white/90' : 'hover:bg-white/10'}`}
+                onClick={() => setShowOptions(!showOptions)}
+                className={`p-1.5 rounded-lg transition-colors ${showOptions ? '' : 'hover-themed'}`}
                 style={showOptions ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
                 title="Design Options"
               >
@@ -666,8 +737,8 @@ const App: React.FC = () => {
               </button>
 
               <button 
-                onClick={() => setShowHistory(!showHistory)} 
-                className={`p-1.5 rounded-lg transition-colors ${showHistory ? 'bg-current text-white/90' : 'hover:bg-white/10'}`}
+                onClick={() => setShowHistory(!showHistory)}
+                className={`p-1.5 rounded-lg transition-colors ${showHistory ? '' : 'hover-themed'}`}
                 style={showHistory ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
                 title="History"
               >
@@ -675,8 +746,8 @@ const App: React.FC = () => {
               </button>
 
               <button 
-                onClick={() => setShowImagePickerModal(true)} 
-                className={`p-1.5 rounded-lg transition-colors ${showImagePickerModal ? 'bg-current text-white/90' : 'hover:bg-white/10'}`}
+                onClick={() => setShowImagePickerModal(true)}
+                className={`p-1.5 rounded-lg transition-colors ${showImagePickerModal ? '' : 'hover-themed'}`}
                 style={showImagePickerModal ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : {}}
                 title="Pick from Image"
               >
@@ -684,16 +755,16 @@ const App: React.FC = () => {
               </button>
 
               <button 
-                onClick={exportTheme} 
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                onClick={exportTheme}
+                className="p-1.5 rounded-lg transition-colors hover-themed"
                 title="Export JSON"
               >
                 <Download size={18} />
               </button>
 
               <button 
-                onClick={() => setShowShareModal(true)} 
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                onClick={() => setShowShareModal(true)}
+                className="p-1.5 rounded-lg transition-colors hover-themed"
                 title="Share Theme"
               >
                 <Share size={18} />
@@ -701,7 +772,7 @@ const App: React.FC = () => {
 
               <button
                 onClick={() => setIsDarkUI(!isDarkUI)}
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                className="p-1.5 rounded-lg transition-colors hover-themed"
                 title="Toggle UI Theme"
               >
                 {isDarkUI ? <Sun size={18} /> : <Moon size={18} />}
@@ -712,7 +783,7 @@ const App: React.FC = () => {
           {/* Right: Hamburger Menu (mobile only) */}
           <button 
             onClick={() => setShowMobileMenu(!showMobileMenu)}
-            className="md:hidden p-2 rounded-lg transition-colors hover:bg-white/10"
+            className="md:hidden p-2 rounded-lg transition-colors hover-themed"
             aria-label="Menu"
           >
             <Menu size={24} />
@@ -765,7 +836,7 @@ const App: React.FC = () => {
             <div className="grid grid-cols-2 gap-2 pt-2">
               <button 
                 onClick={() => { setShowSwatches(!showSwatches); setShowMobileMenu(false); }}
-                className={`p-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${showSwatches ? 'bg-current text-white' : 'border'}`}
+                className={`p-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${showSwatches ? '' : 'border'}`}
                 style={showSwatches ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : { borderColor: shellTheme.border }}
               >
                 <Palette size={18} />
@@ -774,7 +845,7 @@ const App: React.FC = () => {
 
               <button 
                 onClick={() => { setShowOptions(!showOptions); setShowMobileMenu(false); }}
-                className={`p-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${showOptions ? 'bg-current text-white' : 'border'}`}
+                className={`p-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${showOptions ? '' : 'border'}`}
                 style={showOptions ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : { borderColor: shellTheme.border }}
               >
                 <SlidersHorizontal size={18} />
@@ -783,7 +854,7 @@ const App: React.FC = () => {
 
               <button 
                 onClick={() => { setShowHistory(!showHistory); setShowMobileMenu(false); }}
-                className={`p-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${showHistory ? 'bg-current text-white' : 'border'}`}
+                className={`p-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${showHistory ? '' : 'border'}`}
                 style={showHistory ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : { borderColor: shellTheme.border }}
               >
                 <History size={18} />
@@ -792,7 +863,7 @@ const App: React.FC = () => {
 
               <button 
                 onClick={() => { setShowImagePickerModal(true); setShowMobileMenu(false); }}
-                className={`p-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${showImagePickerModal ? 'bg-current text-white' : 'border'}`}
+                className={`p-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${showImagePickerModal ? '' : 'border'}`}
                 style={showImagePickerModal ? { backgroundColor: shellTheme.primary, color: shellTheme.primaryFg } : { borderColor: shellTheme.border }}
               >
                 <ImageIcon size={18} />
@@ -849,7 +920,7 @@ const App: React.FC = () => {
           <span className="text-t-text">For best results, use this website on a desktop computer.</span>
           <button 
             onClick={() => setShowMobileNotice(false)}
-            className="ml-2 p-1 rounded hover:bg-black/10 transition-colors"
+            className="ml-2 p-1 rounded hover-themed transition-colors"
             style={{ color: shellTheme.textMuted }}
           >
             <X size={14} />
@@ -876,13 +947,13 @@ const App: React.FC = () => {
           style={{ backgroundColor: shellTheme.bg, borderColor: shellTheme.border }}
         >
           <div className="max-w-[1920px] mx-auto w-full space-y-4">
-          {/* Row 1: Sliders */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-x-4 gap-y-4">
+          {/* Row 1: Structural Sliders */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-4">
            {/* Border Width */}
            <div className="space-y-2 group/opt">
              <div className="flex justify-between items-center">
                <div className="flex items-center gap-1.5">
-                 <button 
+                 <button
                    onClick={() => toggleOptionLock('borderWidth')}
                    className={`p-0.5 rounded transition-all ${lockedOptions.borderWidth ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                    title={lockedOptions.borderWidth ? 'Unlock' : 'Lock'}
@@ -895,12 +966,12 @@ const App: React.FC = () => {
                  {designOptions.borderWidth === 0 ? 'None' : designOptions.borderWidth === 1 ? 'Thin' : 'Thick'}
                </span>
              </div>
-             <input 
+             <input
                type="range" min="0" max="2" step="1"
                value={designOptions.borderWidth}
                onChange={(e) => updateOption('borderWidth', parseInt(e.target.value))}
-               className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
-               style={{ accentColor: shellTheme.primary }}
+               className="w-full h-1.5 rounded-lg cursor-pointer"
+               style={{ color: shellTheme.primary }}
              />
              <div className="grid grid-cols-3 text-[10px] opacity-40 px-0.5">
                <span>None</span>
@@ -913,7 +984,7 @@ const App: React.FC = () => {
            <div className="space-y-2 group/opt">
              <div className="flex justify-between items-center">
                <div className="flex items-center gap-1.5">
-                 <button 
+                 <button
                    onClick={() => toggleOptionLock('shadowStrength')}
                    className={`p-0.5 rounded transition-all ${lockedOptions.shadowStrength ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                    title={lockedOptions.shadowStrength ? 'Unlock' : 'Lock'}
@@ -924,12 +995,12 @@ const App: React.FC = () => {
                </div>
                <span className="text-xs font-mono opacity-50">Lvl {designOptions.shadowStrength}</span>
              </div>
-             <input 
+             <input
                type="range" min="0" max="5" step="1"
                value={designOptions.shadowStrength}
                onChange={(e) => updateOption('shadowStrength', parseInt(e.target.value))}
-               className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
-               style={{ accentColor: shellTheme.primary }}
+               className="w-full h-1.5 rounded-lg cursor-pointer"
+               style={{ color: shellTheme.primary }}
              />
              <div className="flex justify-between text-[10px] opacity-40 px-0.5">
                <span>None</span><span>Deep</span>
@@ -940,7 +1011,7 @@ const App: React.FC = () => {
            <div className="space-y-2 group/opt">
              <div className="flex justify-between items-center">
                <div className="flex items-center gap-1.5">
-                 <button 
+                 <button
                    onClick={() => toggleOptionLock('shadowOpacity')}
                    className={`p-0.5 rounded transition-all ${lockedOptions.shadowOpacity ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                    title={lockedOptions.shadowOpacity ? 'Unlock' : 'Lock'}
@@ -951,12 +1022,12 @@ const App: React.FC = () => {
                </div>
                <span className="text-xs font-mono opacity-50">{designOptions.shadowOpacity}%</span>
              </div>
-             <input 
+             <input
                type="range" min="5" max="50" step="5"
                value={designOptions.shadowOpacity}
                onChange={(e) => updateOption('shadowOpacity', parseInt(e.target.value))}
-               className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
-               style={{ accentColor: shellTheme.primary }}
+               className="w-full h-1.5 rounded-lg cursor-pointer"
+               style={{ color: shellTheme.primary }}
              />
              <div className="flex justify-between text-[10px] opacity-40 px-0.5">
                <span>5%</span><span>50%</span>
@@ -967,7 +1038,7 @@ const App: React.FC = () => {
            <div className="space-y-2 group/opt">
              <div className="flex justify-between items-center">
                <div className="flex items-center gap-1.5">
-                 <button 
+                 <button
                    onClick={() => toggleOptionLock('radius')}
                    className={`p-0.5 rounded transition-all ${lockedOptions.radius ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                    title={lockedOptions.radius ? 'Unlock' : 'Lock'}
@@ -978,146 +1049,326 @@ const App: React.FC = () => {
                </div>
                <span className="text-xs font-mono opacity-50">Lvl {designOptions.radius}</span>
              </div>
-             <input 
+             <input
                type="range" min="0" max="5" step="1"
                value={designOptions.radius}
                onChange={(e) => updateOption('radius', parseInt(e.target.value))}
-               className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
-               style={{ accentColor: shellTheme.primary }}
+               className="w-full h-1.5 rounded-lg cursor-pointer"
+               style={{ color: shellTheme.primary }}
              />
              <div className="flex justify-between text-[10px] opacity-40 px-0.5">
                <span>Square</span><span>Round</span>
              </div>
            </div>
-
-           {/* Saturation Level */}
-           <div className="space-y-2 group/opt">
-             <div className="flex justify-between items-center">
-               <div className="flex items-center gap-1.5">
-                 <button 
-                   onClick={() => toggleOptionLock('saturationLevel')}
-                   className={`p-0.5 rounded transition-all ${lockedOptions.saturationLevel ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
-                   title={lockedOptions.saturationLevel ? 'Unlock' : 'Lock'}
-                 >
-                   {lockedOptions.saturationLevel ? <Lock size={10} /> : <Unlock size={10} />}
-                 </button>
-                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Saturation</label>
-               </div>
-               <span className="text-xs font-mono opacity-50">{designOptions.saturationLevel > 0 ? '+' : ''}{designOptions.saturationLevel}</span>
-             </div>
-             <input 
-               type="range" min="-5" max="5" step="1"
-               value={designOptions.saturationLevel}
-               onChange={(e) => updateOption('saturationLevel', parseInt(e.target.value))}
-               className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
-               style={{ accentColor: shellTheme.primary }}
-             />
-             <div className="flex justify-between text-[10px] opacity-40 px-0.5">
-               <span>Muted</span><span>Vivid</span>
-             </div>
-           </div>
-
-           {/* Brightness Level */}
-           <div className="space-y-2 group/opt">
-             <div className="flex justify-between items-center">
-               <div className="flex items-center gap-1.5">
-                 <button 
-                   onClick={() => toggleOptionLock('brightnessLevel')}
-                   className={`p-0.5 rounded transition-all ${lockedOptions.brightnessLevel ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
-                   title={lockedOptions.brightnessLevel ? 'Unlock' : 'Lock'}
-                 >
-                   {lockedOptions.brightnessLevel ? <Lock size={10} /> : <Unlock size={10} />}
-                 </button>
-                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Brightness</label>
-               </div>
-               <span className="text-xs font-mono opacity-50">{designOptions.brightnessLevel > 0 ? '+' : ''}{designOptions.brightnessLevel}</span>
-             </div>
-             <input 
-               type="range" min="-5" max="5" step="1"
-               value={designOptions.brightnessLevel}
-               onChange={(e) => updateOption('brightnessLevel', parseInt(e.target.value))}
-               className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
-               style={{ accentColor: shellTheme.primary }}
-             />
-             <div className="flex justify-between text-[10px] opacity-40 px-0.5">
-               <span>Dark</span><span>Bright</span>
-             </div>
-           </div>
-
-           {/* Contrast Level */}
-           <div className="space-y-2 group/opt">
-             <div className="flex justify-between items-center">
-               <div className="flex items-center gap-1.5">
-                 <button 
-                   onClick={() => toggleOptionLock('contrastLevel')}
-                   className={`p-0.5 rounded transition-all ${lockedOptions.contrastLevel ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
-                   title={lockedOptions.contrastLevel ? 'Unlock' : 'Lock'}
-                 >
-                   {lockedOptions.contrastLevel ? <Lock size={10} /> : <Unlock size={10} />}
-                 </button>
-                 <label className="text-xs font-bold uppercase tracking-wider opacity-70">Contrast</label>
-               </div>
-               <span className="text-xs font-mono opacity-50">{designOptions.contrastLevel > 0 ? '+' : ''}{designOptions.contrastLevel}</span>
-             </div>
-             <input 
-               type="range" min="-5" max="5" step="1"
-               value={designOptions.contrastLevel}
-               onChange={(e) => updateOption('contrastLevel', parseInt(e.target.value))}
-               className="w-full h-1.5 bg-current opacity-20 rounded-lg appearance-none cursor-pointer accent-current"
-               style={{ accentColor: shellTheme.primary }}
-             />
-             <div className="flex justify-between text-[10px] opacity-40 px-0.5">
-               <span>Soft</span><span>Max</span>
-             </div>
-           </div>
           </div>
 
-          {/* Row 2: Toggles */}
-          <div className="flex flex-wrap gap-6 pt-2 border-t border-t-border/30">
+          {/* Row 2: Color Adjustments */}
+          <div className="pt-2 border-t space-y-3" style={{ borderColor: `${shellTheme.border}60` }}>
+           <div className="flex items-center gap-2">
+             <label className="text-xs font-bold uppercase tracking-wider opacity-70">Color Adjustments</label>
+           </div>
+
+           {/* Shared sliders (when split is off) */}
+           {!designOptions.splitAdjustments && (
+             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-4">
+               {/* Saturation */}
+               <div className="space-y-2 group/opt">
+                 <div className="flex justify-between items-center">
+                   <div className="flex items-center gap-1.5">
+                     <button
+                       onClick={() => toggleOptionLock('saturationLevel')}
+                       className={`p-0.5 rounded transition-all ${lockedOptions.saturationLevel ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
+                       title={lockedOptions.saturationLevel ? 'Unlock' : 'Lock'}
+                     >
+                       {lockedOptions.saturationLevel ? <Lock size={10} /> : <Unlock size={10} />}
+                     </button>
+                     <label className="text-xs font-bold uppercase tracking-wider opacity-70">Saturation</label>
+                   </div>
+                   <span className="text-xs font-mono opacity-50">{designOptions.saturationLevel > 0 ? '+' : ''}{designOptions.saturationLevel}</span>
+                 </div>
+                 <input
+                   type="range" min="-5" max="5" step="1"
+                   value={designOptions.saturationLevel}
+                   onChange={(e) => updateOption('saturationLevel', parseInt(e.target.value))}
+                   className="w-full h-1.5 rounded-lg cursor-pointer"
+                   style={{ color: shellTheme.primary }}
+                 />
+                 <div className="flex justify-between text-[10px] opacity-40 px-0.5">
+                   <span>Muted</span><span>Vivid</span>
+                 </div>
+               </div>
+
+               {/* Brightness */}
+               <div className="space-y-2 group/opt">
+                 <div className="flex justify-between items-center">
+                   <div className="flex items-center gap-1.5">
+                     <button
+                       onClick={() => toggleOptionLock('brightnessLevel')}
+                       className={`p-0.5 rounded transition-all ${lockedOptions.brightnessLevel ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
+                       title={lockedOptions.brightnessLevel ? 'Unlock' : 'Lock'}
+                     >
+                       {lockedOptions.brightnessLevel ? <Lock size={10} /> : <Unlock size={10} />}
+                     </button>
+                     <label className="text-xs font-bold uppercase tracking-wider opacity-70">Brightness</label>
+                   </div>
+                   <span className="text-xs font-mono opacity-50">{designOptions.brightnessLevel > 0 ? '+' : ''}{designOptions.brightnessLevel}</span>
+                 </div>
+                 <input
+                   type="range" min="-5" max="5" step="1"
+                   value={designOptions.brightnessLevel}
+                   onChange={(e) => updateOption('brightnessLevel', parseInt(e.target.value))}
+                   className="w-full h-1.5 rounded-lg cursor-pointer"
+                   style={{ color: shellTheme.primary }}
+                 />
+                 <div className="flex justify-between text-[10px] opacity-40 px-0.5">
+                   <span>Dark</span><span>Bright</span>
+                 </div>
+               </div>
+
+               {/* Contrast */}
+               <div className="space-y-2 group/opt">
+                 <div className="flex justify-between items-center">
+                   <div className="flex items-center gap-1.5">
+                     <button
+                       onClick={() => toggleOptionLock('contrastLevel')}
+                       className={`p-0.5 rounded transition-all ${lockedOptions.contrastLevel ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
+                       title={lockedOptions.contrastLevel ? 'Unlock' : 'Lock'}
+                     >
+                       {lockedOptions.contrastLevel ? <Lock size={10} /> : <Unlock size={10} />}
+                     </button>
+                     <label className="text-xs font-bold uppercase tracking-wider opacity-70">Contrast</label>
+                   </div>
+                   <span className="text-xs font-mono opacity-50">{designOptions.contrastLevel > 0 ? '+' : ''}{designOptions.contrastLevel}</span>
+                 </div>
+                 <input
+                   type="range" min="-5" max="5" step="1"
+                   value={designOptions.contrastLevel}
+                   onChange={(e) => updateOption('contrastLevel', parseInt(e.target.value))}
+                   className="w-full h-1.5 rounded-lg cursor-pointer"
+                   style={{ color: shellTheme.primary }}
+                 />
+                 <div className="flex justify-between text-[10px] opacity-40 px-0.5">
+                   <span>Soft</span><span>Max</span>
+                 </div>
+               </div>
+             </div>
+           )}
+
+           {/* Per-mode sliders (when split is on) */}
+           {designOptions.splitAdjustments && (
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               {/* Light Mode Adjustments */}
+               <div className="space-y-3 p-3 rounded-lg border" style={{ borderColor: `${shellTheme.border}80`, backgroundColor: `${shellTheme.card}40` }}>
+                 <div className="flex items-center gap-1.5">
+                   <Sun size={13} className="opacity-70" />
+                   <span className="text-[11px] font-bold uppercase tracking-wider opacity-70">Light Mode</span>
+                 </div>
+                 <div className="grid grid-cols-3 gap-x-3 gap-y-3">
+                   {/* Light Saturation */}
+                   <div className="space-y-1.5 group/opt">
+                     <div className="flex justify-between items-center">
+                       <label className="text-[10px] font-bold uppercase tracking-wider opacity-60">Saturation</label>
+                       <span className="text-[10px] font-mono opacity-40">{designOptions.lightSaturationLevel > 0 ? '+' : ''}{designOptions.lightSaturationLevel}</span>
+                     </div>
+                     <input
+                       type="range" min="-5" max="5" step="1"
+                       value={designOptions.lightSaturationLevel}
+                       onChange={(e) => updateOption('lightSaturationLevel', parseInt(e.target.value))}
+                       className="w-full h-1.5 rounded-lg cursor-pointer"
+                       style={{ color: shellTheme.primary }}
+                     />
+                     <div className="flex justify-between text-[9px] opacity-30 px-0.5">
+                       <span>Muted</span><span>Vivid</span>
+                     </div>
+                   </div>
+                   {/* Light Brightness */}
+                   <div className="space-y-1.5 group/opt">
+                     <div className="flex justify-between items-center">
+                       <label className="text-[10px] font-bold uppercase tracking-wider opacity-60">Brightness</label>
+                       <span className="text-[10px] font-mono opacity-40">{designOptions.lightBrightnessLevel > 0 ? '+' : ''}{designOptions.lightBrightnessLevel}</span>
+                     </div>
+                     <input
+                       type="range" min="-5" max="5" step="1"
+                       value={designOptions.lightBrightnessLevel}
+                       onChange={(e) => updateOption('lightBrightnessLevel', parseInt(e.target.value))}
+                       className="w-full h-1.5 rounded-lg cursor-pointer"
+                       style={{ color: shellTheme.primary }}
+                     />
+                     <div className="flex justify-between text-[9px] opacity-30 px-0.5">
+                       <span>Dark</span><span>Bright</span>
+                     </div>
+                   </div>
+                   {/* Light Contrast */}
+                   <div className="space-y-1.5 group/opt">
+                     <div className="flex justify-between items-center">
+                       <label className="text-[10px] font-bold uppercase tracking-wider opacity-60">Contrast</label>
+                       <span className="text-[10px] font-mono opacity-40">{designOptions.lightContrastLevel > 0 ? '+' : ''}{designOptions.lightContrastLevel}</span>
+                     </div>
+                     <input
+                       type="range" min="-5" max="5" step="1"
+                       value={designOptions.lightContrastLevel}
+                       onChange={(e) => updateOption('lightContrastLevel', parseInt(e.target.value))}
+                       className="w-full h-1.5 rounded-lg cursor-pointer"
+                       style={{ color: shellTheme.primary }}
+                     />
+                     <div className="flex justify-between text-[9px] opacity-30 px-0.5">
+                       <span>Soft</span><span>Max</span>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+
+               {/* Dark Mode Adjustments */}
+               <div className="space-y-3 p-3 rounded-lg border" style={{ borderColor: `${shellTheme.border}80`, backgroundColor: `${shellTheme.card}40` }}>
+                 <div className="flex items-center gap-1.5">
+                   <Moon size={13} className="opacity-70" />
+                   <span className="text-[11px] font-bold uppercase tracking-wider opacity-70">Dark Mode</span>
+                 </div>
+                 <div className="grid grid-cols-3 gap-x-3 gap-y-3">
+                   {/* Dark Saturation */}
+                   <div className="space-y-1.5 group/opt">
+                     <div className="flex justify-between items-center">
+                       <label className="text-[10px] font-bold uppercase tracking-wider opacity-60">Saturation</label>
+                       <span className="text-[10px] font-mono opacity-40">{designOptions.darkSaturationLevel > 0 ? '+' : ''}{designOptions.darkSaturationLevel}</span>
+                     </div>
+                     <input
+                       type="range" min="-5" max="5" step="1"
+                       value={designOptions.darkSaturationLevel}
+                       onChange={(e) => updateOption('darkSaturationLevel', parseInt(e.target.value))}
+                       className="w-full h-1.5 rounded-lg cursor-pointer"
+                       style={{ color: shellTheme.primary }}
+                     />
+                     <div className="flex justify-between text-[9px] opacity-30 px-0.5">
+                       <span>Muted</span><span>Vivid</span>
+                     </div>
+                   </div>
+                   {/* Dark Brightness */}
+                   <div className="space-y-1.5 group/opt">
+                     <div className="flex justify-between items-center">
+                       <label className="text-[10px] font-bold uppercase tracking-wider opacity-60">Brightness</label>
+                       <span className="text-[10px] font-mono opacity-40">{designOptions.darkBrightnessLevel > 0 ? '+' : ''}{designOptions.darkBrightnessLevel}</span>
+                     </div>
+                     <input
+                       type="range" min="-5" max="5" step="1"
+                       value={designOptions.darkBrightnessLevel}
+                       onChange={(e) => updateOption('darkBrightnessLevel', parseInt(e.target.value))}
+                       className="w-full h-1.5 rounded-lg cursor-pointer"
+                       style={{ color: shellTheme.primary }}
+                     />
+                     <div className="flex justify-between text-[9px] opacity-30 px-0.5">
+                       <span>Dark</span><span>Bright</span>
+                     </div>
+                   </div>
+                   {/* Dark Contrast */}
+                   <div className="space-y-1.5 group/opt">
+                     <div className="flex justify-between items-center">
+                       <label className="text-[10px] font-bold uppercase tracking-wider opacity-60">Contrast</label>
+                       <span className="text-[10px] font-mono opacity-40">{designOptions.darkContrastLevel > 0 ? '+' : ''}{designOptions.darkContrastLevel}</span>
+                     </div>
+                     <input
+                       type="range" min="-5" max="5" step="1"
+                       value={designOptions.darkContrastLevel}
+                       onChange={(e) => updateOption('darkContrastLevel', parseInt(e.target.value))}
+                       className="w-full h-1.5 rounded-lg cursor-pointer"
+                       style={{ color: shellTheme.primary }}
+                     />
+                     <div className="flex justify-between text-[9px] opacity-30 px-0.5">
+                       <span>Soft</span><span>Max</span>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             </div>
+           )}
+          </div>
+
+          {/* Row 3: Toggles */}
+          <div className="flex flex-wrap gap-6 pt-2 border-t" style={{ borderColor: `${shellTheme.border}60` }}>
            {/* Dark First Toggle */}
            <div className="flex items-center gap-2 group/opt">
-             <button 
+             <button
                onClick={() => toggleOptionLock('darkFirst')}
                className={`p-0.5 rounded transition-all ${lockedOptions.darkFirst ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                title={lockedOptions.darkFirst ? 'Unlock' : 'Lock'}
              >
                {lockedOptions.darkFirst ? <Lock size={10} /> : <Unlock size={10} />}
              </button>
-             <label className="flex items-center gap-2 cursor-pointer">
-               <input 
-                 type="checkbox" 
-                 checked={designOptions.darkFirst}
-                 onChange={(e) => setDesignOptions(prev => ({ ...prev, darkFirst: e.target.checked }))}
-                 className="w-4 h-4 rounded cursor-pointer"
-                 style={{ accentColor: shellTheme.primary }}
-               />
+             <button
+               onClick={() => setDesignOptions(prev => ({ ...prev, darkFirst: !prev.darkFirst }))}
+               onMouseDown={(e) => e.preventDefault()}
+               className="flex items-center gap-2 cursor-pointer"
+             >
+               <span
+                 className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
+                 style={{ backgroundColor: designOptions.darkFirst ? shellTheme.primary : `${shellTheme.text}30` }}
+               >
+                 <span className={`inline-block h-3.5 w-3.5 rounded-full shadow transition-transform duration-200 ${designOptions.darkFirst ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: designOptions.darkFirst ? shellTheme.primaryFg : shellTheme.bg }} />
+               </span>
                <span className="text-xs font-bold uppercase tracking-wider opacity-70">
                  Dark First
                </span>
-             </label>
+             </button>
            </div>
 
            {/* Gradients Toggle */}
            <div className="flex items-center gap-2 group/opt">
-             <button 
+             <button
                onClick={() => toggleOptionLock('gradients')}
                className={`p-0.5 rounded transition-all ${lockedOptions.gradients ? 'opacity-100 text-t-primary' : 'opacity-0 group-hover/opt:opacity-60 hover:!opacity-100'}`}
                title={lockedOptions.gradients ? 'Unlock' : 'Lock'}
              >
                {lockedOptions.gradients ? <Lock size={10} /> : <Unlock size={10} />}
              </button>
-             <label className="flex items-center gap-2 cursor-pointer">
-               <input 
-                 type="checkbox" 
-                 checked={designOptions.gradients}
-                 onChange={(e) => setDesignOptions(prev => ({ ...prev, gradients: e.target.checked }))}
-                 className="w-4 h-4 rounded cursor-pointer"
-                 style={{ accentColor: shellTheme.primary }}
-               />
+             <button
+               onClick={() => setDesignOptions(prev => ({ ...prev, gradients: !prev.gradients }))}
+               onMouseDown={(e) => e.preventDefault()}
+               className="flex items-center gap-2 cursor-pointer"
+             >
+               <span
+                 className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
+                 style={{ backgroundColor: designOptions.gradients ? shellTheme.primary : `${shellTheme.text}30` }}
+               >
+                 <span className={`inline-block h-3.5 w-3.5 rounded-full shadow transition-transform duration-200 ${designOptions.gradients ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: designOptions.gradients ? shellTheme.primaryFg : shellTheme.bg }} />
+               </span>
                <span className="text-xs font-bold uppercase tracking-wider opacity-70">
                  Gradients
                </span>
-             </label>
+             </button>
+           </div>
+
+           {/* Split Light / Dark Toggle */}
+           <div className="flex items-center gap-2">
+             <button
+               onClick={() => {
+                 setDesignOptions(prev => {
+                   if (!prev.splitAdjustments) {
+                     return {
+                       ...prev,
+                       splitAdjustments: true,
+                       lightBrightnessLevel: prev.brightnessLevel,
+                       lightContrastLevel: prev.contrastLevel,
+                       lightSaturationLevel: prev.saturationLevel,
+                       darkBrightnessLevel: prev.brightnessLevel,
+                       darkContrastLevel: prev.contrastLevel,
+                       darkSaturationLevel: prev.saturationLevel,
+                     };
+                   }
+                   return { ...prev, splitAdjustments: false };
+                 });
+               }}
+               onMouseDown={(e) => e.preventDefault()}
+               className="flex items-center gap-2 cursor-pointer"
+             >
+               <span
+                 className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
+                 style={{ backgroundColor: designOptions.splitAdjustments ? shellTheme.primary : `${shellTheme.text}30` }}
+               >
+                 <span className={`inline-block h-3.5 w-3.5 rounded-full shadow transition-transform duration-200 ${designOptions.splitAdjustments ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: designOptions.splitAdjustments ? shellTheme.primaryFg : shellTheme.bg }} />
+               </span>
+               <span className="text-xs font-bold uppercase tracking-wider opacity-70">
+                 Split Light / Dark
+               </span>
+             </button>
            </div>
           </div>
           </div>

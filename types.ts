@@ -46,10 +46,17 @@ export interface DesignOptions {
   shadowOpacity: number; // 0 - 100 (%)
   gradients: boolean;    // Apply gradients to colored elements
   radius: number;        // 0 - 5
-  brightnessLevel: number; // -5 to 5, 0 is normal
-  contrastLevel: number; // -5 to 5, 0 is normal
-  saturationLevel: number; // -5 to 5, 0 is normal
+  brightnessLevel: number; // -5 to 5, 0 is normal (shared when split is off)
+  contrastLevel: number; // -5 to 5, 0 is normal (shared when split is off)
+  saturationLevel: number; // -5 to 5, 0 is normal (shared when split is off)
   darkFirst: boolean;    // Generate dark mode first, derive light from dark
+  splitAdjustments: boolean; // When true, light/dark have independent B/C/S sliders
+  lightBrightnessLevel: number; // -5 to 5 (per-mode)
+  lightContrastLevel: number;   // -5 to 5 (per-mode)
+  lightSaturationLevel: number; // -5 to 5 (per-mode)
+  darkBrightnessLevel: number;  // -5 to 5 (per-mode)
+  darkContrastLevel: number;    // -5 to 5 (per-mode)
+  darkSaturationLevel: number;  // -5 to 5 (per-mode)
 }
 
 export type LockedColors = Partial<Record<keyof ThemeTokens, boolean>>;

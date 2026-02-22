@@ -1,7 +1,7 @@
 {
   "name": "taichi-theme-generator",
   "private": true,
-  "version": "25.12.2",
+  "version": "26.2.1",
   "type": "module",
   "scripts": {
     "dev": "vite",

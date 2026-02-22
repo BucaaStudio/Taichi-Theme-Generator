@@ -3,7 +3,7 @@ import {
   Palette, Shuffle, Image as ImageIcon,
   ChevronRight, Check, Copy, Download, Share2,
   Sliders, Sparkles, Upload, Github,
-  History, Sun, Moon, Menu, Lock
+  Lock
 } from 'lucide-react';
 import { DesignOptions, ThemeTokens } from '../types';
 
@@ -51,7 +51,7 @@ const ControlledSlider: React.FC<{
         max={max}
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value))}
-        className={`w-full h-2 bg-t-text/15 ${rClass} appearance-none cursor-pointer accent-t-primary transition-colors`} 
+        className={`w-full h-1.5 ${rClass} cursor-pointer text-t-primary transition-colors`}
       />
     </div>
   );
@@ -145,8 +145,8 @@ const PreviewSection: React.FC<PreviewProps> = ({
   const getBorder = (width: number) => {
     const clamped = Math.min(Math.max(width, 0), 2);
     if (clamped === 0) return 'border-0';
-    if (clamped === 1) return 'border border-t-border';
-    return 'border-2 border-t-border';
+    if (clamped === 1) return 'border border-themed';
+    return 'border-2 border-themed';
   };
   
   const getShadow = (strength: number, opacity: number) => {
@@ -181,7 +181,9 @@ const PreviewSection: React.FC<PreviewProps> = ({
     ? 'bg-t-secondary bg-[linear-gradient(to_bottom,color-mix(in_oklab,var(--secondary),white_18%),color-mix(in_oklab,var(--secondary),black_10%))]'
     : 'bg-t-secondary';
 
-  const heroOverlayClass = themeName === 'Dark' ? 'bg-black/70' : 'bg-white/75';
+  // Hero overlay uses the theme's bg color so it stays consistent with
+  // brightness/contrast adjustments (instead of hardcoded black/white)
+  const heroOverlayOpacity = themeName === 'Dark' ? 'B3' : 'BF'; // B3=70%, BF=75%
   const badgeAccentClass = themeName === 'Dark' ? 'text-t-accent' : 'text-t-secondary';
   const hoverLiftClass = 'transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_35px_rgba(0,0,0,0.16)]';
   const hoverPanelClass = 'transition-colors duration-200 hover:bg-t-bg/80';
@@ -189,7 +191,6 @@ const PreviewSection: React.FC<PreviewProps> = ({
   const tokenChipClass = 'font-semibold px-1.5 py-0.5 rounded bg-t-text/10';
   const neutralChipClass = 'font-semibold px-2 py-1 rounded bg-[color-mix(in_oklab,var(--text),transparent_12%)] ring-1 ring-[color-mix(in_oklab,var(--border),transparent_45%)]';
   const ringChipClass = 'font-semibold px-1.5 py-0.5 rounded bg-t-text/10 ring-1 ring-[var(--ring)]';
-  const manualIconSize = 20;
   const isAutoSync = autoSyncPreview ?? true;
   const activeWorkspaceTab = isAutoSync && syncedWorkspaceTab ? syncedWorkspaceTab : localWorkspaceTab;
 
@@ -318,7 +319,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
         }}
       >
         {/* Solid Color Overlay */}
-        <div className={`absolute inset-0 ${heroOverlayClass} pointer-events-none`} />
+        <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: `${themeTokens.bg}${heroOverlayOpacity}` }} />
 
         <div className={`absolute left-4 top-4 z-10 inline-flex items-center justify-center ${rClass} ${bClass} px-3 py-1.5 text-[11px] font-semibold backdrop-blur leading-none`} style={{ backgroundColor: themeTokens.card, color: themeTokens.text }}>
           <span className={badgeAccentClass}>{themeName} preview</span>
@@ -365,7 +366,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
               className="w-full flex items-center justify-between p-4 hover:bg-t-card2 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${rClass} ${gradientClass} flex items-center justify-center text-t-textOnColor`}>
+                <div className={`w-10 h-10 ${rClass} ${gradientClass} flex items-center justify-center text-t-primaryFg`}>
                   <Shuffle size={20} />
                 </div>
                 <div className="text-left">
@@ -377,7 +378,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
             </button>
             
             {expandedSections.start && (
-              <div className="border-t border-t-border/40 p-6 space-y-4">
+              <div className="border-t border-themed p-6 space-y-4">
                 <p className="text-sm text-t-textMuted">
                   Start by uploading an image to extract colors, or press <kbd className="px-2 py-1 bg-t-text/10 rounded text-t-text font-mono text-xs">Space</kbd> to generate a random harmonious palette.
                 </p>
@@ -385,7 +386,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
                 <div className="flex flex-wrap gap-3">
                   <button 
                     onClick={() => onOpenImagePicker?.()}
-                    className={`${gradientAccent} text-t-textOnColor px-6 py-3 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2`}
+                    className={`${gradientAccent} text-t-accentFg px-6 py-3 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2`}
                   >
                     <Upload size={18} />
                     Upload Image
@@ -394,11 +395,11 @@ const PreviewSection: React.FC<PreviewProps> = ({
                   <button
                     onClick={onRandomize}
                     disabled={!onRandomize}
-                    className={`${gradientClass} text-t-textOnColor px-6 py-3 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60`}
+                    className={`${gradientClass} text-t-primaryFg px-6 py-3 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60`}
                   >
                     <Shuffle size={18} />
                     Randomize
-                    <span className="text-xs opacity-75 ml-1 bg-black/20 px-2 py-0.5 rounded">Space</span>
+                    <span className="text-xs opacity-75 ml-1 px-2 py-0.5 rounded" style={{ backgroundColor: `${themeTokens.primaryFg}25` }}>Space</span>
                   </button>
                 </div>
                 
@@ -419,7 +420,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
               className="w-full flex items-center justify-between p-4 hover:bg-t-card2 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${rClass} bg-t-good flex items-center justify-center text-t-textOnColor`}>
+                <div className={`w-10 h-10 ${rClass} bg-t-good flex items-center justify-center text-t-goodFg`}>
                   <Palette size={20} />
                 </div>
                 <div className="text-left">
@@ -431,7 +432,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
             </button>
             
             {expandedSections.swatches && (
-              <div className="border-t border-t-border/40 p-6 space-y-4">
+              <div className="border-t border-themed p-6 space-y-4">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                   <ColorSwatch name="primary" colorClass="bg-t-primary" description="Main brand" rClass={rClass} />
                   <ColorSwatch name="secondary" colorClass="bg-t-secondary" description="Supporting" rClass={rClass} />
@@ -457,7 +458,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
               className="w-full flex items-center justify-between p-4 hover:bg-t-card2 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${rClass} ${gradientSecondary} flex items-center justify-center text-t-textOnColor`}>
+                <div className={`w-10 h-10 ${rClass} ${gradientSecondary} flex items-center justify-center text-t-secondaryFg`}>
                   <Sliders size={20} />
                 </div>
                 <div className="text-left">
@@ -469,7 +470,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
             </button>
             
             {expandedSections.adjust && (
-              <div className="border-t border-t-border/40 p-6 space-y-6">
+              <div className="border-t border-themed p-6 space-y-6">
                 <p className="text-sm text-t-textMuted">
                   These sliders affect how colors are generated. Changes apply in real-time.
                 </p>
@@ -499,32 +500,40 @@ const PreviewSection: React.FC<PreviewProps> = ({
                   <p className="text-sm text-t-textMuted italic">Controls not available in this view</p>
                 )}
                 
-                <div className="flex flex-wrap gap-6 pt-4 border-t border-t-border">
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input 
-                      type="checkbox" 
-                      checked={options.darkFirst}
-                      onChange={(e) => onUpdateOption?.('darkFirst', e.target.checked)}
-                      className="w-5 h-5 accent-t-primary rounded cursor-pointer"
-                    />
-                    <div>
+                <div className="flex flex-wrap gap-6 pt-4 border-t border-themed">
+                  <button
+                    onClick={() => onUpdateOption?.('darkFirst', !options.darkFirst)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    className="flex items-center gap-3 cursor-pointer group"
+                  >
+                    <span
+                      className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200"
+                      style={{ backgroundColor: options.darkFirst ? themeTokens.primary : `${themeTokens.text}30` }}
+                    >
+                      <span className={`inline-block h-4 w-4 rounded-full shadow transition-transform duration-200 ${options.darkFirst ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: options.darkFirst ? themeTokens.primaryFg : themeTokens.bg }} />
+                    </span>
+                    <div className="text-left">
                       <span className="text-sm font-medium text-t-text group-hover:text-t-primary transition-colors">Dark First</span>
                       <p className="text-xs text-t-textMuted">Generate dark theme as primary</p>
                     </div>
-                  </label>
-                  
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input 
-                      type="checkbox" 
-                      checked={options.gradients}
-                      onChange={(e) => onUpdateOption?.('gradients', e.target.checked)}
-                      className="w-5 h-5 accent-t-primary rounded cursor-pointer"
-                    />
-                    <div>
+                  </button>
+
+                  <button
+                    onClick={() => onUpdateOption?.('gradients', !options.gradients)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    className="flex items-center gap-3 cursor-pointer group"
+                  >
+                    <span
+                      className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200"
+                      style={{ backgroundColor: options.gradients ? themeTokens.primary : `${themeTokens.text}30` }}
+                    >
+                      <span className={`inline-block h-4 w-4 rounded-full shadow transition-transform duration-200 ${options.gradients ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: options.gradients ? themeTokens.primaryFg : themeTokens.bg }} />
+                    </span>
+                    <div className="text-left">
                       <span className="text-sm font-medium text-t-text group-hover:text-t-primary transition-colors">Gradients</span>
                       <p className="text-xs text-t-textMuted">Apply gradients to colored elements</p>
                     </div>
-                  </label>
+                  </button>
                 </div>
               </div>
             )}
@@ -549,20 +558,20 @@ const PreviewSection: React.FC<PreviewProps> = ({
             </button>
             
             {expandedSections.export && (
-              <div className="border-t border-t-border/40 p-6 space-y-4">
+              <div className="border-t border-themed p-6 space-y-4">
                 <div className="flex flex-wrap gap-3">
                   <button
                     onClick={handleDownloadCss}
-                    className={`${gradientClass} text-t-textOnColor px-5 py-2.5 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2`}
+                    className={`${gradientClass} text-t-primaryFg px-5 py-2.5 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2`}
                   >
                     <Download size={16} />
                     Download CSS
                   </button>
-                  
+
                   <button
                     onClick={onShare}
                     disabled={!onShare}
-                    className={`${gradientSecondary} text-t-textOnColor px-5 py-2.5 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60`}
+                    className={`${gradientSecondary} text-t-secondaryFg px-5 py-2.5 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60`}
                   >
                     <Share2 size={16} />
                     Share URL
@@ -595,7 +604,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
             <button
               onClick={onRandomize}
               disabled={!onRandomize}
-              className={`${gradientClass} text-t-textOnColor px-3 py-2 ${rClass} ${sClass} text-xs font-semibold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60`}
+              className={`${gradientClass} text-t-primaryFg px-3 py-2 ${rClass} ${sClass} text-xs font-semibold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60`}
             >
               <Shuffle size={14} />
               New Variation
@@ -653,8 +662,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
                       onChange={() =>
                         setChecklist((prev) => ({ ...prev, [item.key]: !prev[item.key] }))
                       }
-                      className="mt-1 h-4 w-4 accent-t-primary"
-                    />
+                      className="mt-1 h-4 w-4"                    />
                     <span>
                       <span className="font-semibold">{item.label}</span>
                       <span className="block text-xs text-t-textMuted">{item.helper}</span>
@@ -673,7 +681,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
                   value={reviewNotes}
                   onChange={(e) => setReviewNotes(e.target.value)}
                   rows={4}
-                  className={`w-full resize-none px-3 py-2 ${rClass} ${bClass} bg-t-bg text-sm text-t-text placeholder:text-t-textMuted/70 focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
+                  className={`w-full resize-none px-3 py-2 ${rClass} ${bClass} bg-t-bg text-sm text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
                 />
                 <label className="flex items-center justify-between text-xs text-t-textMuted">
                   <span>Auto-sync preview: {isAutoSync ? 'On' : 'Off'}</span>
@@ -681,8 +689,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
                     type="checkbox"
                     checked={isAutoSync}
                     onChange={(e) => handleAutoSyncToggle(e.target.checked)}
-                    className="h-4 w-4 accent-t-primary"
-                  />
+                    className="h-4 w-4"                  />
                 </label>
               </div>
               <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-5 space-y-3`}>
@@ -721,7 +728,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
                 value={tokenFilter}
                 onChange={(e) => setTokenFilter(e.target.value)}
                 placeholder="Filter tokens"
-                className={`w-full sm:w-56 px-3 py-2 ${rClass} ${bClass} bg-t-bg text-sm text-t-text placeholder:text-t-textMuted/70 focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
+                className={`w-full sm:w-56 px-3 py-2 ${rClass} ${bClass} bg-t-bg text-sm text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
               />
             </div>
             <div className="space-y-2">
@@ -777,7 +784,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleDownloadCss}
-                  className={`${gradientClass} text-t-textOnColor px-3 py-2 ${rClass} ${sClass} text-xs font-semibold flex items-center gap-2 transition-all hover:scale-105 active:scale-95`}
+                  className={`${gradientClass} text-t-primaryFg px-3 py-2 ${rClass} ${sClass} text-xs font-semibold flex items-center gap-2 transition-all hover:scale-105 active:scale-95`}
                 >
                   <Download size={14} />
                   Download CSS
@@ -809,7 +816,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
                 value={deliveryNote}
                 onChange={(e) => setDeliveryNote(e.target.value)}
                 rows={5}
-                className={`w-full resize-none px-3 py-2 ${rClass} ${bClass} bg-t-bg text-sm text-t-text placeholder:text-t-textMuted/70 focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
+                className={`w-full resize-none px-3 py-2 ${rClass} ${bClass} bg-t-bg text-sm text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
               />
               <div className="flex flex-wrap gap-2">
                 <button
@@ -825,7 +832,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
                 <button
                   onClick={onShare}
                   disabled={!onShare}
-                  className={`${gradientSecondary} text-t-textOnColor px-3 py-2 ${rClass} ${sClass} text-xs font-semibold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60`}
+                  className={`${gradientSecondary} text-t-secondaryFg px-3 py-2 ${rClass} ${sClass} text-xs font-semibold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60`}
                 >
                   <Share2 size={14} />
                   Open share sheet
@@ -842,301 +849,258 @@ const PreviewSection: React.FC<PreviewProps> = ({
         <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,var(--primary)_0%,transparent_70%)] opacity-10" />
 
         <div className="relative z-10 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-wider text-t-textMuted">
-                <span className="h-2.5 w-2.5 rounded-full bg-t-primary" />
-                Instruction Manual
-                <span className={`${rClass} bg-t-secondary/15 px-2 py-0.5 text-[10px] font-semibold text-t-secondary`}>Hotkeys</span>
-                <span className={`${rClass} bg-t-accent/15 px-2 py-0.5 text-[10px] font-semibold text-t-accent`}>Exports</span>
-                <span className={`${rClass} bg-t-good/15 px-2 py-0.5 text-[10px] font-semibold text-t-good`}>Locks</span>
-              </div>
-              <h2 className="text-lg font-bold">
-                <span className="text-t-primary">Everything</span>{' '}
-                <span className="text-t-accent">You Can Do</span>
-              </h2>
-              <p className="text-sm text-t-textMuted max-w-xl">
-                All buttons, hotkeys, options, locks, and outputs live here so you can move faster and keep both themes aligned.
-              </p>
-              <div className="flex flex-wrap gap-2 text-[10px] font-semibold">
-                <span className={`${rClass} bg-t-primary/15 px-2 py-1 text-t-primary`}>Generate</span>
-                <span className={`${rClass} bg-t-secondary/15 px-2 py-1 text-t-secondary`}>Modes</span>
-                <span className={`${rClass} bg-t-accent/15 px-2 py-1 text-t-accent`}>Share</span>
-                <span className={`${rClass} bg-t-good/15 px-2 py-1 text-t-good`}>Review</span>
-                <span className={`${rClass} bg-t-bad/15 px-2 py-1 text-t-bad`}>Undo</span>
-              </div>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-wider text-t-textMuted">
+              <span className="h-2.5 w-2.5 rounded-full bg-t-primary" />
+              Component Showcase
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={onRandomize}
-                disabled={!onRandomize}
-                className={`${gradientClass} text-t-textOnColor px-3 py-2 ${rClass} ${sClass} text-xs font-semibold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60`}
-              >
-                <Shuffle size={manualIconSize} />
-                Generate
-              </button>
-              <button
-                onClick={onOpenImagePicker}
-                disabled={!onOpenImagePicker}
-                className={`bg-t-text/10 text-t-text px-3 py-2 ${rClass} ${bClass} text-xs font-semibold flex items-center gap-2 transition-colors hover:bg-t-text/20 disabled:cursor-not-allowed disabled:opacity-60`}
-              >
-                <ImageIcon size={manualIconSize} />
-                Image Palette
-              </button>
-            </div>
+            <h2 className="text-lg font-bold">
+              <span className="text-t-primary">Your Theme</span>{' '}
+              <span className="text-t-accent">In Action</span>
+            </h2>
+            <p className="text-sm text-t-textMuted max-w-xl">
+              Every component below uses your generated tokens. Press <kbd className="px-1.5 py-0.5 rounded bg-t-text/10 font-mono text-[10px] text-t-text">Space</kbd> to regenerate and watch them all update.
+            </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+
+            {/* Buttons */}
             <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-              <div className={`inline-flex items-center gap-2 ${rClass} bg-t-primary/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-t-primary`}>
-                <Menu size={manualIconSize} className="text-t-primary" />
-                Header Panels
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-              <button
-                onClick={onToggleSwatches}
-                disabled={!onToggleSwatches}
-                className={`flex items-center gap-2 px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs font-semibold text-t-text transition-colors hover:bg-t-card2 disabled:cursor-not-allowed disabled:opacity-60`}
-              >
-                <Palette size={manualIconSize} className="text-t-primary" />
-                <span>Palette Swatches</span>
-              </button>
-              <button
-                onClick={onToggleOptions}
-                disabled={!onToggleOptions}
-                className={`flex items-center gap-2 px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs font-semibold text-t-text transition-colors hover:bg-t-card2 disabled:cursor-not-allowed disabled:opacity-60`}
-              >
-                <Sliders size={manualIconSize} className="text-t-primary" />
-                <span>Design Options</span>
-              </button>
-              <button
-                onClick={onToggleHistory}
-                disabled={!onToggleHistory}
-                className={`flex items-center gap-2 px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs font-semibold text-t-text transition-colors hover:bg-t-card2 disabled:cursor-not-allowed disabled:opacity-60`}
-              >
-                <History size={manualIconSize} className="text-t-primary" />
-                <span>History</span>
-              </button>
-              <button
-                onClick={onOpenImagePicker}
-                disabled={!onOpenImagePicker}
-                className={`flex items-center gap-2 px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs font-semibold text-t-text transition-colors hover:bg-t-card2 disabled:cursor-not-allowed disabled:opacity-60`}
-              >
-                <ImageIcon size={manualIconSize} className="text-t-primary" />
-                <span>Image Palette</span>
-              </button>
-            </div>
-            <p className="text-[11px] text-t-textMuted">
-              Mobile: tap the menu icon to access mode/format selectors, Generate, and quick actions.
-            </p>
-            <ul className="space-y-2 text-[11px] text-t-textMuted">
-              <li><span className="font-semibold text-t-text">Mobile menu</span> includes Generate, Palette, Options, History, Image, Export, Share, Theme toggle, and Undo.</li>
-              <li><span className="font-semibold text-t-text">Mobile notice</span> can be dismissed with the X button.</li>
-            </ul>
-          </div>
-
-          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-            <div className={`inline-flex items-center gap-2 ${rClass} bg-t-accent/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-t-accent`}>
-              <Share2 size={manualIconSize} className="text-t-accent" />
-              Actions & Share
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <button
-                onClick={handleDownloadCss}
-                className={`flex items-center gap-2 px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs font-semibold text-t-text transition-colors hover:bg-t-card2`}
-              >
-                <Download size={manualIconSize} className="text-t-primary" />
-                <span>Download CSS</span>
-              </button>
-              <button
-                onClick={onExport}
-                disabled={!onExport}
-                className={`flex items-center gap-2 px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs font-semibold text-t-text transition-colors hover:bg-t-card2 disabled:cursor-not-allowed disabled:opacity-60`}
-              >
-                <Download size={manualIconSize} className="text-t-primary" />
-                <span>Export JSON</span>
-              </button>
-              <button
-                onClick={onShare}
-                disabled={!onShare}
-                className={`flex items-center gap-2 px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs font-semibold text-t-text transition-colors hover:bg-t-card2 disabled:cursor-not-allowed disabled:opacity-60`}
-              >
-                <Share2 size={manualIconSize} className="text-t-primary" />
-                <span>Share URL</span>
-              </button>
-              <button
-                onClick={onToggleTheme}
-                disabled={!onToggleTheme}
-                className={`flex items-center gap-2 px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs font-semibold text-t-text transition-colors hover:bg-t-card2 disabled:cursor-not-allowed disabled:opacity-60`}
-              >
-                <span className="text-t-primary flex items-center gap-1">
-                  {themeName === 'Dark' ? <Moon size={manualIconSize} /> : <Sun size={manualIconSize} />}
-                </span>
-                <span>Toggle UI Theme</span>
-              </button>
-            </div>
-            <ul className="space-y-2 text-[11px] text-t-textMuted">
-              <li><span className="font-semibold text-t-text">Share modal:</span> QR code, copy link, and social share (X, Facebook, LinkedIn, Reddit, TikTok). Press <kbd className="px-1.5 py-0.5 rounded bg-t-text/10 font-mono text-[10px] text-t-text">Esc</kbd> to close.</li>
-              <li><span className="font-semibold text-t-text">Copy tokens:</span> Copy All Tokens + Copy CSS buttons duplicate formatted variables.</li>
-              <li><span className="font-semibold text-t-text">Export & Share card</span> in preview mirrors Download CSS, Share URL, and Copy All Tokens.</li>
-            </ul>
-          </div>
-
-          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-            <div className={`inline-flex items-center gap-2 ${rClass} bg-t-secondary/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-t-secondary`}>
-              <Shuffle size={manualIconSize} className="text-t-secondary" />
-              Generate & History
-            </div>
-            <ul className="space-y-2 text-xs text-t-textMuted">
-              <li><span className="font-semibold text-t-text">Generate</span> (header + preview buttons) creates a new palette and randomizes unlocked options. Hotkey: <kbd className="px-1.5 py-0.5 rounded bg-t-text/10 font-mono text-[10px] text-t-text">Space</kbd>.</li>
-              <li><span className="font-semibold text-t-text">Generator Actions</span> include Upload Image and Randomize shortcuts inside the preview.</li>
-              <li><span className="font-semibold text-t-text">Undo/Redo</span> with header arrows or <kbd className="px-1.5 py-0.5 rounded bg-t-text/10 font-mono text-[10px] text-t-text">Cmd/Ctrl+Z</kbd> and <kbd className="px-1.5 py-0.5 rounded bg-t-text/10 font-mono text-[10px] text-t-text">Cmd/Ctrl+Shift+Z</kbd>.</li>
-              <li><span className="font-semibold text-t-text">History drawer</span> holds up to 20 snapshots. Click a thumbnail to restore.</li>
-            </ul>
-          </div>
-
-          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-            <div className={`inline-flex items-center gap-2 ${rClass} bg-t-good/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-t-good`}>
-              <Sliders size={manualIconSize} className="text-t-good" />
-              Modes & Format
-            </div>
-            <ul className="space-y-2 text-xs text-t-textMuted">
-              <li><span className="font-semibold text-t-text">Mode</span> selector: Random, Monochrome, Analogous, Complementary, Split Complementary, Triadic, Tetradic, Compound, Triadic Split.</li>
-              <li><span className="font-semibold text-t-text">Format</span> selector: HEX, RGB, HSL, OKLCH. Affects swatch values, copy output, and exports.</li>
-              <li><span className="font-semibold text-t-text">Light + Dark</span> previews update together so you always ship matching themes.</li>
-            </ul>
-          </div>
-
-          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-            <div className={`inline-flex items-center gap-2 ${rClass} bg-t-secondary/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-t-secondary`}>
-              <Palette size={manualIconSize} className="text-t-secondary" />
-              Swatches & Locks
-            </div>
-            <ul className="space-y-2 text-xs text-t-textMuted">
-              <li><span className="font-semibold text-t-text">Sticky swatch strip</span> shows 10 tokens (bg, card, text, textMuted, textOnColor, primary, secondary, accent, good, bad).</li>
-              <li><span className="font-semibold text-t-text">Edit & copy</span>: click a half to open the color picker, type a value, press Enter/blur to apply. Alt/Option or Cmd+click copies the formatted value.</li>
-              <li><span className="font-semibold text-t-text">Lock icons</span> freeze individual tokens during generation. Color Tokens grid copies CSS variable names (var(--token)).</li>
-            </ul>
-          </div>
-
-          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-            <div className={`inline-flex items-center gap-2 ${rClass} bg-t-primary/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-t-primary`}>
-              <Sliders size={manualIconSize} className="text-t-primary" />
-              Design Options
-            </div>
-            <ul className="space-y-2 text-xs text-t-textMuted">
-              <li><span className="font-semibold text-t-text">Borders</span> none/thin/thick. Shadow size 0–5, shadow opacity 5–50%.</li>
-              <li><span className="font-semibold text-t-text">Roundness</span> 0–5. Saturation, Brightness, Contrast range from -5 to +5.</li>
-              <li><span className="font-semibold text-t-text">Toggles</span> for Gradients and Dark First. Lock any option to keep it fixed.</li>
-              <li><span className="font-semibold text-t-text">Palette Controls</span> card in the preview mirrors saturation/brightness/contrast plus Dark First and Gradients.</li>
-            </ul>
-          </div>
-
-          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-            <div className={`inline-flex items-center gap-2 ${rClass} bg-t-accent/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-t-accent`}>
-              <Sparkles size={manualIconSize} className="text-t-accent" />
-              Workspace & Review Hub
-            </div>
-            <ul className="space-y-2 text-xs text-t-textMuted">
-              <li><span className="font-semibold text-t-text">Tabs</span> (Overview, Tokens, Delivery) with Auto-sync to mirror light/dark panels.</li>
-              <li><span className="font-semibold text-t-text">Overview</span> includes checklist, progress bar, review notes, review depth, and Toggle UI theme preview.</li>
-              <li><span className="font-semibold text-t-text">Tokens</span> filter, copy individual values, and Copy CSS.</li>
-              <li><span className="font-semibold text-t-text">Delivery</span> buttons for Download CSS, Export JSON, Share URL, release note editor, Copy note, and Open share sheet.</li>
-              <li><span className="font-semibold text-t-text">New Variation</span> creates a fresh palette without leaving the workspace.</li>
-            </ul>
-          </div>
-
-          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-            <div className={`inline-flex items-center gap-2 ${rClass} bg-t-secondary/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-t-secondary`}>
-              <ImageIcon size={manualIconSize} className="text-t-secondary" />
-              Image Palette
-            </div>
-            <ul className="space-y-2 text-xs text-t-textMuted">
-              <li><span className="font-semibold text-t-text">Pick from Image</span> with upload, drag & drop, or paste (<kbd className="px-1.5 py-0.5 rounded bg-t-text/10 font-mono text-[10px] text-t-text">Cmd/Ctrl+V</kbd>).</li>
-              <li><span className="font-semibold text-t-text">Sample</span> the image to fill the selected slot. Toggle checkboxes to include/exclude slots.</li>
-              <li><span className="font-semibold text-t-text">Import Selection</span> applies checked colors. Reset clears the image.</li>
-            </ul>
-          </div>
-
-          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-            <div className={`inline-flex items-center gap-2 ${rClass} bg-t-primary/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-t-primary`}>
-              <Sparkles size={manualIconSize} className="text-t-primary" />
-              Component Samples
-            </div>
-            <div className="space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Buttons</p>
               <div className="flex flex-wrap gap-2">
-                <span className={`${rClass} bg-t-primary/15 px-2 py-1 text-[10px] font-semibold text-t-primary`}>Badge</span>
-                <span className={`${rClass} bg-t-secondary/15 px-2 py-1 text-[10px] font-semibold text-t-secondary`}>Tag</span>
-                <span className={`${rClass} bg-t-accent/15 px-2 py-1 text-[10px] font-semibold text-t-accent`}>Accent</span>
-                <span className={`${rClass} bg-t-good/15 px-2 py-1 text-[10px] font-semibold text-t-good`}>Success</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button className={`${gradientClass} text-t-textOnColor px-3 py-2 ${rClass} ${sClass} text-xs font-semibold transition-all hover:scale-105 active:scale-95`}>
+                <button className={`${gradientClass} text-t-primaryFg px-4 py-2 ${rClass} ${sClass} text-xs font-semibold transition-all hover:scale-105 active:scale-95`}>
                   Primary
                 </button>
-                <button className={`bg-t-secondary/15 text-t-secondary px-3 py-2 ${rClass} ${bClass} text-xs font-semibold transition-colors hover:bg-t-secondary/25`}>
+                <button className={`${gradientSecondary} text-t-secondaryFg px-4 py-2 ${rClass} ${sClass} text-xs font-semibold transition-all hover:scale-105 active:scale-95`}>
                   Secondary
                 </button>
-                <button className={`bg-t-text/10 text-t-text px-3 py-2 ${rClass} ${bClass} text-xs font-semibold transition-colors hover:bg-t-text/20`}>
-                  Ghost
+                <button className={`${gradientAccent} text-t-accentFg px-4 py-2 ${rClass} ${sClass} text-xs font-semibold transition-all hover:scale-105 active:scale-95`}>
+                  Accent
                 </button>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <input
-                  type="text"
-                  placeholder="Email address"
-                  className={`w-full px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs text-t-text placeholder:text-t-textMuted/70 focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
-                />
-                <select
-                  className={`w-full px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs text-t-text cursor-pointer focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
-                >
+              <div className="flex flex-wrap gap-2">
+                <button className={`bg-t-primary/15 text-t-primary px-4 py-2 ${rClass} ${bClass} text-xs font-semibold transition-colors hover:bg-t-primary/25`}>
+                  Soft
+                </button>
+                <button className={`bg-t-text/10 text-t-text px-4 py-2 ${rClass} ${bClass} text-xs font-semibold transition-colors hover:bg-t-text/20`}>
+                  Ghost
+                </button>
+                <button className={`bg-t-bad text-t-badFg px-4 py-2 ${rClass} ${sClass} text-xs font-semibold transition-all hover:scale-105 active:scale-95`}>
+                  Danger
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button disabled className={`${gradientClass} text-t-primaryFg px-4 py-2 ${rClass} text-xs font-semibold opacity-50 cursor-not-allowed`}>
+                  Disabled
+                </button>
+                <button className={`bg-transparent text-t-primary px-4 py-2 ${rClass} text-xs font-semibold underline underline-offset-2 transition-colors hover:text-t-accent`}>
+                  Link
+                </button>
+              </div>
+            </div>
+
+            {/* Badges & Tags */}
+            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Badges & Tags</p>
+              <div className="flex flex-wrap gap-2">
+                <span className={`${rClass} bg-t-primary/15 px-2.5 py-1 text-[11px] font-semibold text-t-primary`}>Primary</span>
+                <span className={`${rClass} bg-t-secondary/15 px-2.5 py-1 text-[11px] font-semibold text-t-secondary`}>Secondary</span>
+                <span className={`${rClass} bg-t-accent/15 px-2.5 py-1 text-[11px] font-semibold text-t-accent`}>Accent</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className={`${rClass} bg-t-good/15 px-2.5 py-1 text-[11px] font-semibold text-t-good`}>Deployed</span>
+                <span className={`${rClass} bg-t-warn/15 px-2.5 py-1 text-[11px] font-semibold text-t-warn`}>Pending</span>
+                <span className={`${rClass} bg-t-bad/15 px-2.5 py-1 text-[11px] font-semibold text-t-bad`}>Failed</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className={`${rClass} ${bClass} px-2.5 py-1 text-[11px] font-semibold text-t-text`}>Outlined</span>
+                <span className={`${rClass} bg-t-primary text-t-primaryFg px-2.5 py-1 text-[11px] font-semibold`}>Solid</span>
+                <span className={`rounded-full bg-t-accent/15 px-2.5 py-1 text-[11px] font-semibold text-t-accent`}>Pill</span>
+              </div>
+            </div>
+
+            {/* Typography */}
+            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Typography</p>
+              <div className="space-y-1.5">
+                <p className="text-xl font-black text-t-text leading-tight">Display Heading</p>
+                <p className="text-sm font-semibold text-t-text">Section Title</p>
+                <p className="text-xs text-t-text">Body text uses your primary text token for maximum readability on the background surface.</p>
+                <p className="text-xs text-t-textMuted">Muted text for secondary information and helpers.</p>
+                <p className="text-xs"><span className="text-t-primary font-semibold">Primary link</span> &middot; <span className="text-t-accent font-semibold">Accent link</span> &middot; <span className="text-t-secondary font-semibold">Secondary link</span></p>
+              </div>
+            </div>
+
+            {/* Form Controls */}
+            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Form Controls</p>
+              <input
+                type="text"
+                placeholder="Email address"
+                className={`w-full px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <select className={`w-full px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs text-t-text cursor-pointer focus:outline-none focus:ring-2 focus:ring-t-primary/30`}>
                   <option>Designer</option>
                   <option>Developer</option>
                   <option>Product</option>
                 </select>
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className={`w-full px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
+                />
               </div>
-              <div className={`flex items-center justify-between gap-3 ${rClass} ${bClass} bg-t-card px-3 py-2 text-xs text-t-text`}>
-                <div>
-                  <p className="font-semibold">Email alerts</p>
-                  <p className="text-[11px] text-t-textMuted">Weekly summary</p>
-                </div>
-                <input type="checkbox" defaultChecked className="h-4 w-4 accent-t-primary" />
+              <div className="flex items-center justify-between gap-3">
+                <label className="flex items-center gap-2 text-xs text-t-text cursor-pointer">
+                  <input type="checkbox" defaultChecked className="h-4 w-4" />
+                  <span>Remember me</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-t-text cursor-pointer">
+                  <input type="radio" name="demo" defaultChecked className="h-4 w-4" />
+                  <span>Option A</span>
+                </label>
               </div>
-              <div className="grid gap-2">
-                <div className={`${rClass} ${bClass} bg-t-good/15 px-3 py-2 text-xs text-t-good flex items-center justify-between`}>
-                  <span>Success banner</span>
-                  <span className="text-[11px] text-t-good">Resolved</span>
+              <textarea
+                rows={2}
+                placeholder="Leave a note..."
+                className={`w-full resize-none px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
+              />
+            </div>
+
+            {/* Alerts & Banners */}
+            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Alerts & Banners</p>
+              <div className={`${rClass} ${bClass} bg-t-good/15 border-t-good/30 px-3 py-2.5 text-xs text-t-good flex items-center gap-2`}>
+                <Check size={14} className="shrink-0" />
+                <span><strong>Success:</strong> Changes saved to your theme.</span>
+              </div>
+              <div className={`${rClass} ${bClass} bg-t-warn/15 border-t-warn/30 px-3 py-2.5 text-xs text-t-warn flex items-center gap-2`}>
+                <Sparkles size={14} className="shrink-0" />
+                <span><strong>Warning:</strong> Low contrast on muted text.</span>
+              </div>
+              <div className={`${rClass} ${bClass} bg-t-bad/15 border-t-bad/30 px-3 py-2.5 text-xs text-t-bad flex items-center gap-2`}>
+                <Lock size={14} className="shrink-0" />
+                <span><strong>Error:</strong> Export failed. Retry?</span>
+              </div>
+              <div className={`${rClass} ${bClass} bg-t-primary/10 border-t-primary/30 px-3 py-2.5 text-xs text-t-primary flex items-center gap-2`}>
+                <Sparkles size={14} className="shrink-0" />
+                <span><strong>Info:</strong> New palette generated.</span>
+              </div>
+            </div>
+
+            {/* Cards & Surfaces */}
+            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Cards & Surfaces</p>
+              <div className={`${rClass} ${bClass} ${sClass} bg-t-card p-3 space-y-2`}>
+                <div className="flex items-center gap-2">
+                  <div className={`w-8 h-8 ${rClass} ${gradientClass} flex items-center justify-center text-t-primaryFg text-xs font-bold`}>T</div>
+                  <div>
+                    <p className="text-xs font-semibold text-t-text">Theme Card</p>
+                    <p className="text-[10px] text-t-textMuted">bg-t-card surface</p>
+                  </div>
                 </div>
-                <div className={`${rClass} ${bClass} bg-t-bad/15 px-3 py-2 text-xs text-t-bad flex items-center justify-between`}>
-                  <span>Error banner</span>
-                  <span className="text-[11px] text-t-bad">Action needed</span>
+                <div className={`${rClass} bg-t-card2 p-2 text-[10px] text-t-textMuted`}>
+                  Nested bg-t-card2 surface
                 </div>
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-[11px] text-t-textMuted">
-                  <span>Progress</span>
-                  <span className="text-t-primary font-semibold">68%</span>
+              <div className={`${rClass} ${bClass} bg-t-bg p-3 space-y-1`}>
+                <p className="text-xs font-semibold text-t-text">Base Surface</p>
+                <p className="text-[10px] text-t-textMuted">bg-t-bg — the page background itself</p>
+              </div>
+            </div>
+
+            {/* Progress & Metrics */}
+            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Progress & Metrics</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-t-text font-semibold">Primary</span>
+                  <span className="text-t-primary font-semibold">72%</span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-t-text/10">
-                  <div className={`h-full ${rClass} ${gradientAccent}`} style={{ width: '68%' }} />
+                  <div className={`h-full rounded-full ${gradientClass}`} style={{ width: '72%' }} />
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[11px] text-t-textMuted">
-                <span className="text-t-text font-semibold">Pagination</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-t-text font-semibold">Accent</span>
+                  <span className="text-t-accent font-semibold">45%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-t-text/10">
+                  <div className={`h-full rounded-full ${gradientAccent}`} style={{ width: '45%' }} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <div className={`${rClass} ${bClass} bg-t-card p-2 text-center`}>
+                  <p className="text-lg font-bold text-t-primary">24</p>
+                  <p className="text-[10px] text-t-textMuted">Tokens</p>
+                </div>
+                <div className={`${rClass} ${bClass} bg-t-card p-2 text-center`}>
+                  <p className="text-lg font-bold text-t-accent">2</p>
+                  <p className="text-[10px] text-t-textMuted">Themes</p>
+                </div>
+                <div className={`${rClass} ${bClass} bg-t-card p-2 text-center`}>
+                  <p className="text-lg font-bold text-t-good">AA</p>
+                  <p className="text-[10px] text-t-textMuted">WCAG</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Navigation</p>
+              <div className="flex gap-1">
+                <button className={`${rClass} bg-t-primary/15 px-3 py-1.5 text-[11px] font-semibold text-t-primary`}>Active</button>
+                <button className={`${rClass} bg-t-text/10 px-3 py-1.5 text-[11px] font-semibold text-t-text hover:bg-t-text/20 transition-colors`}>Tokens</button>
+                <button className={`${rClass} bg-t-text/10 px-3 py-1.5 text-[11px] font-semibold text-t-text hover:bg-t-text/20 transition-colors`}>Export</button>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] text-t-textMuted">
+                <span className="text-t-primary">Home</span>
+                <ChevronRight size={10} />
+                <span className="text-t-primary">Themes</span>
+                <ChevronRight size={10} />
+                <span className="text-t-text font-semibold">Current</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-t-text font-semibold">Page 2 of 5</span>
                 <div className="flex items-center gap-1">
                   <button className={`${rClass} ${bClass} bg-t-card px-2 py-1 text-[11px] text-t-text transition-colors hover:bg-t-card2`}>1</button>
-                  <button className={`${rClass} ${bClass} bg-t-primary/15 px-2 py-1 text-[11px] text-t-primary transition-colors hover:bg-t-primary/20`}>2</button>
+                  <button className={`${rClass} ${bClass} bg-t-primary/15 px-2 py-1 text-[11px] text-t-primary font-semibold`}>2</button>
                   <button className={`${rClass} ${bClass} bg-t-card px-2 py-1 text-[11px] text-t-text transition-colors hover:bg-t-card2`}>3</button>
+                  <button className={`${rClass} ${bClass} bg-t-card px-2 py-1 text-[11px] text-t-text transition-colors hover:bg-t-card2`}>4</button>
+                  <button className={`${rClass} ${bClass} bg-t-card px-2 py-1 text-[11px] text-t-text transition-colors hover:bg-t-card2`}>5</button>
                 </div>
+              </div>
+            </div>
+
+            {/* List Items */}
+            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">List Items</p>
+              <div className="space-y-1.5">
+                {[
+                  { name: 'Background', token: '--bg', color: 'bg-t-bg' },
+                  { name: 'Primary', token: '--primary', color: 'bg-t-primary' },
+                  { name: 'Accent', token: '--accent', color: 'bg-t-accent' },
+                ].map((item) => (
+                  <div key={item.token} className={`flex items-center gap-3 ${rClass} ${bClass} bg-t-card px-3 py-2 transition-colors hover:bg-t-card2`}>
+                    <div className={`w-5 h-5 ${rClass} ${item.color} shrink-0`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-t-text">{item.name}</p>
+                      <p className="text-[10px] text-t-textMuted font-mono">{item.token}</p>
+                    </div>
+                    <Copy size={12} className="text-t-textMuted shrink-0" />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
-      </div>
       </section>
 
       {/* Footer */}
-      <footer className="flex flex-col gap-6 pt-10 pb-8 border-t border-t-border transition-colors duration-500">
+      <footer className="flex flex-col gap-6 pt-10 pb-8 border-t border-themed transition-colors duration-500">
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex flex-col items-center md:items-start gap-2">
             <a 
@@ -1183,7 +1147,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
             >
               Bucaa Studio
             </a>
-            . All Rights Reserved. v25.12.2
+            . All Rights Reserved. v26.2.1
           </p>
         </div>
       </footer>

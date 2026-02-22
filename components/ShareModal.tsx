@@ -52,7 +52,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, theme }) 
       onClick={onClose}
     >
       <div 
-        className={`w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-300 ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}
+        className={`w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-300 ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}
         style={{ backgroundColor: theme.card, color: theme.text, borderColor: theme.border, borderWidth: 1 }}
         onClick={e => e.stopPropagation()}
       >
@@ -61,10 +61,10 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, theme }) 
           <div className="flex items-center gap-3">
              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm" style={{ backgroundColor: theme.primary }}>
                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" fill="white" stroke="none" />
-                    <path d="M12 2 A10 10 0 0 1 12 22 A5 5 0 0 1 12 12 A5 5 0 0 0 12 2" fill="black" stroke="none"/>
-                    <circle cx="15" cy="7" r="1.8" fill="white" stroke="none" />
-                    <circle cx="9" cy="17" r="1.8" fill="black" stroke="none" />
+                    <circle cx="12" cy="12" r="10" fill={theme.primaryFg} stroke="none" />
+                    <path d="M12 2 A10 10 0 0 1 12 22 A5 5 0 0 1 12 12 A5 5 0 0 0 12 2" fill={theme.primary} stroke="none"/>
+                    <circle cx="15" cy="7" r="1.8" fill={theme.primaryFg} stroke="none" />
+                    <circle cx="9" cy="17" r="1.8" fill={theme.primary} stroke="none" />
                  </svg>
              </div>
              <div>
@@ -74,7 +74,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, theme }) 
           </div>
           <button 
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-black/5 transition-colors"
+            className="p-2 rounded-full hover-themed transition-colors"
             style={{ color: theme.textMuted }}
           >
             <X size={20} />
@@ -83,9 +83,9 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, theme }) 
 
         {/* Content */}
         <div className="p-8 flex flex-col items-center space-y-8">
-          
-          {/* QR Code Card */}
-          <div className="p-1 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center space-y-2">
+
+          {/* QR Code Card — white bg required for QR readability */}
+          <div className="p-1 bg-white rounded-2xl shadow-sm border flex flex-col items-center space-y-2" style={{ borderColor: theme.border }}>
             <QRCodeSVG 
               value={url} 
               size={280} 
@@ -117,7 +117,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, theme }) 
                <button 
                  onClick={handleCopy}
                  className="p-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-all hover:brightness-110 active:scale-95"
-                 style={{ backgroundColor: copied ? theme.good : theme.primary, color: '#fff' }}
+                 style={{ backgroundColor: copied ? theme.good : theme.primary, color: copied ? theme.goodFg : theme.primaryFg }}
                >
                  {copied ? <Check size={16} /> : <Copy size={16} />}
                </button>

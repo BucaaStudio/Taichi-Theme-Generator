@@ -61,28 +61,37 @@ export function meetsWCAG(fg: string, bg: string, level: 'AA' | 'AAA' = 'AA'): b
 
 export function selectForeground(
   bg: OklchColor,
-  preferLight: boolean = true,
+  _preferLight: boolean = true,
   targetRatio: number = 4.5
 ): OklchColor {
   const bgHex = toHex(bg);
-  
-  // Try preferred color first
-  const white = { L: 1, C: 0, H: bg.H };
-  const black = { L: 0, C: 0, H: bg.H };
-  
+
+  // Determine direction: light or dark foreground
   const whiteRatio = contrastRatio('#ffffff', bgHex);
   const blackRatio = contrastRatio('#000000', bgHex);
-  
-  // Return the one with better contrast
-  if (whiteRatio >= blackRatio && whiteRatio >= targetRatio) {
-    return white;
+  const goLight = whiteRatio >= blackRatio;
+
+  // Themed tint: carry the bg's hue with visible chroma instead of pure B/W.
+  // Floor of 0.035 ensures even neutralish backgrounds produce tinted fg.
+  const tintC = Math.max(0.035, Math.min(bg.C * 0.8, 0.09));
+
+  // Try tinted candidate first — start well away from pure white/black and
+  // nudge toward the extreme only if contrast is insufficient
+  let L = goLight ? 0.88 : 0.22;
+  const step = goLight ? 0.02 : -0.02;
+
+  for (let i = 0; i < 25; i++) {
+    const candidate = clampToSRGBGamut({ L, C: tintC, H: bg.H });
+    if (contrastRatio(toHex(candidate), bgHex) >= targetRatio) {
+      return candidate;
+    }
+    L = Math.max(0.03, Math.min(0.97, L + step));
   }
-  if (blackRatio >= targetRatio) {
-    return black;
-  }
-  
-  // If neither meets target, return the better one
-  return whiteRatio >= blackRatio ? white : black;
+
+  // Final fallback: near-white or near-black with tint (never pure achromatic)
+  return goLight
+    ? clampToSRGBGamut({ L: 0.97, C: tintC, H: bg.H })
+    : clampToSRGBGamut({ L: 0.05, C: tintC, H: bg.H });
 }
 
 export function selectForegroundHex(bgHex: string): string {
