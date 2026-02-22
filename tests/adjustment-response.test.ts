@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { generateTheme } from '../utils/colorUtils';
 import { toOklch } from '../utils/oklch';
+import { contrastRatio } from '../utils/contrast';
 
 const MODES = [
   'monochrome',
@@ -15,6 +16,7 @@ const MODES = [
 
 const SPREAD_KEYS = ['bg', 'card', 'card2', 'text', 'textMuted', 'primary', 'secondary', 'accent'] as const;
 const BRIGHTNESS_KEYS = ['bg', 'card', 'card2', 'text', 'primary', 'secondary', 'accent'] as const;
+const VISIBLE_COLOR_KEYS = ['primary', 'secondary', 'accent'] as const;
 
 function buildSeed(index: number): string {
   const hue = (index * 137.508) % 360;
@@ -95,6 +97,55 @@ describe('Adjustment response', () => {
         throw new Error(
           `Dark contrast weak at bri+5 mode=${mode} seed=${seed} low=${lowDarkSpread.toFixed(3)} high=${highDarkSpread.toFixed(3)}`
         );
+      }
+    }
+  });
+
+  it('keeps chromatic tokens visible at extreme brightness in both modes', () => {
+    const minVisibilityRatio = 2.4;
+    for (let i = 0; i < 80; i++) {
+      const mode = MODES[i % MODES.length];
+      const seed = buildSeed(i + 12000);
+
+      // Bright light side should not wash out semantic colors.
+      const highBrightness = generateTheme(mode, seed, 3, -1, 5, undefined, false);
+      for (const key of VISIBLE_COLOR_KEYS) {
+        const ratio = contrastRatio(highBrightness.light[key], highBrightness.light.bg);
+        if (ratio < minVisibilityRatio) {
+          throw new Error(
+            `Light chroma visibility too low mode=${mode} seed=${seed} key=${key} ratio=${ratio.toFixed(2)}`
+          );
+        }
+      }
+
+      // Very dark side should also keep semantic colors readable against dark bg.
+      const lowBrightness = generateTheme(mode, seed, 3, -1, -5, undefined, false);
+      for (const key of VISIBLE_COLOR_KEYS) {
+        const ratio = contrastRatio(lowBrightness.dark[key], lowBrightness.dark.bg);
+        if (ratio < minVisibilityRatio) {
+          throw new Error(
+            `Dark chroma visibility too low mode=${mode} seed=${seed} key=${key} ratio=${ratio.toFixed(2)}`
+          );
+        }
+      }
+    }
+  });
+
+  it('preserves light-side brand visibility for high-brightness low-contrast cases', () => {
+    const seed = '#9a4b00';
+    const mode = 'compound';
+    const sat = 5;
+    const bri = 2;
+    const minBrandRatio = 2.55;
+    for (const con of [-3, -4, -5]) {
+      const { light } = generateTheme(mode, seed, sat, con, bri, undefined, false);
+      for (const key of VISIBLE_COLOR_KEYS) {
+        const ratio = contrastRatio(light[key], light.bg);
+        if (ratio < minBrandRatio) {
+          throw new Error(
+            `Brand visibility regression con=${con} key=${key} ratio=${ratio.toFixed(2)} bg=${light.bg} token=${light[key]}`
+          );
+        }
       }
     }
   });

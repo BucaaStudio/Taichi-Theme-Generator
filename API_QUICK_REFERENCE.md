@@ -60,6 +60,9 @@ POST /api/generate-theme
 
 `light` and `dark` each contain 20 semantic tokens (40 total token values per response).
 
+Image-slot override arrays (`overridePalette`) are a UI-only workflow right now
+and are not part of the public API contract.
+
 **Adjustment aliases:**
 
 - Shared: `saturationLevel|saturation|sat`, `contrastLevel|contrast|con`, `brightnessLevel|brightness|bri`

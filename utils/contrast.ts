@@ -88,10 +88,21 @@ export function selectForeground(
     L = Math.max(0.03, Math.min(0.97, L + step));
   }
 
-  // Final fallback: near-white or near-black with tint (never pure achromatic)
-  return goLight
+  // Final fallback: near-white or near-black with tint first.
+  // If even that cannot hit targetRatio, use pure achromatic white/black as
+  // a guaranteed contrast fallback.
+  const tintedExtreme = goLight
     ? clampToSRGBGamut({ L: 0.97, C: tintC, H: bg.H })
     : clampToSRGBGamut({ L: 0.05, C: tintC, H: bg.H });
+  if (contrastRatio(toHex(tintedExtreme), bgHex) >= targetRatio) {
+    return tintedExtreme;
+  }
+
+  const pureLight = { L: 0.999, C: 0, H: bg.H };
+  const pureDark = { L: 0.001, C: 0, H: bg.H };
+  const lightRatio = contrastRatio(toHex(pureLight), bgHex);
+  const darkRatio = contrastRatio(toHex(pureDark), bgHex);
+  return lightRatio >= darkRatio ? pureLight : pureDark;
 }
 
 export function selectForegroundHex(bgHex: string): string {
@@ -107,20 +118,43 @@ export function adjustForContrast(
   minRatio: number = 4.5
 ): OklchColor {
   const bgHex = toHex(bg);
-  let adjusted = { ...fg };
-  
-  // Determine direction: if fg is lighter than bg, go lighter; else darker
-  const direction = fg.L > bg.L ? 1 : -1;
-  
-  // Iteratively adjust lightness until contrast is met
-  while (contrastRatio(toHex(adjusted), bgHex) < minRatio) {
-    adjusted.L += direction * 0.02;
-    
-    // Clamp to valid range
-    if (adjusted.L <= 0.05 || adjusted.L >= 0.95) break;
+  const step = 0.02;
+  const maxSteps = 48;
+
+  const search = (direction: 1 | -1) => {
+    let candidate = { ...fg };
+    let best = clampToSRGBGamut(candidate);
+    let bestRatio = contrastRatio(toHex(best), bgHex);
+
+    for (let i = 0; i < maxSteps; i++) {
+      candidate.L = Math.max(0.001, Math.min(0.999, candidate.L + direction * step));
+      const clamped = clampToSRGBGamut(candidate);
+      const ratio = contrastRatio(toHex(clamped), bgHex);
+      if (ratio > bestRatio) {
+        best = clamped;
+        bestRatio = ratio;
+      }
+      if (ratio >= minRatio) {
+        return { color: clamped, ratio, met: true };
+      }
+      if (clamped.L <= 0.001 || clamped.L >= 0.999) break;
+    }
+
+    return { color: best, ratio: bestRatio, met: false };
+  };
+
+  const up = search(1);
+  const down = search(-1);
+  const base = clampToSRGBGamut(fg);
+  const deltaUp = Math.abs(up.color.L - base.L);
+  const deltaDown = Math.abs(down.color.L - base.L);
+
+  if (up.met && down.met) {
+    return deltaUp <= deltaDown ? up.color : down.color;
   }
-  
-  return clampToSRGBGamut(adjusted);
+  if (up.met) return up.color;
+  if (down.met) return down.color;
+  return up.ratio >= down.ratio ? up.color : down.color;
 }
 
 // --- Contrast Headroom ---

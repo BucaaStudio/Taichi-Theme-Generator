@@ -226,8 +226,10 @@ const PreviewSection: React.FC<PreviewProps> = ({
   );
   const interactiveAccent = readableOn(themeTokens.primary, themeTokens.card, cardReadableText, 3);
   const previewLabelColor = readableOn(themeTokens.accent, themeTokens.card, cardReadableText, 3);
-  const headingAccent = readableOn(themeTokens.primary, themeTokens.bg, cardReadableText, 3);
-  const useGradientHeading = options.gradients && contrastRatio(themeTokens.primary, themeTokens.bg) >= 3;
+  // Keep headline color tied directly to semantic primary token.
+  // Visibility is enforced upstream in the generator guardrails.
+  const headingAccent = themeTokens.primary;
+  const useGradientHeading = options.gradients;
   const toggleOnBg = interactiveAccent;
   const toggleOffBg = alphaHex(cardReadableText, 0.28);
   const toggleOnKnob = selectForegroundHex(toggleOnBg);

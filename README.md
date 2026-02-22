@@ -33,6 +33,9 @@
 - **Image Color Extraction** - Extract 10 colors from an image mapped to all
   palette roles (bg, card, text, textMuted, textOnColor, primary, secondary,
   accent, good, bad) with dark-mode-aware sorting
+  - Checked import slots are preserved as exact token values on the source side
+    (light-first => light, dark-first => dark)
+  - The remaining 10 tokens are derived from those imported 10 for coherence
 - **History Management** - FIFO history with up to 20 saved themes
 - **Keyboard Shortcuts**
   - `Space` - Generate new theme
@@ -122,6 +125,8 @@ npm run preview
 4. Toggle checkboxes to choose which slots to import (unchecked slots
    regenerate)
 5. Click **Import Selection** to apply
+   - Imported slots remain exact in the source theme
+   - The remaining tokens are derived from the imported foundation
 
 ### Color Palette Strip
 

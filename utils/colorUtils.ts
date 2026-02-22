@@ -179,12 +179,14 @@ export function applyAdjustments(
       ['primaryFg', 'primary'], ['secondaryFg', 'secondary'], ['accentFg', 'accent'],
       ['goodFg', 'good'], ['warnFg', 'warn'], ['badFg', 'bad'],
     ];
-    for (const [fgKey, bgKey] of fgPairs) {
-      if (contrastRatio(adjusted[fgKey], adjusted[bgKey]) < fgFloor) {
-        const bg = toOklch(adjusted[bgKey]);
-        adjusted[fgKey] = toHex(selectForeground(bg, true, fgTargetRatio));
+    const enforceForegroundPairs = () => {
+      for (const [fgKey, bgKey] of fgPairs) {
+        if (contrastRatio(adjusted[fgKey], adjusted[bgKey]) < fgFloor) {
+          const bg = toOklch(adjusted[bgKey]);
+          adjusted[fgKey] = toHex(selectForeground(bg, true, fgTargetRatio));
+        }
       }
-    }
+    };
 
     // --- Color Separation Enforcement ---
     // Ensure no two tokens share the exact same hex, and that structurally
@@ -250,45 +252,52 @@ export function applyAdjustments(
     // --- Readability Guardrails ---
     // Keep long-form text readable regardless of extreme slider settings.
     // Enforce contrast for text and muted text against all core surfaces.
+    const getWorstSurface = (
+      fgHex: string,
+      bgKeys: Array<'bg' | 'card' | 'card2'>
+    ): { key: 'bg' | 'card' | 'card2'; ratio: number } => {
+      let worstKey: 'bg' | 'card' | 'card2' = bgKeys[0];
+      let worstRatio = Number.POSITIVE_INFINITY;
+      for (const bgKey of bgKeys) {
+        const ratio = contrastRatio(fgHex, adjusted[bgKey]);
+        if (ratio < worstRatio) {
+          worstRatio = ratio;
+          worstKey = bgKey;
+        }
+      }
+      return { key: worstKey, ratio: worstRatio };
+    };
+
     const enforceSurfaceContrast = (
       fgKey: 'text' | 'textMuted',
       bgKeys: Array<'bg' | 'card' | 'card2'>,
       minRatio: number
     ) => {
-      const getWorstSurface = (fgHex: string): { key: 'bg' | 'card' | 'card2'; ratio: number } => {
-        let worstKey: 'bg' | 'card' | 'card2' = bgKeys[0];
-        let worstRatio = Number.POSITIVE_INFINITY;
-        for (const bgKey of bgKeys) {
-          const ratio = contrastRatio(fgHex, adjusted[bgKey]);
-          if (ratio < worstRatio) {
-            worstRatio = ratio;
-            worstKey = bgKey;
-          }
-        }
-        return { key: worstKey, ratio: worstRatio };
-      };
-
       let fg = toOklch(adjusted[fgKey]);
       for (let i = 0; i < 10; i++) {
         const fgHex = toHex(fg);
-        const { key: worstKey, ratio: worstRatio } = getWorstSurface(fgHex);
+        const { key: worstKey, ratio: worstRatio } = getWorstSurface(fgHex, bgKeys);
         if (worstRatio >= minRatio) break;
         fg = adjustForContrast(fg, toOklch(adjusted[worstKey]), minRatio);
       }
       let fgHex = toHex(fg);
-      const post = getWorstSurface(fgHex);
+      const post = getWorstSurface(fgHex, bgKeys);
       if (post.ratio < minRatio) {
+        // Achromatic extremes are still needed as a final shared-surfaces rescue
+        // when no tinted foreground can satisfy all surfaces simultaneously.
+        const achromaticLight = toHex({ L: 0.999, C: 0, H: toOklch(adjusted.bg).H });
+        const achromaticDark = toHex({ L: 0.001, C: 0, H: toOklch(adjusted.bg).H });
         const candidates = [
           toHex(selectForeground(toOklch(adjusted.bg), true, minRatio)),
           toHex(selectForeground(toOklch(adjusted.card), true, minRatio)),
           toHex(selectForeground(toOklch(adjusted.card2), true, minRatio)),
-          '#111111',
-          '#f5f5f5',
+          achromaticLight,
+          achromaticDark,
         ];
         let best = fgHex;
         let bestWorst = post.ratio;
         for (const candidate of candidates) {
-          const worst = getWorstSurface(candidate).ratio;
+          const worst = getWorstSurface(candidate, bgKeys).ratio;
           if (worst > bestWorst) {
             best = candidate;
             bestWorst = worst;
@@ -305,6 +314,52 @@ export function applyAdjustments(
 
     enforceSurfaceContrast('text', ['bg', 'card', 'card2'], textMinRatio);
     enforceSurfaceContrast('textMuted', ['bg', 'card', 'card2'], mutedMinRatio);
+
+    // Keep semantic chromatic tokens visible on core surfaces at brightness
+    // extremes. Without this, bright light themes and very dark themes can
+    // collapse accent/text contrast (e.g. primary vs bg).
+    const chromaMinBase = isDarkTheme ? 2.9 : 2.8;
+    // Keep semantic colors visible even when user reduces contrast heavily.
+    // Negative contrast should flatten surfaces, but not erase brand/status color identity.
+    const chromaVisibilityFloor = isDarkTheme ? 2.5 : 2.6;
+    const chromaMinRatio = contrastForReadability >= 0
+      ? chromaMinBase
+      : Math.max(chromaVisibilityFloor, chromaMinBase + contrastForReadability * 0.08);
+
+    const enforceChromaticSurfaceContrast = (
+      key: 'primary' | 'secondary' | 'accent' | 'good' | 'warn' | 'bad' | 'ring',
+      minRatio: number
+    ) => {
+      let color = toOklch(adjusted[key]);
+      const surfaces: Array<'bg' | 'card' | 'card2'> = ['bg', 'card', 'card2'];
+      for (let i = 0; i < 12; i++) {
+        const hex = toHex(color);
+        const { key: worstKey, ratio: worstRatio } = getWorstSurface(hex, surfaces);
+        if (worstRatio >= minRatio) break;
+        color = adjustForContrast(color, toOklch(adjusted[worstKey]), minRatio);
+      }
+      adjusted[key] = toHex(color);
+    };
+
+    enforceChromaticSurfaceContrast('primary', chromaMinRatio);
+    enforceChromaticSurfaceContrast('secondary', chromaMinRatio);
+    enforceChromaticSurfaceContrast('accent', chromaMinRatio);
+    enforceChromaticSurfaceContrast('good', chromaMinRatio);
+    enforceChromaticSurfaceContrast('warn', chromaMinRatio);
+    enforceChromaticSurfaceContrast('bad', chromaMinRatio);
+    enforceChromaticSurfaceContrast('ring', Math.max(2, chromaMinRatio - 0.3));
+
+    // Recompute on-color text after chromatic adjustments.
+    const deriveOnColorFg = (bgKey: 'primary' | 'secondary' | 'accent' | 'good' | 'warn' | 'bad'): string =>
+      toHex(selectForeground(toOklch(adjusted[bgKey]), true, fgTargetRatio));
+    adjusted.textOnColor = deriveOnColorFg('primary');
+    adjusted.primaryFg = deriveOnColorFg('primary');
+    adjusted.secondaryFg = deriveOnColorFg('secondary');
+    adjusted.accentFg = deriveOnColorFg('accent');
+    adjusted.goodFg = deriveOnColorFg('good');
+    adjusted.warnFg = deriveOnColorFg('warn');
+    adjusted.badFg = deriveOnColorFg('bad');
+    enforceForegroundPairs();
 
     // Preserve visual hierarchy after readability correction.
     ensureSeparation('textMuted', 'text', 0.06);
@@ -386,6 +441,101 @@ export function applyAdjustments(
 
 interface ParityOptions {
   strength?: number;
+}
+
+const IMAGE_SLOT_KEYS = [
+  'bg',
+  'card',
+  'text',
+  'textMuted',
+  'textOnColor',
+  'primary',
+  'secondary',
+  'accent',
+  'good',
+  'bad',
+] as const;
+
+type ImageSlotKey = typeof IMAGE_SLOT_KEYS[number];
+
+function parseImageOverrides(overridePalette?: string[]): Partial<Record<ImageSlotKey, string>> {
+  if (!overridePalette || overridePalette.length !== IMAGE_SLOT_KEYS.length) return {};
+  const mapped: Partial<Record<ImageSlotKey, string>> = {};
+  for (let i = 0; i < IMAGE_SLOT_KEYS.length; i++) {
+    const raw = (overridePalette[i] || '').trim();
+    if (!raw) continue;
+    const parsed = parseToHex(raw);
+    if (parsed) mapped[IMAGE_SLOT_KEYS[i]] = parsed;
+  }
+  return mapped;
+}
+
+function hueMidpoint(a: number, b: number): number {
+  const delta = ((((b - a) % 360) + 540) % 360) - 180;
+  return (a + delta * 0.5 + 360) % 360;
+}
+
+function deriveThemeFromImportedSlots(
+  theme: ThemeTokens,
+  importedSlots: Partial<Record<ImageSlotKey, string>>
+): ThemeTokens {
+  const next: ThemeTokens = { ...theme };
+
+  // 10 direct slots from image import stay exact.
+  for (const key of IMAGE_SLOT_KEYS) {
+    if (importedSlots[key]) {
+      next[key] = importedSlots[key]!;
+    }
+  }
+
+  // Remaining 10 tokens are derived from the imported foundation.
+  const bg = toOklch(next.bg);
+  const card = toOklch(next.card);
+  const primary = toOklch(next.primary);
+  const good = toOklch(next.good);
+  const bad = toOklch(next.bad);
+
+  const neutralDir = bg.L > 0.5 ? -1 : 1;
+  const cardDelta = Math.abs(card.L - bg.L);
+  const card2Dir = cardDelta < 0.005 ? neutralDir : (card.L >= bg.L ? 1 : -1);
+  const card2Step = Math.max(0.02, Math.min(0.06, Math.max(cardDelta * 0.75, 0.03)));
+  next.card2 = toHex(clampToSRGBGamut({
+    L: Math.max(0.03, Math.min(0.97, card.L + card2Dir * card2Step)),
+    C: card.C,
+    H: card.H,
+  }));
+
+  next.border = toHex(clampToSRGBGamut({
+    L: Math.max(0.03, Math.min(0.97, bg.L + neutralDir * 0.08)),
+    C: Math.max(0.004, Math.max(bg.C, card.C) * 0.45),
+    H: card.H,
+  }));
+
+  next.ring = toHex(clampToSRGBGamut({
+    L: Math.max(0.08, Math.min(0.92, primary.L + (bg.L > 0.5 ? -0.08 : 0.08))),
+    C: Math.max(0.02, primary.C * 0.85),
+    H: primary.H,
+  }));
+
+  next.warn = toHex(clampToSRGBGamut({
+    L: Math.max(0.08, Math.min(0.92, (good.L + bad.L) / 2 + (bg.L > 0.5 ? 0.05 : 0.08))),
+    C: Math.max(0.02, (good.C + bad.C) * 0.45),
+    H: hueMidpoint(good.H, bad.H),
+  }));
+
+  next.primaryFg = selectForegroundHex(next.primary);
+  next.secondaryFg = selectForegroundHex(next.secondary);
+  next.accentFg = selectForegroundHex(next.accent);
+  next.goodFg = selectForegroundHex(next.good);
+  next.warnFg = selectForegroundHex(next.warn);
+  next.badFg = selectForegroundHex(next.bad);
+
+  // Keep imported textOnColor exact when provided; otherwise derive from primary.
+  if (!importedSlots.textOnColor) {
+    next.textOnColor = next.primaryFg;
+  }
+
+  return next;
 }
 
 function maxGamutChromaAt(lightness: number, hue: number): number {
@@ -514,6 +664,19 @@ export function generateTheme(
     light = enforceCompanionParity(dark, light, { strength: parityStrength });
   } else {
     dark = enforceCompanionParity(light, dark, { strength: parityStrength });
+  }
+
+  // Image imports: keep checked 10 slots exact on the source side.
+  // The other 10 tokens are derived from those imported slots.
+  const importedSlots = parseImageOverrides(overridePalette);
+  if (Object.keys(importedSlots).length > 0) {
+    if (darkFirst) {
+      dark = deriveThemeFromImportedSlots(dark, importedSlots);
+      light = enforceCompanionParity(dark, light, { strength: parityStrength });
+    } else {
+      light = deriveThemeFromImportedSlots(light, importedSlots);
+      dark = enforceCompanionParity(light, dark, { strength: parityStrength });
+    }
   }
 
   return {

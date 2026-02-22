@@ -151,6 +151,8 @@ Each theme object contains 20 semantic tokens (40 token values total per respons
 - Brightness, contrast, and saturation are applied together in one coherent adjustment stage.
 - Readability guardrails enforce legibility for `text` and `textMuted` against `bg`, `card`, and `card2`.
 - A final parity pass keeps semantic chromatic tokens aligned between light and dark modes.
+- Image palette import overrides are currently a UI workflow; the public API does
+  not accept `overridePalette`/image slot arrays.
 
 #### Style Options (`style`)
 

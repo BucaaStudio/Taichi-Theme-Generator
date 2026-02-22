@@ -90,6 +90,7 @@ const App: React.FC = () => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [imageOverridePalette, setImageOverridePalette] = useState<string[] | null>(null);
   
   const [designOptions, setDesignOptions] = useState<DesignOptions>({
     borderWidth: 1,
@@ -196,6 +197,7 @@ const App: React.FC = () => {
     const urlMode = params.get('mode') as GenerationMode;
     
     if (urlSeed && urlMode) {
+      setMode(urlMode);
       // Parse Design Options from URL
       const sat = params.get('sat') ? parseInt(params.get('sat')!) : undefined;
       const con = params.get('con') ? parseInt(params.get('con')!) : undefined;
@@ -255,6 +257,7 @@ const App: React.FC = () => {
         setHistory(parsed);
         setHistoryIndex(parsed.length - 1);
         setCurrentTheme(parsed[parsed.length - 1]);
+        setMode(parsed[parsed.length - 1].mode);
         return;
       }
     }
@@ -361,8 +364,11 @@ const App: React.FC = () => {
       darkBri = bLevel;
     }
 
+    const effectiveOverridePalette =
+      overridePalette ?? (genMode === 'image' ? (imageOverridePalette ?? undefined) : undefined);
+
     const { light, dark, seed: newSeed } = generateTheme(
-      genMode, seed, lightSat, lightCon, lightBri, overridePalette, designOptions.darkFirst,
+      genMode, seed, lightSat, lightCon, lightBri, effectiveOverridePalette, designOptions.darkFirst,
       darkSat, darkCon, darkBri
     );
     
@@ -432,7 +438,7 @@ const App: React.FC = () => {
       designOptions.darkFirst, designOptions.splitAdjustments,
       designOptions.lightBrightnessLevel, designOptions.lightContrastLevel, designOptions.lightSaturationLevel,
       designOptions.darkBrightnessLevel, designOptions.darkContrastLevel, designOptions.darkSaturationLevel,
-      lockedColors, currentTheme]);
+      lockedColors, currentTheme, imageOverridePalette]);
 
   // Update a single token (manual edit)
   const handleTokenUpdate = useCallback((side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => {
@@ -530,10 +536,18 @@ const App: React.FC = () => {
 
 
   const handleImageConfirm = (palette: string[]) => {
-    setMode('image');
-    generateNewTheme('analogous', undefined, undefined, undefined, undefined, palette); 
+    setImageOverridePalette(palette);
+    handleModeChange('image');
+    generateNewTheme('image', undefined, undefined, undefined, undefined, palette); 
     setShowImagePickerModal(false);
   };
+
+  const handleModeChange = useCallback((nextMode: GenerationMode) => {
+    setMode(nextMode);
+    if (nextMode !== 'image') {
+      setImageOverridePalette(null);
+    }
+  }, []);
 
   const exportTheme = () => {
      if (!currentTheme) return;
@@ -723,7 +737,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-2 shrink-0">
               <select 
                 value={mode} 
-                onChange={(e) => setMode(e.target.value as GenerationMode)}
+                onChange={(e) => handleModeChange(e.target.value as GenerationMode)}
                 className="text-sm rounded-md px-2 py-1.5 focus:outline-none border cursor-pointer"
                 style={{ ...inputStyle, outlineColor: shellTheme.primary }}
               >
@@ -736,6 +750,7 @@ const App: React.FC = () => {
                 <option value="tetradic">Tetradic</option>
                 <option value="compound">Compound</option>
                 <option value="triadic-split">Triadic Split</option>
+                {(mode === 'image' || imageOverridePalette) && <option value="image">Image</option>}
               </select>
 
               <select 
@@ -837,7 +852,7 @@ const App: React.FC = () => {
               <label className="text-xs font-bold uppercase tracking-wider opacity-70">Mode</label>
               <select 
                 value={mode} 
-                onChange={(e) => setMode(e.target.value as GenerationMode)}
+                onChange={(e) => handleModeChange(e.target.value as GenerationMode)}
                 className="w-full text-sm rounded-md px-3 py-2 focus:outline-none border cursor-pointer"
                 style={{ ...inputStyle, outlineColor: shellTheme.primary }}
               >
@@ -850,6 +865,7 @@ const App: React.FC = () => {
                 <option value="tetradic">Tetradic</option>
                 <option value="compound">Compound</option>
                 <option value="triadic-split">Triadic Split</option>
+                {(mode === 'image' || imageOverridePalette) && <option value="image">Image</option>}
               </select>
             </div>
 
