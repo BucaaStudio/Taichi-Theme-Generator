@@ -1,6 +1,6 @@
 # API Development Summary
 
-**Last Updated:** December 28, 2025
+**Last Updated:** February 22, 2026
 
 ## Overview
 
@@ -17,11 +17,24 @@ simultaneously, ensuring visual parity for modern UI development.
 
 ### 2. Advanced Generation Parameters
 
-- **Saturation (-5 to 5):** Control vibrancy from grayscale to vivid.
-- **Contrast (-5 to 5):** Fine-tune readability and depth.
-- **Brightness (-5 to 5):** Global lightness shift for the foundation.
+- **Saturation (-5 to 5):** Control vibrancy from muted to vivid.
+- **Contrast (-5 to 5):** Control separation/flatness across tokens.
+- **Brightness (-5 to 5):** Global lightness shift.
+- **Split Controls:** Optional independent `light*` / `dark*` levels.
+- **Dark First:** Optional dark-first generation with companion parity.
 
-### 3. Harmony Modes
+### 3. Unified Adjustment Pipeline
+
+- Base palettes are generated at neutral levels.
+- Brightness, contrast, and saturation are then applied together in one coherent adjustment stage.
+- A parity pass aligns chromatic token identity between light/dark modes.
+
+### 4. Readability Guardrails
+
+- Text readability is enforced on `bg`, `card`, and `card2` after all adjustments.
+- Guardrails also ensure token separation (e.g., border vs bg/card, text vs textMuted).
+
+### 5. Harmony Modes
 
 9 color harmony styles supported:
 
@@ -33,7 +46,7 @@ simultaneously, ensuring visual parity for modern UI development.
 ### `/api/generate-theme` (POST)
 
 - Generates balanced Light and Dark themes using color harmony theory.
-- Returns 20 semantic tokens per theme (bg, card, primary, status colors, etc.).
+- Returns 20 semantic tokens per theme (40 total token values per response).
 - Includes metadata with philosophical context.
 
 ### `/api/export-theme` (POST)
@@ -45,7 +58,7 @@ simultaneously, ensuring visual parity for modern UI development.
 
 ```
 api/
-├── generate-theme.ts   # Self-contained theme generator
+├── generate-theme.ts   # API handler for theme generation
 ├── export-theme.ts     # Multi-format exporter
 └── README.md           # Local dev guide
 ```
@@ -55,7 +68,7 @@ api/
 ```bash
 curl -X POST https://taichi.bucaastudio.com/api/generate-theme \
   -H "Content-Type: application/json" \
-  -d '{"style":"analogous","baseColor":"#3B82F6","saturation":2}'
+  -d '{"style":"analogous","baseColor":"#3B82F6","saturationLevel":2,"contrastLevel":1,"brightnessLevel":-1}'
 ```
 
 ## Future Roadmap

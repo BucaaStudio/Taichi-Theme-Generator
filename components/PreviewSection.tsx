@@ -6,6 +6,7 @@ import {
   Lock
 } from 'lucide-react';
 import { DesignOptions, ThemeTokens } from '../types';
+import { contrastRatio, selectForegroundHex } from '../utils/contrast';
 
 type WorkspaceTab = 'overview' | 'tokens' | 'delivery';
 type AdjustmentOptionKey =
@@ -44,14 +45,16 @@ const ControlledSlider: React.FC<{
   label: string;
   value: number;
   onChange: (value: number) => void;
+  accentColor: string;
+  labelColor: string;
   min?: number;
   max?: number;
-}> = ({ rClass, label, value, onChange, min = -5, max = 5 }) => {
+}> = ({ rClass, label, value, onChange, accentColor, labelColor, min = -5, max = 5 }) => {
   return (
     <div className="space-y-2">
       <div className="flex justify-between">
-        <label className="text-sm font-medium text-t-text">{label}</label>
-        <span className="text-xs font-mono text-t-primary font-bold">
+        <label className="text-sm font-medium" style={{ color: labelColor }}>{label}</label>
+        <span className="text-xs font-mono font-bold" style={{ color: accentColor }}>
           {value > 0 ? `+${value}` : value}
         </span>
       </div>
@@ -61,7 +64,8 @@ const ControlledSlider: React.FC<{
         max={max}
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value))}
-        className={`w-full h-1.5 ${rClass} cursor-pointer text-t-primary transition-colors`}
+        className={`w-full h-1.5 ${rClass} cursor-pointer transition-colors`}
+        style={{ color: accentColor }}
       />
     </div>
   );
@@ -191,10 +195,47 @@ const PreviewSection: React.FC<PreviewProps> = ({
     ? 'bg-t-secondary bg-[linear-gradient(to_bottom,color-mix(in_oklab,var(--secondary),white_18%),color-mix(in_oklab,var(--secondary),black_10%))]'
     : 'bg-t-secondary';
 
+  const alphaHex = (hex: string, alpha: number) => {
+    const normalized = Math.max(0, Math.min(1, alpha));
+    const a = Math.round(normalized * 255).toString(16).padStart(2, '0');
+    return /^#([0-9a-f]{6})$/i.test(hex) ? `${hex}${a}` : hex;
+  };
+
+  const readableOn = (
+    preferred: string,
+    background: string,
+    fallback: string,
+    minRatio: number
+  ) => {
+    if (contrastRatio(preferred, background) >= minRatio) return preferred;
+    if (contrastRatio(fallback, background) >= minRatio) return fallback;
+    return selectForegroundHex(background);
+  };
+
+  const cardReadableText = readableOn(
+    themeTokens.text,
+    themeTokens.card,
+    selectForegroundHex(themeTokens.card),
+    4.2
+  );
+  const cardReadableMuted = readableOn(
+    themeTokens.textMuted,
+    themeTokens.card,
+    cardReadableText,
+    2.6
+  );
+  const interactiveAccent = readableOn(themeTokens.primary, themeTokens.card, cardReadableText, 3);
+  const previewLabelColor = readableOn(themeTokens.accent, themeTokens.card, cardReadableText, 3);
+  const headingAccent = readableOn(themeTokens.primary, themeTokens.bg, cardReadableText, 3);
+  const useGradientHeading = options.gradients && contrastRatio(themeTokens.primary, themeTokens.bg) >= 3;
+  const toggleOnBg = interactiveAccent;
+  const toggleOffBg = alphaHex(cardReadableText, 0.28);
+  const toggleOnKnob = selectForegroundHex(toggleOnBg);
+  const toggleOffKnob = readableOn(themeTokens.bg, themeTokens.card, selectForegroundHex(themeTokens.card), 2);
+
   // Hero overlay uses the theme's bg color so it stays consistent with
   // brightness/contrast adjustments (instead of hardcoded black/white)
   const heroOverlayOpacity = themeName === 'Dark' ? 'B3' : 'BF'; // B3=70%, BF=75%
-  const badgeAccentClass = themeName === 'Dark' ? 'text-t-accent' : 'text-t-secondary';
   const hoverLiftClass = 'transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_35px_rgba(0,0,0,0.16)]';
   const hoverPanelClass = 'transition-colors duration-200 hover:bg-t-bg/80';
   const hoverCardClass = 'transition-colors duration-200 hover:bg-t-card2';
@@ -341,8 +382,8 @@ const PreviewSection: React.FC<PreviewProps> = ({
         {/* Solid Color Overlay */}
         <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: `${themeTokens.bg}${heroOverlayOpacity}` }} />
 
-        <div className={`absolute left-4 top-4 z-10 inline-flex items-center justify-center ${rClass} ${bClass} px-3 py-1.5 text-[11px] font-semibold backdrop-blur leading-none`} style={{ backgroundColor: themeTokens.card, color: themeTokens.text }}>
-          <span className={badgeAccentClass}>{themeName} preview</span>
+        <div className={`absolute left-4 top-4 z-10 inline-flex items-center justify-center ${rClass} ${bClass} px-3 py-1.5 text-[11px] font-semibold backdrop-blur leading-none`} style={{ backgroundColor: themeTokens.card, color: cardReadableText }}>
+          <span style={{ color: previewLabelColor }}>{themeName} preview</span>
         </div>
 
         {/* Content */}
@@ -350,13 +391,16 @@ const PreviewSection: React.FC<PreviewProps> = ({
           <h1 className="text-4xl md:text-5xl lg:text-7xl font-black tracking-tight text-left leading-tight">
             <span className="text-t-text block">Taichi</span>
             <span className="block">
-              <span className={`bg-clip-text text-transparent ${options.gradients ? 'bg-t-primary bg-[linear-gradient(to_bottom,color-mix(in_oklab,var(--primary),white_18%),color-mix(in_oklab,var(--primary),black_10%))]' : 'bg-t-primary'}`}>
+              <span
+                className={useGradientHeading ? 'bg-clip-text text-transparent bg-t-primary bg-[linear-gradient(to_bottom,color-mix(in_oklab,var(--primary),white_18%),color-mix(in_oklab,var(--primary),black_10%))]' : ''}
+                style={!useGradientHeading ? { color: headingAccent } : undefined}
+              >
                 Theme Generator
               </span>
             </span>
           </h1>
           <p className="text-lg text-t-textMuted max-w-xl text-left pt-4">
-            Generate balanced color palettes using the <strong className="text-t-primary">OKLCH color space</strong>, automatically create matching light and dark themes, and tune{' '}
+            Generate balanced color palettes using the <strong style={{ color: interactiveAccent }}>OKLCH color space</strong>, automatically create matching light and dark themes, and tune{' '}
             <span className={`text-t-bg ${neutralChipClass}`}>background</span>,{' '}
             <span className={`text-t-card ${neutralChipClass}`}>surface</span>,{' '}
             <span className="text-t-text font-semibold">text</span>,{' '}
@@ -423,9 +467,9 @@ const PreviewSection: React.FC<PreviewProps> = ({
                   </button>
                 </div>
                 
-                <div className={`p-4 ${rClass} ${bClass} bg-t-primary/10 border-t-primary/30 transition-colors hover:bg-t-primary/15`}>
-                  <p className="text-sm text-t-primary flex items-start gap-2">
-                    <Sparkles size={16} className="shrink-0 mt-0.5" />
+                <div className={`p-4 ${rClass} ${bClass} bg-t-card2/80 border-themed transition-colors hover:bg-t-card2`}>
+                  <p className="text-sm flex items-start gap-2" style={{ color: cardReadableText }}>
+                    <Sparkles size={16} className="shrink-0 mt-0.5" style={{ color: interactiveAccent }} />
                     <span><strong>Pro tip:</strong> Lock colors or options you want to keep, then generate to only change the unlocked ones.</span>
                   </p>
                 </div>
@@ -504,22 +548,28 @@ const PreviewSection: React.FC<PreviewProps> = ({
                       label={options.splitAdjustments ? `Saturation (${themeName})` : 'Saturation'}
                       value={options[saturationKey]}
                       onChange={(v) => onUpdateOption(saturationKey, v)}
+                      accentColor={interactiveAccent}
+                      labelColor={cardReadableText}
                     />
                     <ControlledSlider 
                       rClass={rClass}
                       label={options.splitAdjustments ? `Brightness (${themeName})` : 'Brightness'}
                       value={options[brightnessKey]}
                       onChange={(v) => onUpdateOption(brightnessKey, v)}
+                      accentColor={interactiveAccent}
+                      labelColor={cardReadableText}
                     />
                     <ControlledSlider 
                       rClass={rClass}
                       label={options.splitAdjustments ? `Contrast (${themeName})` : 'Contrast'}
                       value={options[contrastKey]}
                       onChange={(v) => onUpdateOption(contrastKey, v)}
+                      accentColor={interactiveAccent}
+                      labelColor={cardReadableText}
                     />
                   </div>
                 ) : (
-                  <p className="text-sm text-t-textMuted italic">Controls not available in this view</p>
+                  <p className="text-sm italic" style={{ color: cardReadableMuted }}>Controls not available in this view</p>
                 )}
                 
                 <div className="flex flex-wrap gap-6 pt-4 border-t border-themed">
@@ -530,13 +580,13 @@ const PreviewSection: React.FC<PreviewProps> = ({
                   >
                     <span
                       className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200"
-                      style={{ backgroundColor: options.darkFirst ? themeTokens.primary : `${themeTokens.text}30` }}
+                      style={{ backgroundColor: options.darkFirst ? toggleOnBg : toggleOffBg }}
                     >
-                      <span className={`inline-block h-4 w-4 rounded-full shadow transition-transform duration-200 ${options.darkFirst ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: options.darkFirst ? themeTokens.primaryFg : themeTokens.bg }} />
+                      <span className={`inline-block h-4 w-4 rounded-full shadow transition-transform duration-200 ${options.darkFirst ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: options.darkFirst ? toggleOnKnob : toggleOffKnob }} />
                     </span>
                     <div className="text-left">
-                      <span className="text-sm font-medium text-t-text group-hover:text-t-primary transition-colors">Dark First</span>
-                      <p className="text-xs text-t-textMuted">Generate dark theme as primary</p>
+                      <span className="text-sm font-medium transition-colors" style={{ color: cardReadableText }}>Dark First</span>
+                      <p className="text-xs" style={{ color: cardReadableMuted }}>Generate dark theme as primary</p>
                     </div>
                   </button>
 
@@ -547,13 +597,13 @@ const PreviewSection: React.FC<PreviewProps> = ({
                   >
                     <span
                       className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200"
-                      style={{ backgroundColor: options.gradients ? themeTokens.primary : `${themeTokens.text}30` }}
+                      style={{ backgroundColor: options.gradients ? toggleOnBg : toggleOffBg }}
                     >
-                      <span className={`inline-block h-4 w-4 rounded-full shadow transition-transform duration-200 ${options.gradients ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: options.gradients ? themeTokens.primaryFg : themeTokens.bg }} />
+                      <span className={`inline-block h-4 w-4 rounded-full shadow transition-transform duration-200 ${options.gradients ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: options.gradients ? toggleOnKnob : toggleOffKnob }} />
                     </span>
                     <div className="text-left">
-                      <span className="text-sm font-medium text-t-text group-hover:text-t-primary transition-colors">Gradients</span>
-                      <p className="text-xs text-t-textMuted">Apply gradients to colored elements</p>
+                      <span className="text-sm font-medium transition-colors" style={{ color: cardReadableText }}>Gradients</span>
+                      <p className="text-xs" style={{ color: cardReadableMuted }}>Apply gradients to colored elements</p>
                     </div>
                   </button>
 
@@ -564,13 +614,13 @@ const PreviewSection: React.FC<PreviewProps> = ({
                   >
                     <span
                       className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200"
-                      style={{ backgroundColor: options.splitAdjustments ? themeTokens.primary : `${themeTokens.text}30` }}
+                      style={{ backgroundColor: options.splitAdjustments ? toggleOnBg : toggleOffBg }}
                     >
-                      <span className={`inline-block h-4 w-4 rounded-full shadow transition-transform duration-200 ${options.splitAdjustments ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: options.splitAdjustments ? themeTokens.primaryFg : themeTokens.bg }} />
+                      <span className={`inline-block h-4 w-4 rounded-full shadow transition-transform duration-200 ${options.splitAdjustments ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} style={{ backgroundColor: options.splitAdjustments ? toggleOnKnob : toggleOffKnob }} />
                     </span>
                     <div className="text-left">
-                      <span className="text-sm font-medium text-t-text group-hover:text-t-primary transition-colors">Split Light / Dark</span>
-                      <p className="text-xs text-t-textMuted">Use independent adjustments per mode</p>
+                      <span className="text-sm font-medium transition-colors" style={{ color: cardReadableText }}>Split Light / Dark</span>
+                      <p className="text-xs" style={{ color: cardReadableMuted }}>Use independent adjustments per mode</p>
                     </div>
                   </button>
                 </div>

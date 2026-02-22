@@ -398,6 +398,65 @@ function constructStatusColors(
 
 // --- Dark Mode Derivation ---
 
+interface CompanionChromaOptions {
+  minChroma?: number;
+  relativeBias?: number;
+  maxRelative?: number;
+  relativeWeight?: number;
+  maxChangeRatio?: number;
+}
+
+function maxGamutChromaAt(lightness: number, hue: number): number {
+  const safeL = Math.max(0.001, Math.min(0.999, lightness));
+  // Probe with high chroma and let gamut mapping resolve the max reachable value.
+  return clampToSRGBGamut({ L: safeL, C: 0.4, H: hue }).C;
+}
+
+function remapCompanionChroma(
+  source: OklchColor,
+  targetL: number,
+  options: CompanionChromaOptions = {}
+): number {
+  const sourceMax = Math.max(0.001, maxGamutChromaAt(source.L, source.H));
+  const targetMax = Math.max(0.001, maxGamutChromaAt(targetL, source.H));
+  const sourceRelative = source.C / sourceMax;
+  const relative = Math.max(
+    0,
+    Math.min(options.maxRelative ?? 1, sourceRelative * (options.relativeBias ?? 1))
+  );
+  const relativeTarget = targetMax * relative;
+  const absoluteTarget = Math.min(targetMax, source.C);
+  const relativeWeight = Math.max(0, Math.min(1, options.relativeWeight ?? 0.58));
+
+  // Blend two strategies:
+  // 1) relative gamut occupancy (mode consistency)
+  // 2) absolute chroma retention (saturation consistency)
+  let targetChroma = absoluteTarget * (1 - relativeWeight) + relativeTarget * relativeWeight;
+
+  // Bound saturation drift so companion mode does not look over/under-saturated.
+  const maxChangeRatio = options.maxChangeRatio;
+  if (typeof maxChangeRatio === 'number' && Number.isFinite(maxChangeRatio) && maxChangeRatio >= 0) {
+    const low = source.C * Math.max(0, 1 - maxChangeRatio);
+    const high = source.C * (1 + maxChangeRatio);
+    targetChroma = Math.max(low, Math.min(high, targetChroma));
+  }
+
+  // Never force a floor above the source chroma; this preserves user desaturation.
+  const minChroma = options.minChroma ?? 0;
+  const adaptiveMin = Math.min(minChroma, source.C * 0.9);
+  return Math.max(adaptiveMin, Math.min(targetMax, targetChroma));
+}
+
+function deriveCompanionColor(
+  source: OklchColor,
+  targetL: number,
+  options: CompanionChromaOptions = {}
+): OklchColor {
+  const safeL = Math.max(0.03, Math.min(0.97, targetL));
+  const safeC = remapCompanionChroma(source, safeL, options);
+  return clampToSRGBGamut({ L: safeL, C: safeC, H: source.H });
+}
+
 function deriveDarkMode(light: ThemeTokens, brightnessLevel: number = 0): ThemeTokens {
   const darkTargets = NEUTRAL_TARGETS.dark;
   
@@ -417,15 +476,6 @@ function deriveDarkMode(light: ThemeTokens, brightnessLevel: number = 0): ThemeT
   const lightBad = toOklch(light.bad);
   const lightWarn = toOklch(light.warn);
   
-  // Invert lightness with offsets
-  const invertL = (light: OklchColor, offset: number = 0): OklchColor => {
-    return clampToSRGBGamut({
-      L: Math.max(0.05, Math.min(0.95, 1 - light.L + offset)),
-      C: light.C * 0.85,
-      H: light.H,
-    });
-  };
-  
   // Neutral tokens with specific dark targets, adjusted by brightness
   const darkBg = clampToSRGBGamut({ L: Math.max(0.03, Math.min(0.25, darkTargets.bg + brightnessMod)), C: lightBg.C * 0.5, H: lightBg.H });
   const darkCard = clampToSRGBGamut({ L: Math.max(0.06, Math.min(0.30, darkTargets.card + brightnessMod)), C: lightCard.C * 0.5, H: lightCard.H });
@@ -434,49 +484,42 @@ function deriveDarkMode(light: ThemeTokens, brightnessLevel: number = 0): ThemeT
   const darkTextMuted = clampToSRGBGamut({ L: darkTargets.textMuted, C: lightTextMuted.C * 0.3, H: lightTextMuted.H });
   const darkBorder = clampToSRGBGamut({ L: Math.max(0.15, Math.min(0.40, darkTargets.border + brightnessMod)), C: lightBorder.C * 0.5, H: lightBorder.H });
   
-  // Brand colors - preserve hue, adjust lightness for dark
-  const darkPrimary = clampToSRGBGamut({
-    L: Math.min(0.65, lightPrimary.L + 0.1),
-    C: lightPrimary.C * 0.9,
-    H: lightPrimary.H,
+  // Brand + status colors preserve relative chroma headroom so light/dark feel matched.
+  const darkPrimary = deriveCompanionColor(lightPrimary, Math.min(0.65, lightPrimary.L + 0.1), {
+    minChroma: 0.03,
+    relativeBias: 1.0,
+    maxChangeRatio: 0.18,
   });
-  
-  const darkSecondary = clampToSRGBGamut({
-    L: Math.min(0.60, lightSecondary.L + 0.05),
-    C: lightSecondary.C * 0.85,
-    H: lightSecondary.H,
+  const darkSecondary = deriveCompanionColor(lightSecondary, Math.min(0.60, lightSecondary.L + 0.05), {
+    minChroma: 0.024,
+    relativeBias: 1.0,
+    maxChangeRatio: 0.2,
   });
-  
-  const darkAccent = clampToSRGBGamut({
-    L: Math.min(0.70, lightAccent.L + 0.15),
-    C: lightAccent.C * 0.9,
-    H: lightAccent.H,
+  const darkAccent = deriveCompanionColor(lightAccent, Math.min(0.70, lightAccent.L + 0.15), {
+    minChroma: 0.03,
+    relativeBias: 1.0,
+    maxChangeRatio: 0.2,
   });
-  
-  // Status colors
-  const darkGood = clampToSRGBGamut({
-    L: lightGood.L + 0.05,
-    C: lightGood.C * 0.85,
-    H: lightGood.H,
+  const darkGood = deriveCompanionColor(lightGood, lightGood.L + 0.05, {
+    minChroma: 0.04,
+    relativeBias: 1.0,
+    maxChangeRatio: 0.18,
   });
-  
-  const darkBad = clampToSRGBGamut({
-    L: lightBad.L + 0.05,
-    C: lightBad.C * 0.85,
-    H: lightBad.H,
+  const darkBad = deriveCompanionColor(lightBad, lightBad.L + 0.05, {
+    minChroma: 0.04,
+    relativeBias: 1.0,
+    maxChangeRatio: 0.18,
   });
-  
-  const darkWarn = clampToSRGBGamut({
-    L: lightWarn.L,
-    C: lightWarn.C * 0.85,
-    H: lightWarn.H,
+  const darkWarn = deriveCompanionColor(lightWarn, lightWarn.L, {
+    minChroma: 0.038,
+    relativeBias: 1.0,
+    maxChangeRatio: 0.18,
   });
-  
-  // Ring and foreground tokens
-  const darkRing = clampToSRGBGamut({
-    L: 0.6,
-    C: lightPrimary.C * 0.7,
-    H: lightPrimary.H,
+
+  // Keep focus ring chroma aligned with primary across modes.
+  const darkRing = deriveCompanionColor(lightPrimary, 0.6, {
+    minChroma: 0.03,
+    relativeBias: 1,
   });
   
   return {
@@ -529,49 +572,42 @@ function deriveLightMode(dark: ThemeTokens): ThemeTokens {
   const lightTextMuted = clampToSRGBGamut({ L: lightTargets.textMuted, C: darkTextMuted.C * 0.3, H: darkTextMuted.H });
   const lightBorder = clampToSRGBGamut({ L: lightTargets.border, C: darkBorder.C * 0.5, H: darkBorder.H });
   
-  // Brand colors - preserve hue, adjust lightness for light mode
-  const lightPrimary = clampToSRGBGamut({
-    L: Math.max(0.35, darkPrimary.L - 0.1),
-    C: darkPrimary.C * 1.1,
-    H: darkPrimary.H,
+  // Brand + status colors preserve relative chroma headroom so light/dark feel matched.
+  const lightPrimary = deriveCompanionColor(darkPrimary, Math.max(0.35, darkPrimary.L - 0.1), {
+    minChroma: 0.03,
+    relativeBias: 1.0,
+    maxChangeRatio: 0.18,
   });
-  
-  const lightSecondary = clampToSRGBGamut({
-    L: Math.max(0.40, darkSecondary.L - 0.05),
-    C: darkSecondary.C * 1.15,
-    H: darkSecondary.H,
+  const lightSecondary = deriveCompanionColor(darkSecondary, Math.max(0.40, darkSecondary.L - 0.05), {
+    minChroma: 0.024,
+    relativeBias: 1.0,
+    maxChangeRatio: 0.2,
   });
-  
-  const lightAccent = clampToSRGBGamut({
-    L: Math.max(0.30, darkAccent.L - 0.15),
-    C: darkAccent.C * 1.1,
-    H: darkAccent.H,
+  const lightAccent = deriveCompanionColor(darkAccent, Math.max(0.30, darkAccent.L - 0.15), {
+    minChroma: 0.03,
+    relativeBias: 1.0,
+    maxChangeRatio: 0.2,
   });
-  
-  // Status colors
-  const lightGood = clampToSRGBGamut({
-    L: darkGood.L - 0.05,
-    C: darkGood.C * 1.15,
-    H: darkGood.H,
+  const lightGood = deriveCompanionColor(darkGood, darkGood.L - 0.05, {
+    minChroma: 0.04,
+    relativeBias: 1.0,
+    maxChangeRatio: 0.18,
   });
-  
-  const lightBad = clampToSRGBGamut({
-    L: darkBad.L - 0.05,
-    C: darkBad.C * 1.15,
-    H: darkBad.H,
+  const lightBad = deriveCompanionColor(darkBad, darkBad.L - 0.05, {
+    minChroma: 0.04,
+    relativeBias: 1.0,
+    maxChangeRatio: 0.18,
   });
-  
-  const lightWarn = clampToSRGBGamut({
-    L: darkWarn.L,
-    C: darkWarn.C * 1.15,
-    H: darkWarn.H,
+  const lightWarn = deriveCompanionColor(darkWarn, darkWarn.L, {
+    minChroma: 0.038,
+    relativeBias: 1,
+    maxChangeRatio: 0.18,
   });
-  
-  // Ring token
-  const lightRing = clampToSRGBGamut({
-    L: 0.6,
-    C: darkPrimary.C * 1.2,
-    H: darkPrimary.H,
+
+  // Keep focus ring chroma aligned with primary across modes.
+  const lightRing = deriveCompanionColor(darkPrimary, 0.6, {
+    minChroma: 0.03,
+    relativeBias: 1,
   });
   
   return {
@@ -740,7 +776,7 @@ export function generatePalette(
   };
   
   // Step 5: Derive the other mode deterministically
-  const dark = deriveDarkMode(light);
+  const dark = deriveDarkMode(light, brightnessLevel);
   
   // Step 6: Score and validate
   const scored = evaluatePalette(

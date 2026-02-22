@@ -6,7 +6,7 @@
         <title>API Documentation - Taichi Theme Generator</title>
         <meta
             name="description"
-            content="Generate perfectly balanced light and dark UI themes programmatically using the Taichi Theme Generator API. OKLCH color space, 20 semantic tokens, rate-limited endpoints."
+            content="Generate perfectly balanced light and dark UI themes programmatically using the Taichi Theme Generator API. OKLCH color space, 20 semantic tokens per mode, unified adjustments, and rate-limited endpoints."
         >
 
         <!-- Fonts -->
@@ -363,12 +363,12 @@
                     </p>
                 </div>
                 <div class="feature-card">
-                    <h4>🔧 20 Semantic Tokens</h4>
+                    <h4>🔧 20 Tokens per Theme</h4>
                     <p>Complete design system tokens ready for production.</p>
                 </div>
                 <div class="feature-card">
-                    <h4>📦 Multiple Formats</h4>
-                    <p>Export to CSS, SCSS, LESS, Tailwind, or JSON.</p>
+                    <h4>🧪 Readability Guardrails</h4>
+                    <p>Final pass protects text legibility and token separation.</p>
                 </div>
             </div>
 
@@ -387,7 +387,7 @@
 
                 <p>
                     Generate balanced light and dark themes using color harmony
-                    theory.
+                    theory with one coherent brightness/contrast/saturation adjustment stage.
                 </p>
 
                 <h3>Request Body</h3>
@@ -434,7 +434,12 @@
                     <tr>
                         <td><span class="param-name">splitAdjustments</span></td>
                         <td><span class="param-type">boolean?</span></td>
-                        <td>Enable separate light/dark adjustment levels.</td>
+                        <td>Enable separate light/dark adjustment levels (alias: <code>split</code>).</td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">light*/dark*</span></td>
+                        <td><span class="param-type">number?</span></td>
+                        <td>Per-mode levels used with <code>splitAdjustments=true</code> (aliases: <code>lsat</code>, <code>lcon</code>, <code>lbri</code>, <code>dsat</code>, <code>dcon</code>, <code>dbri</code>).</td>
                     </tr>
                 </table>
 
@@ -469,7 +474,16 @@ curl -X POST https://taichi.bucaastudio.com/api/generate-theme \
     "philosophy": "Harmony found in nature...",
     "options": {
       "darkFirst": true,
-      "splitAdjustments": true
+      "splitAdjustments": true,
+      "saturationLevel": 2,
+      "contrastLevel": 0,
+      "brightnessLevel": 0,
+      "lightSaturationLevel": 2,
+      "lightContrastLevel": 0,
+      "lightBrightnessLevel": 1,
+      "darkSaturationLevel": 2,
+      "darkContrastLevel": 0,
+      "darkBrightnessLevel": -1
     }
   }
 }</pre
@@ -530,9 +544,9 @@ curl -X POST https://taichi.bucaastudio.com/api/export-theme \
                 >
             </div>
 
-            <h2>Semantic Tokens (20)</h2>
+            <h2>Semantic Tokens (20 per theme)</h2>
             <p>
-                Each theme includes these tokens for both light and dark modes:
+                Each theme includes these 20 tokens. The response returns light + dark (40 token values total):
             </p>
             <div class="token-grid">
                 <div class="token">bg</div>
@@ -556,6 +570,14 @@ curl -X POST https://taichi.bucaastudio.com/api/export-theme \
                 <div class="token">bad</div>
                 <div class="token">badFg</div>
             </div>
+
+            <h2>Adjustment Model</h2>
+            <p>
+                The API generates a neutral base palette, then applies brightness, contrast,
+                and saturation together in one adjustment stage. A final readability/parity
+                pass keeps text legible and semantic chromatic identity aligned between light
+                and dark outputs.
+            </p>
 
             <h2>Harmony Modes</h2>
             <table class="param-table">

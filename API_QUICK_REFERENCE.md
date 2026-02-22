@@ -18,7 +18,13 @@ POST /api/generate-theme
     "contrastLevel": 0,
     "brightnessLevel": 0,
     "darkFirst": false,
-    "splitAdjustments": false
+    "splitAdjustments": false,
+    "lightSaturationLevel": 0,
+    "lightContrastLevel": 0,
+    "lightBrightnessLevel": 0,
+    "darkSaturationLevel": 0,
+    "darkContrastLevel": 0,
+    "darkBrightnessLevel": 0
 }
 ```
 
@@ -40,11 +46,24 @@ POST /api/generate-theme
             "splitAdjustments": false,
             "saturationLevel": 0,
             "contrastLevel": 0,
-            "brightnessLevel": 0
+            "brightnessLevel": 0,
+            "lightSaturationLevel": 0,
+            "lightContrastLevel": 0,
+            "lightBrightnessLevel": 0,
+            "darkSaturationLevel": 0,
+            "darkContrastLevel": 0,
+            "darkBrightnessLevel": 0
         }
     }
 }
 ```
+
+`light` and `dark` each contain 20 semantic tokens (40 total token values per response).
+
+**Adjustment aliases:**
+
+- Shared: `saturationLevel|saturation|sat`, `contrastLevel|contrast|con`, `brightnessLevel|brightness|bri`
+- Split short aliases: `lsat`, `lcon`, `lbri`, `dsat`, `dcon`, `dbri`
 
 **Rate Limit:** 10 requests/minute
 

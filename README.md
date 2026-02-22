@@ -22,10 +22,11 @@
 - **Dual Theme Generation** - Simultaneously generate perfectly matched light
   and dark themes
 - **Multiple Color Harmonies** - Random, Monochrome, Analogous, Complementary,
-  Split-Complementary, and Triadic
+  Split-Complementary, Triadic, Tetradic, Compound, and Triadic-Split
 - **Advanced Controls**
-  - Saturation levels (0-4): From pure grayscale to maximum saturation
-  - Contrast levels (1-5): Fine-tune readability and visual impact
+  - Saturation, contrast, brightness: `-5` to `+5`
+  - Optional split light/dark adjustments (`light*` and `dark*` levels)
+  - Dark-first generation toggle for mode-first workflows
   - Border width, shadow strength, roundness, and gradient controls
 - **Smart Color Formats** - Export in HEX, RGB, CMYK, HSL, LAB, LCH, OKLCH, or
   Display P3
@@ -100,8 +101,9 @@ npm run preview
 
 1. **Select a color harmony mode** from the dropdown (Random, Monochrome, etc.)
 2. **Adjust design options** using the sliders:
-   - **Saturation**: 0 (grayscale) to 4 (vivid)
-   - **Contrast**: 1 (soft) to 5 (maximum)
+   - **Saturation**: -5 (muted) to +5 (vivid)
+   - **Contrast**: -5 (flatter) to +5 (stronger separation)
+   - **Brightness**: -5 (darker) to +5 (lighter)
    - **Roundness**: 0 (square) to 5 (fully rounded)
    - **Shadows**: 0 (flat) to 5 (floating)
    - **Gradients**: 0 (solid) to 2 (vivid)
@@ -145,7 +147,7 @@ npm run preview
 
 ## Color System
 
-**v25.12.2 - OKLCH Palette Intelligence Engine**
+**v26.2.1 - OKLCH Palette Intelligence Engine**
 
 The generator now uses a perceptually-uniform OKLCH color space for all color
 computation, ensuring consistent and aesthetically pleasing palettes.
@@ -153,8 +155,12 @@ computation, ensuring consistent and aesthetically pleasing palettes.
 ### Core Principles
 
 - **OKLCH-First**: All color math happens in OKLCH for perceptual accuracy
-- **Light Mode First**: Light themes are generated first, then dark mode is
-  derived deterministically
+- **Single Adjustment Stage**: Brightness, contrast, and saturation are applied
+  together through one coherent post-generation transform
+- **Companion Parity**: Light and dark chromatic tokens are parity-aligned to
+  preserve hue/chroma identity across modes
+- **Readability Guardrails**: Text and muted text are corrected against core
+  surfaces (`bg`, `card`, `card2`) after adjustments
 - **Scored & Validated**: Every palette is evaluated for contrast, harmony, and
   usability
 - **Reproducible**: Seeded generation ensures identical palettes from the same
@@ -172,13 +178,13 @@ computation, ensuring consistent and aesthetically pleasing palettes.
 
 ### Quality Guarantees
 
-| Rule                | Guaranteed                 |
-| ------------------- | -------------------------- |
-| Contrast            | WCAG AA+ (4.5:1 minimum)   |
-| Dark/Light Identity | Mathematical derivation    |
-| Brand Consistency   | Hue preserved across modes |
-| Visual Stability    | Scored & tested            |
-| Reproducibility     | Seeded RNG                 |
+| Rule                | Guaranteed                                                            |
+| ------------------- | --------------------------------------------------------------------- |
+| Text Readability    | Guardrailed on core surfaces (`text`: 3.8+ light / 5.0+ dark)        |
+| Muted Readability   | Guardrailed on core surfaces (`textMuted`: 2.6+ light / 3.4+ dark)    |
+| Dark/Light Identity | Companion parity keeps semantic hue/chroma aligned across modes       |
+| Visual Stability    | Token separation and deduplication keep surfaces/borders/text distinct |
+| Reproducibility     | Seeded RNG + deterministic transforms                                 |
 
 ## API Documentation
 
@@ -195,11 +201,13 @@ const response = await fetch("/api/generate-theme", {
   body: JSON.stringify({
     style: "analogous",
     baseColor: "#3B82F6",
-    saturation: 2,
+    saturationLevel: 2,
+    contrastLevel: 1,
+    brightnessLevel: -1,
   }),
 });
 const { light, dark, metadata } = await response.json();
-// Returns 20 tokens for each theme (light + dark)
+// Returns 20 tokens per theme (40 total tokens in each dual-theme response)
 ```
 
 ### Available Endpoints

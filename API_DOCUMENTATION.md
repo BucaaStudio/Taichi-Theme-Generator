@@ -2,8 +2,8 @@
 
 ## Overview
 
-The Taichi Theme Generator API provides endpoints for generating, managing, and
-exporting balanced dual-theme color palettes. It uses color harmony theory to
+The Taichi Theme Generator API provides endpoints for generating and exporting
+balanced dual-theme color palettes. It uses color harmony theory to
 ensure aesthetic consistency across both light and dark modes.
 
 **Base URL:** `https://taichi.bucaastudio.com/api`
@@ -14,7 +14,6 @@ All endpoints are rate-limited per IP address to ensure stability on Vercel's
 free tier:
 
 - **Generate Theme:** 10 requests/minute
-- **Theme History:** 20 requests/minute
 - **Export Theme:** 15 requests/minute
 
 When rate limited, you'll receive a `429` status code with a `retryAfter` field
@@ -67,7 +66,7 @@ Generate a pair of balanced Light and Dark themes based on color harmony rules.
 | `brightnessLevel`      | number  | `0`      | -5 to 5  | Shared brightness adjustment (aliases: `brightness`, `bri`).       |
 | `darkFirst`            | boolean | `false`  | -        | Generate dark mode as the source palette, then derive light mode.  |
 | `splitAdjustments`     | boolean | `false`  | -        | Enable separate light/dark adjustment values.                      |
-| `light*` / `dark*`     | number  | shared   | -5 to 5  | Per-mode levels used only when `splitAdjustments` is `true`.       |
+| `light*` / `dark*`     | number  | shared   | -5 to 5  | Per-mode levels used only when `splitAdjustments` is `true` (short aliases: `lsat`, `lcon`, `lbri`, `dsat`, `dcon`, `dbri`). |
 
 #### Response
 
@@ -125,17 +124,33 @@ Returns both `light` and `dark` theme variants.
         "style": "analogous",
         "seed": "#3B82F6",
         "timestamp": 1703376000000,
+        "colorSpace": "OKLCH",
         "philosophy": "Harmony found in nature by choosing neighboring colors on the wheel.",
         "options": {
             "darkFirst": false,
             "splitAdjustments": false,
             "saturationLevel": 0,
             "contrastLevel": 0,
-            "brightnessLevel": 0
+            "brightnessLevel": 0,
+            "lightSaturationLevel": 0,
+            "lightContrastLevel": 0,
+            "lightBrightnessLevel": 0,
+            "darkSaturationLevel": 0,
+            "darkContrastLevel": 0,
+            "darkBrightnessLevel": 0
         }
     }
 }
 ```
+
+Each theme object contains 20 semantic tokens (40 token values total per response).
+
+#### Adjustment Behavior
+
+- The base palette is generated at neutral levels.
+- Brightness, contrast, and saturation are applied together in one coherent adjustment stage.
+- Readability guardrails enforce legibility for `text` and `textMuted` against `bg`, `card`, and `card2`.
+- A final parity pass keeps semantic chromatic tokens aligned between light and dark modes.
 
 #### Style Options (`style`)
 

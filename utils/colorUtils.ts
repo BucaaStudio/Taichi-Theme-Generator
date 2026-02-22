@@ -1,7 +1,7 @@
 import { ThemeTokens, GenerationMode, ColorFormat } from '../types';
 import { generateTheme as paletteEngineGenerateTheme } from './paletteEngine';
 import { toOklch, toHex, clampToSRGBGamut } from './oklch';
-import { selectForeground, selectForegroundHex, contrastRatio } from './contrast';
+import { selectForeground, selectForegroundHex, contrastRatio, adjustForContrast } from './contrast';
 
 // --- Conversions ---
 
@@ -131,26 +131,19 @@ export function parseToHex(input: string, format?: ColorFormat): string | null {
   return null;
 }
 
-// --- Photoshop-like Color Adjustments ---
-// Applied as post-processing on generated tokens, matching Photoshop's
-// Brightness/Contrast behavior (non-legacy mode).
+// --- Color Adjustments ---
+// Applied as post-processing on generated tokens with a single, coherent model:
+// 1) brightness curve (gamma + lift)
+// 2) contrast around dynamic midpoint
+// 3) chroma scaling for saturation
 
 /**
  * Apply Photoshop-like brightness/contrast/saturation to a theme.
  *
  * Two-pass approach:
- * 1. Apply brightness (gamma + range compression) to all tokens
+ * 1. Apply brightness curve (gamma + additive lift)
  * 2. Compute dynamic midpoint from brightness-adjusted values
- * 3. Apply contrast scaling around that dynamic midpoint
- *
- * Brightness uses gamma correction PLUS range compression so that
- * even near-white (L≈1) and near-black (L≈0) values shift noticeably.
- *   gamma = 2^(-brightness * 0.2)
- *   Negative brightness compresses the ceiling (whites get darker):
- *     ceiling = clamp(1 + brightness * 0.05, 0.15, 1)
- *   Positive brightness raises the floor (blacks get lighter):
- *     floor = clamp(brightness * 0.035, 0, 0.85)
- *   L_out = floor + L^gamma * (ceiling - floor)
+ * 3. Apply contrast scaling around that midpoint
  *
  * Contrast: Midpoint scaling — L_out = mid + (L_in - mid) * factor
  *   factor = 2^(contrast * 0.35)
@@ -164,36 +157,205 @@ export function applyAdjustments(
   contrast: number,    // -5 to 5
   saturation: number   // -5 to 5
 ): ThemeTokens {
-  // Even at zero adjustments, run the full pipeline so the colour-separation
-  // enforcement at the end can catch duplicate or colliding tokens from the
-  // base generation.  The math is a no-op when all three values are zero.
-
-  const gamma = Math.pow(2, -brightness * 0.2);
-  // Range compression: negative brightness lowers the ceiling,
-  // positive brightness raises the floor
-  const ceiling = Math.min(1, Math.max(0.15, 1 + brightness * 0.05));
-  const floor = Math.max(0, Math.min(0.85, brightness > 0 ? brightness * 0.035 : 0));
-  const range = ceiling - floor;
-
-  const contrastFactor = Math.pow(2, contrast * 0.35);
-  const satFactor = Math.max(0.01, 1 + saturation * 0.2);
-
   const allKeys = [
     'bg', 'card', 'card2', 'text', 'textMuted', 'textOnColor', 'border', 'ring',
     'primary', 'secondary', 'accent', 'good', 'bad', 'warn',
     'primaryFg', 'secondaryFg', 'accentFg', 'goodFg', 'warnFg', 'badFg',
   ] as const;
 
+  const finalizeAdjustedTokens = (adjusted: Record<string, string>, contrastForReadability: number): ThemeTokens => {
+    // Verify Fg tokens still contrast against their bg; fall back to re-derivation
+    // if needed. When the user has intentionally lowered contrast, scale the
+    // thresholds so re-derivation doesn't undo the compression.
+    //   con= 0 → floor 3:1, target 4.5:1  (normal)
+    //   con=-3 → floor 1.4:1, target 2.0:1 (reduced)
+    //   con=-5 → floor 1.1:1, target 1.5:1 (very flat — only fix if nearly invisible)
+    const contrastFactor = Math.pow(2, contrastForReadability * 0.35);
+    const fgTargetRatio = contrastForReadability >= 0 ? 4.5 : Math.max(1.5, 4.5 * contrastFactor);
+    const fgFloor = contrastForReadability >= 0 ? 3 : Math.max(1.1, fgTargetRatio * 0.7);
+
+    const fgPairs: [string, string][] = [
+      ['textOnColor', 'primary'],
+      ['primaryFg', 'primary'], ['secondaryFg', 'secondary'], ['accentFg', 'accent'],
+      ['goodFg', 'good'], ['warnFg', 'warn'], ['badFg', 'bad'],
+    ];
+    for (const [fgKey, bgKey] of fgPairs) {
+      if (contrastRatio(adjusted[fgKey], adjusted[bgKey]) < fgFloor) {
+        const bg = toOklch(adjusted[bgKey]);
+        adjusted[fgKey] = toHex(selectForeground(bg, true, fgTargetRatio));
+      }
+    }
+
+    // --- Color Separation Enforcement ---
+    // Ensure no two tokens share the exact same hex, and that structurally
+    // related pairs (border/bg, card/bg, text/textMuted) remain distinct.
+    // After heavy compression the adjustment pipeline can collapse neighbours.
+
+    const ensureSeparation = (
+      movableKey: string,
+      anchorKey: string,
+      minLDelta: number,
+      direction?: 'lighter' | 'darker'
+    ) => {
+      const a = toOklch(adjusted[anchorKey]);
+      const m = toOklch(adjusted[movableKey]);
+      const currentDelta = m.L - a.L;
+      if (Math.abs(currentDelta) >= minLDelta) return; // already separated
+      // Determine nudge direction: if caller specifies, use it; else push
+      // movable away from anchor in its current relative direction
+      const dir = direction
+        ? (direction === 'lighter' ? 1 : -1)
+        : (currentDelta >= 0 ? 1 : -1);
+      const targetL = Math.max(0.03, Math.min(0.97, a.L + dir * minLDelta));
+      adjusted[movableKey] = toHex(clampToSRGBGamut({ L: targetL, C: m.C, H: m.H }));
+    };
+
+    // Border must be visibly distinct from bg and card
+    const bgL = toOklch(adjusted.bg).L;
+    const borderDir = bgL > 0.5 ? 'darker' : 'lighter'; // light theme: border darker; dark theme: border lighter
+    ensureSeparation('border', 'bg', 0.06, borderDir);
+    ensureSeparation('border', 'card', 0.04, borderDir);
+    ensureSeparation('border', 'card2', 0.03, borderDir);
+
+    // Card must be distinct from bg
+    ensureSeparation('card', 'bg', 0.03);
+    // Card2 must be distinct from card
+    ensureSeparation('card2', 'card', 0.02);
+    // textMuted must differ from text
+    ensureSeparation('textMuted', 'text', 0.08);
+
+    // Final dedup: if any two tokens share the exact same hex, nudge the
+    // less critical one by a tiny lightness step to break the tie.
+    const tokenPriority = [
+      'bg', 'text', 'primary', 'card', 'border', 'card2', 'textMuted',
+      'secondary', 'accent', 'good', 'bad', 'warn', 'ring', 'textOnColor',
+      'primaryFg', 'secondaryFg', 'accentFg', 'goodFg', 'warnFg', 'badFg',
+    ];
+    const seen = new Map<string, string>(); // hex → tokenKey
+    for (const key of tokenPriority) {
+      const hex = adjusted[key];
+      if (seen.has(hex)) {
+        // Nudge this lower-priority token slightly
+        const c = toOklch(hex);
+        const nudge = c.L > 0.5 ? -0.02 : 0.02;
+        adjusted[key] = toHex(clampToSRGBGamut({
+          L: Math.max(0.03, Math.min(0.97, c.L + nudge)),
+          C: c.C,
+          H: c.H,
+        }));
+      }
+      seen.set(adjusted[key], key);
+    }
+
+    // --- Readability Guardrails ---
+    // Keep long-form text readable regardless of extreme slider settings.
+    // Enforce contrast for text and muted text against all core surfaces.
+    const enforceSurfaceContrast = (
+      fgKey: 'text' | 'textMuted',
+      bgKeys: Array<'bg' | 'card' | 'card2'>,
+      minRatio: number
+    ) => {
+      const getWorstSurface = (fgHex: string): { key: 'bg' | 'card' | 'card2'; ratio: number } => {
+        let worstKey: 'bg' | 'card' | 'card2' = bgKeys[0];
+        let worstRatio = Number.POSITIVE_INFINITY;
+        for (const bgKey of bgKeys) {
+          const ratio = contrastRatio(fgHex, adjusted[bgKey]);
+          if (ratio < worstRatio) {
+            worstRatio = ratio;
+            worstKey = bgKey;
+          }
+        }
+        return { key: worstKey, ratio: worstRatio };
+      };
+
+      let fg = toOklch(adjusted[fgKey]);
+      for (let i = 0; i < 10; i++) {
+        const fgHex = toHex(fg);
+        const { key: worstKey, ratio: worstRatio } = getWorstSurface(fgHex);
+        if (worstRatio >= minRatio) break;
+        fg = adjustForContrast(fg, toOklch(adjusted[worstKey]), minRatio);
+      }
+      let fgHex = toHex(fg);
+      const post = getWorstSurface(fgHex);
+      if (post.ratio < minRatio) {
+        const candidates = [
+          toHex(selectForeground(toOklch(adjusted.bg), true, minRatio)),
+          toHex(selectForeground(toOklch(adjusted.card), true, minRatio)),
+          toHex(selectForeground(toOklch(adjusted.card2), true, minRatio)),
+          '#111111',
+          '#f5f5f5',
+        ];
+        let best = fgHex;
+        let bestWorst = post.ratio;
+        for (const candidate of candidates) {
+          const worst = getWorstSurface(candidate).ratio;
+          if (worst > bestWorst) {
+            best = candidate;
+            bestWorst = worst;
+          }
+        }
+        fgHex = best;
+      }
+      adjusted[fgKey] = fgHex;
+    };
+
+    const isDarkTheme = toOklch(adjusted.bg).L < 0.5;
+    const textMinRatio = isDarkTheme ? 5 : 3.8;
+    const mutedMinRatio = isDarkTheme ? 3.4 : 2.6;
+
+    enforceSurfaceContrast('text', ['bg', 'card', 'card2'], textMinRatio);
+    enforceSurfaceContrast('textMuted', ['bg', 'card', 'card2'], mutedMinRatio);
+
+    // Preserve visual hierarchy after readability correction.
+    ensureSeparation('textMuted', 'text', 0.06);
+
+    return {
+      bg: adjusted.bg, card: adjusted.card, card2: adjusted.card2,
+      text: adjusted.text, textMuted: adjusted.textMuted,
+      border: adjusted.border, ring: adjusted.ring,
+      primary: adjusted.primary, secondary: adjusted.secondary,
+      accent: adjusted.accent, good: adjusted.good,
+      bad: adjusted.bad, warn: adjusted.warn,
+      textOnColor: adjusted.textOnColor,
+      primaryFg: adjusted.primaryFg,
+      secondaryFg: adjusted.secondaryFg,
+      accentFg: adjusted.accentFg,
+      goodFg: adjusted.goodFg,
+      warnFg: adjusted.warnFg,
+      badFg: adjusted.badFg,
+    };
+  };
+
+  // If adjustments are neutral, skip transform math and only run guardrails.
+  if (brightness === 0 && contrast === 0 && saturation === 0) {
+    const adjusted: Record<string, string> = {};
+    for (const key of allKeys) {
+      adjusted[key] = tokens[key];
+    }
+    return finalizeAdjustedTokens(adjusted, contrast);
+  }
+  
+  const brightnessNorm = Math.max(-1, Math.min(1, brightness / 5));
+  const gamma = Math.pow(2, -brightness * 0.28);
+  const lift = brightnessNorm * 0.14;
+  const lowClip = Math.max(0, Math.min(0.2, Math.max(0, brightnessNorm) * 0.02));
+  const highClip = Math.max(0.8, Math.min(1, 1 - Math.max(0, -brightnessNorm) * 0.08));
+
+  const contrastFactor = Math.pow(2, contrast * 0.35);
+  const satFactor = Math.max(0.01, 1 + saturation * 0.2);
+
   // Pass 1: Apply brightness (gamma + range compression), collect lightness for midpoint
   const brightened: Record<string, { L: number; C: number; H: number }> = {};
   let lightSum = 0;
   for (const key of allKeys) {
     const color = toOklch(tokens[key]);
-    const L = floor + Math.pow(Math.max(0.001, color.L), gamma) * range;
+    let L = Math.pow(Math.max(0.001, color.L), gamma) + lift;
+    L = Math.max(lowClip, Math.min(highClip, L));
     brightened[key] = { L, C: color.C, H: color.H };
     lightSum += L;
   }
   const midpoint = lightSum / allKeys.length;
+  const isLightTheme = brightened.bg.L > 0.5;
 
   // When contrast is reduced, also desaturate proportionally so chromatic
   // elements (buttons, badges) appear visually flatter — not just compressed
@@ -204,109 +366,107 @@ export function applyAdjustments(
   // Clamp L to [0.03, 0.97] so no token is ever pure #000000 or #FFFFFF;
   // enforce minimum chroma of 0.008 so even neutrals carry a slight tint.
   const adjusted: Record<string, string> = {};
+  const chromaticKeys = new Set([
+    'primary', 'secondary', 'accent', 'good', 'warn', 'bad', 'ring',
+  ]);
   for (const key of allKeys) {
+    const isChromatic = chromaticKeys.has(key);
     let L = midpoint + (brightened[key].L - midpoint) * contrastFactor;
-    L = Math.max(0.03, Math.min(0.97, L));
+    // Keep chromatic tokens away from pure black/white, even at high contrast,
+    // so hue identity does not collapse to achromatic output.
+    const minL = isChromatic ? (isLightTheme ? 0.12 : 0.10) : 0.03;
+    const maxL = isChromatic ? (isLightTheme ? 0.92 : 0.90) : 0.97;
+    L = Math.max(minL, Math.min(maxL, L));
     const C = Math.max(0.008, brightened[key].C * satFactor * contrastChromaFactor);
     adjusted[key] = toHex(clampToSRGBGamut({ L, C, H: brightened[key].H }));
   }
 
-  // Verify Fg tokens still contrast against their bg; fall back to re-derivation
-  // if needed. When the user has intentionally lowered contrast, scale the
-  // thresholds so re-derivation doesn't undo the compression.
-  //   con= 0 → floor 3:1, target 4.5:1  (normal)
-  //   con=-3 → floor 1.4:1, target 2.0:1 (reduced)
-  //   con=-5 → floor 1.1:1, target 1.5:1 (very flat — only fix if nearly invisible)
-  const fgTargetRatio = contrast >= 0 ? 4.5 : Math.max(1.5, 4.5 * contrastFactor);
-  const fgFloor = contrast >= 0 ? 3 : Math.max(1.1, fgTargetRatio * 0.7);
+  return finalizeAdjustedTokens(adjusted, contrast);
+}
 
-  const fgPairs: [string, string][] = [
-    ['primaryFg', 'primary'], ['secondaryFg', 'secondary'], ['accentFg', 'accent'],
-    ['goodFg', 'good'], ['warnFg', 'warn'], ['badFg', 'bad'],
-  ];
-  for (const [fgKey, bgKey] of fgPairs) {
-    if (contrastRatio(adjusted[fgKey], adjusted[bgKey]) < fgFloor) {
-      const bg = toOklch(adjusted[bgKey]);
-      adjusted[fgKey] = toHex(selectForeground(bg, true, fgTargetRatio));
+interface ParityOptions {
+  strength?: number;
+}
+
+function maxGamutChromaAt(lightness: number, hue: number): number {
+  const safeL = Math.max(0.001, Math.min(0.999, lightness));
+  return clampToSRGBGamut({ L: safeL, C: 0.4, H: hue }).C;
+}
+
+function enforceCompanionParity(
+  anchor: ThemeTokens,
+  companion: ThemeTokens,
+  options: ParityOptions = {}
+): ThemeTokens {
+  const strength = Math.max(0, Math.min(1, options.strength ?? 1));
+  if (strength <= 0) return companion;
+
+  const adjusted: ThemeTokens = { ...companion };
+  const keys = ['primary', 'secondary', 'accent', 'good', 'warn', 'bad'] as const;
+
+  for (const key of keys) {
+    const anchorColor = toOklch(anchor[key]);
+    const companionColor = toOklch(adjusted[key]);
+    let companionL = companionColor.L;
+
+    const sourceMax = Math.max(0.001, maxGamutChromaAt(anchorColor.L, anchorColor.H));
+    let targetMax = Math.max(0.001, maxGamutChromaAt(companionL, companionColor.H));
+    const sourceRelative = anchorColor.C / sourceMax;
+
+    // If companion lightness is too close to a gamut edge for the anchor chroma,
+    // nudge it toward a safer range to preserve color identity.
+    const desiredIdentityC = anchorColor.C * 0.9;
+    if (targetMax < desiredIdentityC) {
+      if (companionL > 0.6) {
+        companionL = Math.max(0.58, companionL - 0.12 * strength);
+      } else if (companionL < 0.28) {
+        companionL = Math.min(0.34, companionL + 0.1 * strength);
+      }
+      targetMax = Math.max(0.001, maxGamutChromaAt(companionL, companionColor.H));
     }
+
+    const targetByRelative = targetMax * sourceRelative;
+    const targetByAbsolute = Math.min(targetMax, anchorColor.C);
+    let targetC = targetByAbsolute * 0.7 + targetByRelative * 0.3;
+
+    // Keep chroma in a tight band around the anchor to avoid oversaturation drift.
+    const lower = anchorColor.C * 0.86;
+    const upper = anchorColor.C * 1.14;
+    targetC = Math.max(lower, Math.min(upper, targetC));
+
+    const blendedC = companionColor.C + (targetC - companionColor.C) * strength;
+
+    // Hue is unstable when chroma is near zero; only enforce when meaningful.
+    const hueStrength = anchorColor.C < 0.015 ? 0 : strength;
+    const hueDelta = ((((anchorColor.H - companionColor.H) % 360) + 540) % 360) - 180;
+    const blendedH = ((companionColor.H + hueDelta * hueStrength) % 360 + 360) % 360;
+
+    adjusted[key] = toHex(clampToSRGBGamut({
+      L: companionL,
+      C: Math.max(0, blendedC),
+      H: blendedH,
+    }));
   }
 
-  // --- Color Separation Enforcement ---
-  // Ensure no two tokens share the exact same hex, and that structurally
-  // related pairs (border/bg, card/bg, text/textMuted) remain distinct.
-  // After heavy compression the adjustment pipeline can collapse neighbours.
+  // Keep ring behavior tied to primary in the companion mode.
+  const ring = toOklch(adjusted.ring);
+  const primary = toOklch(adjusted.primary);
+  adjusted.ring = toHex(clampToSRGBGamut({
+    L: ring.L,
+    C: Math.max(0.008, primary.C * 0.85),
+    H: primary.H,
+  }));
 
-  const ensureSeparation = (
-    movableKey: string,
-    anchorKey: string,
-    minLDelta: number,
-    direction?: 'lighter' | 'darker'
-  ) => {
-    const a = toOklch(adjusted[anchorKey]);
-    const m = toOklch(adjusted[movableKey]);
-    const currentDelta = m.L - a.L;
-    if (Math.abs(currentDelta) >= minLDelta) return; // already separated
-    // Determine nudge direction: if caller specifies, use it; else push
-    // movable away from anchor in its current relative direction
-    const dir = direction
-      ? (direction === 'lighter' ? 1 : -1)
-      : (currentDelta >= 0 ? 1 : -1);
-    const targetL = Math.max(0.03, Math.min(0.97, a.L + dir * minLDelta));
-    adjusted[movableKey] = toHex(clampToSRGBGamut({ L: targetL, C: m.C, H: m.H }));
-  };
+  // Recompute on-color foreground tokens for any changed chromatic tokens.
+  adjusted.textOnColor = selectForegroundHex(adjusted.primary);
+  adjusted.primaryFg = selectForegroundHex(adjusted.primary);
+  adjusted.secondaryFg = selectForegroundHex(adjusted.secondary);
+  adjusted.accentFg = selectForegroundHex(adjusted.accent);
+  adjusted.goodFg = selectForegroundHex(adjusted.good);
+  adjusted.warnFg = selectForegroundHex(adjusted.warn);
+  adjusted.badFg = selectForegroundHex(adjusted.bad);
 
-  // Border must be visibly distinct from bg and card
-  const bgL = toOklch(adjusted.bg).L;
-  const borderDir = bgL > 0.5 ? 'darker' : 'lighter'; // light theme: border darker; dark theme: border lighter
-  ensureSeparation('border', 'bg', 0.06, borderDir);
-  ensureSeparation('border', 'card', 0.04, borderDir);
-  ensureSeparation('border', 'card2', 0.03, borderDir);
-
-  // Card must be distinct from bg
-  ensureSeparation('card', 'bg', 0.03);
-  // Card2 must be distinct from card
-  ensureSeparation('card2', 'card', 0.02);
-  // textMuted must differ from text
-  ensureSeparation('textMuted', 'text', 0.08);
-
-  // Final dedup: if any two tokens share the exact same hex, nudge the
-  // less critical one by a tiny lightness step to break the tie.
-  const tokenPriority = [
-    'bg', 'text', 'primary', 'card', 'border', 'card2', 'textMuted',
-    'secondary', 'accent', 'good', 'bad', 'warn', 'ring', 'textOnColor',
-    'primaryFg', 'secondaryFg', 'accentFg', 'goodFg', 'warnFg', 'badFg',
-  ];
-  const seen = new Map<string, string>(); // hex → tokenKey
-  for (const key of tokenPriority) {
-    const hex = adjusted[key];
-    if (seen.has(hex)) {
-      // Nudge this lower-priority token slightly
-      const c = toOklch(hex);
-      const nudge = c.L > 0.5 ? -0.02 : 0.02;
-      adjusted[key] = toHex(clampToSRGBGamut({
-        L: Math.max(0.03, Math.min(0.97, c.L + nudge)),
-        C: c.C,
-        H: c.H,
-      }));
-    }
-    seen.set(adjusted[key], key);
-  }
-
-  return {
-    bg: adjusted.bg, card: adjusted.card, card2: adjusted.card2,
-    text: adjusted.text, textMuted: adjusted.textMuted,
-    border: adjusted.border, ring: adjusted.ring,
-    primary: adjusted.primary, secondary: adjusted.secondary,
-    accent: adjusted.accent, good: adjusted.good,
-    bad: adjusted.bad, warn: adjusted.warn,
-    textOnColor: adjusted.textOnColor,
-    primaryFg: adjusted.primaryFg,
-    secondaryFg: adjusted.secondaryFg,
-    accentFg: adjusted.accentFg,
-    goodFg: adjusted.goodFg,
-    warnFg: adjusted.warnFg,
-    badFg: adjusted.badFg,
-  };
+  return adjusted;
 }
 
 // --- Theme Builder ---
@@ -323,23 +483,42 @@ export function generateTheme(
   darkContrastLevel?: number,
   darkBrightnessLevel?: number
 ): { light: ThemeTokens, dark: ThemeTokens, seed: string, mode: GenerationMode } {
-  // Generate base palette at zero adjustments (clean base)
-  const base = paletteEngineGenerateTheme(
-    mode,
-    seedColor,
-    0, 0, 0, // Always generate at neutral — adjustments are post-processing
-    overridePalette,
-    darkFirst
-  );
-
-  // Apply Photoshop-like adjustments as post-processing
+  // Generate the base palette at neutral levels.
+  // Brightness/contrast/saturation are applied in one adjustment stage below.
   const dSat = darkSaturationLevel ?? saturationLevel;
   const dCon = darkContrastLevel ?? contrastLevel;
   const dBri = darkBrightnessLevel ?? brightnessLevel;
 
+  const base = paletteEngineGenerateTheme(
+    mode,
+    seedColor,
+    0,
+    0,
+    0,
+    overridePalette,
+    darkFirst
+  );
+  
+  let light = applyAdjustments(base.light, brightnessLevel, contrastLevel, saturationLevel);
+  let dark = applyAdjustments(base.dark, dBri, dCon, dSat);
+
+  // Final parity pass: keep semantic chroma/hue identity aligned between modes.
+  // If split adjustments diverge heavily, reduce (not disable) parity influence.
+  const splitDelta =
+    Math.abs(saturationLevel - dSat) +
+    Math.abs(contrastLevel - dCon) +
+    Math.abs(brightnessLevel - dBri);
+  const parityStrength = Math.max(0.35, 1 - splitDelta / 18);
+
+  if (darkFirst) {
+    light = enforceCompanionParity(dark, light, { strength: parityStrength });
+  } else {
+    dark = enforceCompanionParity(light, dark, { strength: parityStrength });
+  }
+
   return {
-    light: applyAdjustments(base.light, brightnessLevel, contrastLevel, saturationLevel),
-    dark: applyAdjustments(base.dark, dBri, dCon, dSat),
+    light,
+    dark,
     seed: base.seed,
     mode: base.mode,
   };

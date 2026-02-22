@@ -19,8 +19,12 @@ api/
 - **Gamut Mapping:** Automatic clamping ensures all colors stay within sRGB
   gamut while preserving perceptual uniformity.
 - **Dual Support:** Every generation returns matching Light and Dark themes.
-- **Semantic Tokens:** Outputs 20 semantic tokens (bg, card, status, branding,
-  etc.).
+- **Semantic Tokens:** Outputs 20 semantic tokens per theme (40 total values in
+  a dual-theme response).
+- **Unified Adjustments:** Brightness, contrast, and saturation are applied in
+  one coherent adjustment stage (`-5` to `+5` each).
+- **Readability Guardrails:** Final pass enforces text legibility and semantic
+  token separation.
 - **Format Support:** Export to CSS, SCSS, LESS, Tailwind, and JSON.
 
 ## Rate Limiting
@@ -45,10 +49,15 @@ curl -X POST http://localhost:3000/api/generate-theme \
     "mode": "analogous",
     "baseColor": "#3B82F6",
     "saturationLevel": 2,
-    "contrastLevel": 1,
+    "contrastLevel": 2,
+    "brightnessLevel": -1,
     "darkFirst": true,
     "splitAdjustments": true,
+    "lightSaturationLevel": 1,
+    "lightContrastLevel": 1,
     "lightBrightnessLevel": 1,
+    "darkSaturationLevel": 0,
+    "darkContrastLevel": 2,
     "darkBrightnessLevel": -1
   }'
 ```
