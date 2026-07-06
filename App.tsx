@@ -12,7 +12,6 @@ import ShareModal from './components/ShareModal';
 import ImagePickerModal from './components/ImagePickerModal';
 
 const MAX_HISTORY = 20;
-type WorkspaceTab = 'overview' | 'tokens' | 'delivery';
 type ImportSourceSide = 'light' | 'dark';
 
 // CSS Variable Injection Helper
@@ -68,6 +67,16 @@ const TaichiIcon = ({ size = 24, className = "", lightColor = "white", darkColor
   </svg>
 );
 
+// Fingerprint of the options that affect generated colors. Used to skip the
+// auto-regeneration effect when a generation already used these exact values.
+const colorOptionsKey = (o: DesignOptions): string =>
+  [
+    o.saturationLevel, o.contrastLevel, o.brightnessLevel,
+    o.darkFirst, o.splitAdjustments,
+    o.lightSaturationLevel, o.lightContrastLevel, o.lightBrightnessLevel,
+    o.darkSaturationLevel, o.darkContrastLevel, o.darkBrightnessLevel,
+  ].join('|');
+
 const App: React.FC = () => {
   const [history, setHistory] = useState<DualTheme[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -84,8 +93,6 @@ const App: React.FC = () => {
     return false;
   });
   const [showSwatches, setShowSwatches] = useState(false);
-  const [autoSyncPreview, setAutoSyncPreview] = useState(true);
-  const [syncedWorkspaceTab, setSyncedWorkspaceTab] = useState<WorkspaceTab>('overview');
 
   const [showMobileNotice, setShowMobileNotice] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -116,9 +123,10 @@ const App: React.FC = () => {
   const [lockedColors, setLockedColors] = useState<LockedColors>({});
   const [lockedOptions, setLockedOptions] = useState<LockedOptions>({});
 
-  // Randomize unlocked design options
-  const randomizeDesignOptions = useCallback(() => {
-    setDesignOptions(prev => {
+  // Compute a randomized copy of the design options (respecting locks).
+  // Pure with respect to state: callers decide when to commit it, so the same
+  // object can be both stored and passed synchronously into generation.
+  const computeRandomizedOptions = useCallback((prev: DesignOptions): DesignOptions => {
       const next = { ...prev };
       
       // Border: 0-2 (none, thin, thick)
@@ -181,7 +189,6 @@ const App: React.FC = () => {
       }
       
       return next;
-    });
   }, [lockedOptions]);
 
   // Toggle lock on a design option
@@ -223,29 +230,29 @@ const App: React.FC = () => {
       const dcon = params.get('dcon') ? parseInt(params.get('dcon')!) : 0;
       const dbri = params.get('dbri') ? parseInt(params.get('dbri')!) : 0;
 
-      // Update options if present
-      setDesignOptions(prev => ({
-        ...prev,
-        borderWidth: bw ?? prev.borderWidth,
-        shadowStrength: sh ?? prev.shadowStrength,
-        shadowOpacity: so ?? prev.shadowOpacity,
-        gradients: gradients ?? prev.gradients,
-        radius: rd ?? prev.radius,
-        brightnessLevel: bri ?? prev.brightnessLevel,
-        contrastLevel: con ?? prev.contrastLevel,
-        saturationLevel: sat ?? prev.saturationLevel,
+      // Update options if present. Compute the merged object synchronously so
+      // the initial generation below uses the URL values (including split
+      // adjustments) instead of the not-yet-committed default state.
+      const mergedOptions: DesignOptions = {
+        ...designOptions,
+        borderWidth: bw ?? designOptions.borderWidth,
+        shadowStrength: sh ?? designOptions.shadowStrength,
+        shadowOpacity: so ?? designOptions.shadowOpacity,
+        gradients: gradients ?? designOptions.gradients,
+        radius: rd ?? designOptions.radius,
+        brightnessLevel: bri ?? designOptions.brightnessLevel,
+        contrastLevel: con ?? designOptions.contrastLevel,
+        saturationLevel: sat ?? designOptions.saturationLevel,
         splitAdjustments: split,
-        lightBrightnessLevel: split ? lbri : (bri ?? prev.brightnessLevel),
-        lightContrastLevel: split ? lcon : (con ?? prev.contrastLevel),
-        lightSaturationLevel: split ? lsat : (sat ?? prev.saturationLevel),
-        darkBrightnessLevel: split ? dbri : (bri ?? prev.brightnessLevel),
-        darkContrastLevel: split ? dcon : (con ?? prev.contrastLevel),
-        darkSaturationLevel: split ? dsat : (sat ?? prev.saturationLevel),
-      }));
-
-      // Generate Theme directly with these params
-      // We pass sat/con/bri explicitly because the state update above might not be flushed yet
-      generateNewTheme(urlMode, urlSeed, sat, con, bri);
+        lightBrightnessLevel: split ? lbri : (bri ?? designOptions.brightnessLevel),
+        lightContrastLevel: split ? lcon : (con ?? designOptions.contrastLevel),
+        lightSaturationLevel: split ? lsat : (sat ?? designOptions.saturationLevel),
+        darkBrightnessLevel: split ? dbri : (bri ?? designOptions.brightnessLevel),
+        darkContrastLevel: split ? dcon : (con ?? designOptions.contrastLevel),
+        darkSaturationLevel: split ? dsat : (sat ?? designOptions.saturationLevel),
+      };
+      setDesignOptions(mergedOptions);
+      generateNewTheme(urlMode, urlSeed, undefined, undefined, mergedOptions);
       
       // Remove encoded params cleanly from URL bar to show pretty URL if desired, 
       // but we want to KEEP them for sharing.
@@ -305,10 +312,18 @@ const App: React.FC = () => {
   // Regenerate theme when color-affecting sliders change
   // This is a separate ref to track if this is the initial mount
   const hasInitializedRef = useRef(false);
+  // Fingerprint of the options used by the most recent generation. Lets flows
+  // that set options and generate in one action (randomize, URL init) commit
+  // their state update without this effect firing a duplicate generation.
+  const lastGeneratedOptionsRef = useRef<string | null>(null);
   useEffect(() => {
     // Skip effect on initial mount (handled by initialization useEffect)
     if (!hasInitializedRef.current) {
       hasInitializedRef.current = true;
+      return;
+    }
+    // Skip if the latest generation already used these exact option values
+    if (colorOptionsKey(designOptions) === lastGeneratedOptionsRef.current) {
       return;
     }
     // Only regenerate if we have a current theme
@@ -337,47 +352,48 @@ const App: React.FC = () => {
   const generateNewTheme = useCallback((
     genMode: GenerationMode,
     seed?: string,
-    saturation?: number,
-    contrast?: number,
-    brightness?: number,
     overridePalette?: string[],
-    overrideImportSourceSide?: ImportSourceSide
+    overrideImportSourceSide?: ImportSourceSide,
+    overrideOptions?: DesignOptions
   ) => {
+    // Flows that update design options and generate in the same action pass
+    // the new options directly, since the state update has not committed yet.
+    const opts = overrideOptions ?? designOptions;
+
     // Compute effective adjustment levels
     // When split is on, use per-mode values; otherwise use shared values
     let lightSat: number, lightCon: number, lightBri: number;
     let darkSat: number, darkCon: number, darkBri: number;
 
-    if (designOptions.splitAdjustments) {
-      lightSat = designOptions.lightSaturationLevel;
-      lightCon = designOptions.lightContrastLevel;
-      lightBri = designOptions.lightBrightnessLevel;
-      darkSat = designOptions.darkSaturationLevel;
-      darkCon = designOptions.darkContrastLevel;
-      darkBri = designOptions.darkBrightnessLevel;
+    if (opts.splitAdjustments) {
+      lightSat = opts.lightSaturationLevel;
+      lightCon = opts.lightContrastLevel;
+      lightBri = opts.lightBrightnessLevel;
+      darkSat = opts.darkSaturationLevel;
+      darkCon = opts.darkContrastLevel;
+      darkBri = opts.darkBrightnessLevel;
     } else {
-      const sLevel = saturation !== undefined ? saturation : designOptions.saturationLevel;
-      const cLevel = contrast !== undefined ? contrast : designOptions.contrastLevel;
-      const bLevel = brightness !== undefined ? brightness : designOptions.brightnessLevel;
-      lightSat = sLevel;
-      lightCon = cLevel;
-      lightBri = bLevel;
-      darkSat = sLevel;
-      darkCon = cLevel;
-      darkBri = bLevel;
+      lightSat = opts.saturationLevel;
+      lightCon = opts.contrastLevel;
+      lightBri = opts.brightnessLevel;
+      darkSat = opts.saturationLevel;
+      darkCon = opts.contrastLevel;
+      darkBri = opts.brightnessLevel;
     }
 
     const effectiveOverridePalette =
       overridePalette ?? (genMode === 'image' ? (imageOverridePalette ?? undefined) : undefined);
     const effectiveImportSourceSide =
       genMode === 'image'
-        ? (overrideImportSourceSide ?? imageImportSourceSide ?? (designOptions.darkFirst ? 'dark' : 'light'))
+        ? (overrideImportSourceSide ?? imageImportSourceSide ?? (opts.darkFirst ? 'dark' : 'light'))
         : undefined;
 
     const { light, dark, seed: newSeed } = generateTheme(
-      genMode, seed, lightSat, lightCon, lightBri, effectiveOverridePalette, designOptions.darkFirst,
+      genMode, seed, lightSat, lightCon, lightBri, effectiveOverridePalette, opts.darkFirst,
       darkSat, darkCon, darkBri, effectiveImportSourceSide
     );
+
+    lastGeneratedOptionsRef.current = colorOptionsKey(opts);
     
     // Preserve locked colors from current theme
     // Also lock related tokens when a base token is locked
@@ -447,6 +463,15 @@ const App: React.FC = () => {
       designOptions.darkBrightnessLevel, designOptions.darkContrastLevel, designOptions.darkSaturationLevel,
       lockedColors, currentTheme, imageOverridePalette, imageImportSourceSide]);
 
+  // Randomize unlocked design options and generate with them in one action,
+  // so generation sees the randomized values (not the stale committed state)
+  // and the regeneration effect does not fire a duplicate generation.
+  const randomizeAndGenerate = useCallback((genMode: GenerationMode) => {
+    const nextOptions = computeRandomizedOptions(designOptions);
+    setDesignOptions(nextOptions);
+    generateNewTheme(genMode, undefined, undefined, undefined, nextOptions);
+  }, [computeRandomizedOptions, designOptions, generateNewTheme]);
+
   // Update a single token (manual edit)
   const handleTokenUpdate = useCallback((side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => {
     if (!currentTheme) return;
@@ -514,10 +539,8 @@ const App: React.FC = () => {
         if (document.activeElement instanceof HTMLElement) {
           document.activeElement.blur();
         }
-        // Randomize unlocked design options first
-        randomizeDesignOptions();
-        // Then generate new theme (will use the new options)
-        generateNewTheme(mode);
+        // Randomize unlocked design options and generate atomically
+        randomizeAndGenerate(mode);
       }
       if (!isEditable && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -539,7 +562,7 @@ const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, generateNewTheme, randomizeDesignOptions, undo, redo]);
+  }, [mode, randomizeAndGenerate, undo, redo]);
 
 
   const handleImageConfirm = (palette: string[]) => {
@@ -547,7 +570,7 @@ const App: React.FC = () => {
     setImageOverridePalette(palette);
     setImageImportSourceSide(importSourceSide);
     handleModeChange('image');
-    generateNewTheme('image', undefined, undefined, undefined, undefined, palette, importSourceSide); 
+    generateNewTheme('image', undefined, palette, importSourceSide);
     setShowImagePickerModal(false);
   };
 
@@ -673,14 +696,9 @@ const App: React.FC = () => {
   }, [setSplitAdjustments]);
 
   const handleRandomize = useCallback(() => {
-    randomizeDesignOptions();
-    generateNewTheme(mode);
-  }, [randomizeDesignOptions, generateNewTheme, mode]);
+    randomizeAndGenerate(mode);
+  }, [randomizeAndGenerate, mode]);
 
-  const handleToggleSwatches = useCallback(() => setShowSwatches(prev => !prev), []);
-  const handleToggleOptions = useCallback(() => setShowOptions(prev => !prev), []);
-  const handleToggleHistory = useCallback(() => setShowHistory(prev => !prev), []);
-  const handleToggleTheme = useCallback(() => setIsDarkUI(prev => !prev), []);
   const handleShare = useCallback(() => setShowShareModal(true), []);
   
 
@@ -728,7 +746,7 @@ const App: React.FC = () => {
           {/* Mobile: Generate + Palette + Options Buttons */}
           <div className="md:hidden flex items-center gap-2">
             <button 
-              onClick={() => { randomizeDesignOptions(); generateNewTheme(mode); }}
+              onClick={handleRandomize}
               className="rounded-lg font-medium shadow-md transition-all active:transform active:scale-95 flex items-center overflow-hidden"
               style={{ backgroundColor: shellTheme.primary, color: shellTheme.primaryFg }}
             >
@@ -771,7 +789,7 @@ const App: React.FC = () => {
 
             <div className="flex items-center gap-2 shrink-0">
               <button 
-                onClick={() => { randomizeDesignOptions(); generateNewTheme(mode); }}
+                onClick={handleRandomize}
                 className="rounded-md font-medium shadow-md transition-all active:transform active:scale-95 flex items-center overflow-hidden group"
                 style={{ backgroundColor: shellTheme.primary, color: shellTheme.primaryFg }}
               >
@@ -1526,14 +1544,6 @@ const App: React.FC = () => {
                onRandomize={handleRandomize}
                onExport={exportTheme}
                onShare={handleShare}
-               onToggleSwatches={handleToggleSwatches}
-               onToggleOptions={handleToggleOptions}
-               onToggleHistory={handleToggleHistory}
-               onToggleTheme={handleToggleTheme}
-               autoSyncPreview={autoSyncPreview}
-               onAutoSyncPreviewChange={setAutoSyncPreview}
-               syncedWorkspaceTab={syncedWorkspaceTab}
-               onSyncedWorkspaceTabChange={setSyncedWorkspaceTab}
              />
           </div>
 
@@ -1551,14 +1561,6 @@ const App: React.FC = () => {
                onRandomize={handleRandomize}
                onExport={exportTheme}
                onShare={handleShare}
-               onToggleSwatches={handleToggleSwatches}
-               onToggleOptions={handleToggleOptions}
-               onToggleHistory={handleToggleHistory}
-               onToggleTheme={handleToggleTheme}
-               autoSyncPreview={autoSyncPreview}
-               onAutoSyncPreviewChange={setAutoSyncPreview}
-               syncedWorkspaceTab={syncedWorkspaceTab}
-               onSyncedWorkspaceTabChange={setSyncedWorkspaceTab}
              />
           </div>
         </div>

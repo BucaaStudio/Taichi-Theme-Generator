@@ -544,6 +544,61 @@ curl -X POST https://taichi.bucaastudio.com/api/export-theme \
                 >
             </div>
 
+            <!-- MCP Server -->
+            <h2 id="mcp">MCP Server (for AI Agents)</h2>
+            <p>
+                The generator is also exposed as a
+                <strong>Model Context Protocol</strong> server over streamable
+                HTTP, so AI agents (Claude, or any MCP client) can generate and
+                export themes as native tools. It runs stateless — every POST
+                is a self-contained JSON-RPC message, no session or auth
+                required.
+            </p>
+
+            <div class="endpoint-card">
+                <div class="endpoint-header">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/mcp</span>
+                    <span class="rate-limit">30 req/min</span>
+                </div>
+
+                <h3>Tools</h3>
+                <table class="param-table">
+                    <tr>
+                        <th>Tool</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">generate_theme</span></td>
+                        <td>
+                            Generate a dual light/dark theme. Same parameters
+                            as <code>/generate-theme</code>: style, baseColor,
+                            adjustment levels, <code>darkFirst</code>,
+                            <code>splitAdjustments</code>.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">export_theme</span></td>
+                        <td>
+                            Export a token &rarr; hex map as CSS, SCSS, LESS,
+                            Tailwind config, or JSON. Same options as
+                            <code>/export-theme</code>.
+                        </td>
+                    </tr>
+                </table>
+
+                <h3>Connect from Claude Code</h3>
+                <pre>claude mcp add --transport http taichi https://taichi.bucaastudio.com/api/mcp</pre>
+
+                <h3>Connect from any MCP client</h3>
+                <p>
+                    Point a streamable-HTTP MCP client at the URL below.
+                    Clients that only send <code>Accept: application/json</code>
+                    are accepted too — responses are always plain JSON.
+                </p>
+                <pre>https://taichi.bucaastudio.com/api/mcp</pre>
+            </div>
+
             <h2>Semantic Tokens (20 per theme)</h2>
             <p>
                 Each theme includes these 20 tokens. The response returns light + dark (40 token values total):

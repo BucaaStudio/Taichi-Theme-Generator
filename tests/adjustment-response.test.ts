@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { generateTheme } from '../utils/colorUtils';
 import { toOklch } from '../utils/oklch';
 import { contrastRatio } from '../utils/contrast';
+import type { ThemeTokens } from '../types';
 
 const MODES = [
   'monochrome',
@@ -32,7 +33,7 @@ function buildSeed(index: number): string {
   );
 }
 
-function avgLightness(theme: Record<string, string>, keys: readonly string[]): number {
+function avgLightness(theme: ThemeTokens, keys: readonly (keyof ThemeTokens)[]): number {
   let sum = 0;
   for (const key of keys) {
     sum += toOklch(theme[key]).L;
@@ -40,7 +41,7 @@ function avgLightness(theme: Record<string, string>, keys: readonly string[]): n
   return sum / keys.length;
 }
 
-function lightnessSpread(theme: Record<string, string>, keys: readonly string[]): number {
+function lightnessSpread(theme: ThemeTokens, keys: readonly (keyof ThemeTokens)[]): number {
   const values = keys.map((key) => toOklch(theme[key]).L);
   return Math.max(...values) - Math.min(...values);
 }

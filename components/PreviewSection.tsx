@@ -1,14 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  Palette, Shuffle, Image as ImageIcon,
+  Palette, Shuffle,
   ChevronRight, Check, Copy, Download, Share2,
   Sliders, Sparkles, Upload, Github,
-  Lock
+  Lock, Server, Bot
 } from 'lucide-react';
 import { DesignOptions, ThemeTokens } from '../types';
 import { contrastRatio, selectForegroundHex } from '../utils/contrast';
 
-type WorkspaceTab = 'overview' | 'tokens' | 'delivery';
 type AdjustmentOptionKey =
   | 'saturationLevel'
   | 'brightnessLevel'
@@ -29,14 +28,6 @@ interface PreviewProps {
   onRandomize?: () => void;
   onExport?: () => void;
   onShare?: () => void;
-  onToggleSwatches?: () => void;
-  onToggleOptions?: () => void;
-  onToggleHistory?: () => void;
-  onToggleTheme?: () => void;
-  autoSyncPreview?: boolean;
-  onAutoSyncPreviewChange?: (value: boolean) => void;
-  syncedWorkspaceTab?: WorkspaceTab;
-  onSyncedWorkspaceTabChange?: (tab: WorkspaceTab) => void;
 }
 
 // Controlled Slider Component
@@ -115,33 +106,15 @@ const PreviewSection: React.FC<PreviewProps> = ({
   onOpenImagePicker,
   onRandomize,
   onExport,
-  onShare,
-  onToggleSwatches,
-  onToggleOptions,
-  onToggleHistory,
-  onToggleTheme,
-  autoSyncPreview,
-  onAutoSyncPreviewChange,
-  syncedWorkspaceTab,
-  onSyncedWorkspaceTabChange
+  onShare
 }) => {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => ({
     start: true,
     adjust: true,
-    swatches: true,
-    export: true
-  }));
-  const [localWorkspaceTab, setLocalWorkspaceTab] = useState<WorkspaceTab>('overview');
-  const [reviewNotes, setReviewNotes] = useState('Check contrast for body text and confirm brand accents.');
-  const [deliveryNote, setDeliveryNote] = useState('Theme ready for QA. Share CSS tokens with engineering.');
-  const [tokenFilter, setTokenFilter] = useState('');
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
-  const [reviewLevel, setReviewLevel] = useState<'quick' | 'balanced' | 'deep'>('balanced');
-  const [checklist, setChecklist] = useState({
-    contrast: true,
-    tokens: false,
+    swatches: false,
     export: false
-  });
+  }));
+  const [copiedCommand, setCopiedCommand] = useState(false);
   
   // Style utilities based on options
   const getRadius = (level: number) => {
@@ -243,9 +216,6 @@ const PreviewSection: React.FC<PreviewProps> = ({
   const hoverCardClass = 'transition-colors duration-200 hover:bg-t-card2';
   const tokenChipClass = 'font-semibold px-1.5 py-0.5 rounded bg-t-text/10';
   const neutralChipClass = 'font-semibold px-2 py-1 rounded bg-[color-mix(in_oklab,var(--text),transparent_12%)] ring-1 ring-[color-mix(in_oklab,var(--border),transparent_45%)]';
-  const ringChipClass = 'font-semibold px-1.5 py-0.5 rounded bg-t-text/10 ring-1 ring-[var(--ring)]';
-  const isAutoSync = autoSyncPreview ?? true;
-  const activeWorkspaceTab = isAutoSync && syncedWorkspaceTab ? syncedWorkspaceTab : localWorkspaceTab;
   const isDarkPanel = themeName === 'Dark';
   const saturationKey: AdjustmentOptionKey = options.splitAdjustments
     ? (isDarkPanel ? 'darkSaturationLevel' : 'lightSaturationLevel')
@@ -256,43 +226,6 @@ const PreviewSection: React.FC<PreviewProps> = ({
   const contrastKey: AdjustmentOptionKey = options.splitAdjustments
     ? (isDarkPanel ? 'darkContrastLevel' : 'lightContrastLevel')
     : 'contrastLevel';
-
-  useEffect(() => {
-    if (isAutoSync && syncedWorkspaceTab) {
-      setLocalWorkspaceTab(syncedWorkspaceTab);
-    }
-  }, [isAutoSync, syncedWorkspaceTab]);
-
-  const checklistItems = [
-    { key: 'contrast', label: 'Contrast check verified', helper: 'Text on background passes AA.' },
-    { key: 'tokens', label: 'Tokens locked', helper: 'Primary and accent are pinned.' },
-    { key: 'export', label: 'Export package ready', helper: 'CSS + JSON prepared.' }
-  ] as const;
-
-  const completedCount = checklistItems.filter(item => checklist[item.key]).length;
-  const checklistProgress = Math.round((completedCount / checklistItems.length) * 100);
-
-  const tokenRows = [
-    { key: 'primary', label: 'Primary', value: themeTokens.primary, varName: '--primary' },
-    { key: 'secondary', label: 'Secondary', value: themeTokens.secondary, varName: '--secondary' },
-    { key: 'accent', label: 'Accent', value: themeTokens.accent, varName: '--accent' },
-    { key: 'good', label: 'Good', value: themeTokens.good, varName: '--good' },
-    { key: 'bad', label: 'Bad', value: themeTokens.bad, varName: '--bad' },
-    { key: 'bg', label: 'Background', value: themeTokens.bg, varName: '--bg' },
-    { key: 'card', label: 'Surface', value: themeTokens.card, varName: '--card' },
-    { key: 'text', label: 'Text', value: themeTokens.text, varName: '--text' },
-    { key: 'border', label: 'Border', value: themeTokens.border, varName: '--border' },
-    { key: 'ring', label: 'Ring', value: themeTokens.ring, varName: '--ring' }
-  ];
-  const filteredTokens = tokenRows.filter(token => {
-    const query = tokenFilter.trim().toLowerCase();
-    if (!query) return true;
-    return (
-      token.label.toLowerCase().includes(query) ||
-      token.key.toLowerCase().includes(query) ||
-      token.varName.toLowerCase().includes(query)
-    );
-  });
 
   const buildCssText = () => {
     const cssTokens: Array<[string, string]> = [
@@ -321,13 +254,6 @@ const PreviewSection: React.FC<PreviewProps> = ({
     return `:root {\n${lines.join('\n')}\n}\n`;
   };
 
-  const handleCopyToken = (tokenKey: string, value: string) => {
-    if (!navigator.clipboard) return;
-    navigator.clipboard.writeText(value);
-    setCopiedToken(tokenKey);
-    setTimeout(() => setCopiedToken(null), 1200);
-  };
-
   const handleDownloadCss = () => {
     const cssText = buildCssText();
     const blob = new Blob([cssText], { type: 'text/css' });
@@ -345,21 +271,13 @@ const PreviewSection: React.FC<PreviewProps> = ({
     navigator.clipboard.writeText(cssText);
   };
 
-  const handleWorkspaceTabChange = (tab: WorkspaceTab) => {
-    if (isAutoSync) {
-      onSyncedWorkspaceTabChange?.(tab);
-    } else {
-      setLocalWorkspaceTab(tab);
-    }
-  };
+  const mcpCommand = 'claude mcp add --transport http taichi https://taichi.bucaastudio.com/api/mcp';
 
-  const handleAutoSyncToggle = (next: boolean) => {
-    if (!next) {
-      setLocalWorkspaceTab(activeWorkspaceTab);
-    } else {
-      onSyncedWorkspaceTabChange?.(localWorkspaceTab);
-    }
-    onAutoSyncPreviewChange?.(next);
+  const handleCopyMcpCommand = () => {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(mcpCommand);
+    setCopiedCommand(true);
+    setTimeout(() => setCopiedCommand(false), 1500);
   };
 
   const toggleSection = (section: string) => {
@@ -374,7 +292,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
       
       {/* Hero Section with Background Image */}
       <section
-        className={`relative overflow-hidden ${rClass} ${bClass} ${sClass} ${hoverLiftClass} p-8 md:p-12`}
+        className={`relative overflow-hidden ${rClass} ${bClass} ${sClass} ${hoverLiftClass} p-6 md:p-8`}
         style={{
           backgroundImage: `url('/hero-bg.jpg')`,
           backgroundSize: 'cover',
@@ -389,32 +307,28 @@ const PreviewSection: React.FC<PreviewProps> = ({
         </div>
 
         {/* Content */}
-        <div className="relative z-10 space-y-2 pt-8">
-          <h1 className="text-4xl md:text-5xl lg:text-7xl font-black tracking-tight text-left leading-tight">
-            <span className="text-t-text block">Taichi</span>
-            <span className="block">
-              <span
-                className={useGradientHeading ? 'bg-clip-text text-transparent bg-t-primary bg-[linear-gradient(to_bottom,color-mix(in_oklab,var(--primary),white_18%),color-mix(in_oklab,var(--primary),black_10%))]' : ''}
-                style={!useGradientHeading ? { color: headingAccent } : undefined}
-              >
-                Theme Generator
-              </span>
+        <div className="relative z-10 space-y-2 pt-6">
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tight text-left leading-tight">
+            <span className="text-t-text">Taichi </span>
+            <span
+              className={useGradientHeading ? 'bg-clip-text text-transparent bg-t-primary bg-[linear-gradient(to_bottom,color-mix(in_oklab,var(--primary),white_18%),color-mix(in_oklab,var(--primary),black_10%))]' : ''}
+              style={!useGradientHeading ? { color: headingAccent } : undefined}
+            >
+              Theme Generator
             </span>
           </h1>
-          <p className="text-lg text-t-textMuted max-w-xl text-left pt-4">
-            Generate balanced color palettes using the <strong style={{ color: interactiveAccent }}>OKLCH color space</strong>, automatically create matching light and dark themes, and tune{' '}
+          <p className="text-base text-t-textMuted max-w-xl text-left pt-2">
+            Generate balanced <strong style={{ color: interactiveAccent }}>OKLCH</strong> palettes with matching light and dark modes across{' '}
             <span className={`text-t-bg ${neutralChipClass}`}>background</span>,{' '}
-            <span className={`text-t-card ${neutralChipClass}`}>surface</span>,{' '}
             <span className="text-t-text font-semibold">text</span>,{' '}
-            <span className="text-t-text font-semibold px-2 py-1 rounded ring-1 ring-t-border">border</span>,{' '}
-            <span className={`text-t-text ${ringChipClass}`}>ring</span>,{' '}
             <span className={`text-t-primary ${tokenChipClass}`}>primary</span>,{' '}
             <span className={`text-t-secondary ${tokenChipClass}`}>secondary</span>,{' '}
-            <span className={`text-t-accent ${tokenChipClass}`}>accent</span>,{' '}
-            <span className={`text-t-good ${tokenChipClass}`}>good</span>, and{' '}
-            <span className={`text-t-bad ${tokenChipClass}`}>bad</span> colors across real UI components. Export CSS variables and share themes with your team.
+            <span className={`text-t-accent ${tokenChipClass}`}>accent</span>, and{' '}
+            <span className={`text-t-good ${tokenChipClass}`}>semantic</span> tokens. Export CSS variables, share by URL, or generate programmatically through the{' '}
+            <a href="/api-docs.html" className="font-semibold underline decoration-2 underline-offset-2 transition-opacity hover:opacity-80" style={{ color: interactiveAccent }}>REST API</a> and{' '}
+            <a href="/api-docs.html#mcp" className="font-semibold underline decoration-2 underline-offset-2 transition-opacity hover:opacity-80" style={{ color: interactiveAccent }}>MCP server</a> for AI agents.
           </p>
-          <p className="text-sm text-t-textMuted max-w-xl text-left pt-2">
+          <p className="text-sm text-t-textMuted max-w-xl text-left pt-1">
             Press [Space] to Generate a new theme
           </p>
         </div>
@@ -669,6 +583,15 @@ const PreviewSection: React.FC<PreviewProps> = ({
                   </button>
                   
                   <button
+                    onClick={onExport}
+                    disabled={!onExport}
+                    className={`bg-t-text/10 text-t-text px-5 py-2.5 ${rClass} font-medium ${bClass} ${sClass} transition-all hover:bg-t-text/20 active:scale-95 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    <Download size={16} />
+                    Export JSON
+                  </button>
+
+                  <button
                     onClick={handleCopyTokens}
                     className={`bg-t-text/10 text-t-text px-5 py-2.5 ${rClass} font-medium ${bClass} ${sClass} transition-all hover:bg-t-text/20 active:scale-95 flex items-center gap-2`}
                   >
@@ -682,256 +605,74 @@ const PreviewSection: React.FC<PreviewProps> = ({
         </div>
       </section>
 
-      <section className={`${bClass} ${rClass} ${sClass} ${hoverLiftClass} ${hoverCardClass} bg-t-card p-6 space-y-6`}>
+      {/* Developer Access: REST API + MCP */}
+      <section className={`${bClass} ${rClass} ${sClass} ${hoverLiftClass} ${hoverCardClass} bg-t-card p-6 space-y-4`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-wider text-t-textMuted">Workspace</p>
-            <h2 className="text-xl font-bold text-t-text">Theme Review Hub</h2>
-            <p className="text-sm text-t-textMuted">
-              Validate tokens, track readiness, and prep exports without leaving the preview.
+            <p className="text-xs uppercase tracking-wider text-t-textMuted">Developer Access</p>
+            <h2 className="text-xl font-bold text-t-text">Generate themes programmatically</h2>
+          </div>
+          <a
+            href="/api-docs.html"
+            className={`bg-t-text/10 text-t-text px-3 py-2 ${rClass} ${bClass} text-xs font-semibold flex items-center gap-2 transition-colors hover:bg-t-text/20`}
+          >
+            View full docs
+            <ChevronRight size={14} />
+          </a>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
+            <div className="flex items-center gap-2">
+              <div className={`w-8 h-8 ${rClass} ${gradientClass} flex items-center justify-center text-t-primaryFg`}>
+                <Server size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-t-text">REST API</p>
+                <p className="text-[11px] text-t-textMuted">No auth · rate-limited · JSON</p>
+              </div>
+            </div>
+            <div className="space-y-1.5 font-mono text-xs">
+              <p className={`${rClass} bg-t-text/10 px-3 py-2 text-t-text`}>
+                <span className="text-t-primary font-bold">POST</span> /api/generate-theme
+              </p>
+              <p className={`${rClass} bg-t-text/10 px-3 py-2 text-t-text`}>
+                <span className="text-t-primary font-bold">POST</span> /api/export-theme
+              </p>
+            </div>
+            <p className="text-xs" style={{ color: cardReadableMuted }}>
+              Same engine as this page: 20 tokens per mode, seeded and deterministic.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={onRandomize}
-              disabled={!onRandomize}
-              className={`${gradientClass} text-t-primaryFg px-3 py-2 ${rClass} ${sClass} text-xs font-semibold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60`}
-            >
-              <Shuffle size={14} />
-              New Variation
-            </button>
-            <button
-              onClick={handleCopyTokens}
-              className={`bg-t-text/10 text-t-text px-3 py-2 ${rClass} ${bClass} text-xs font-semibold flex items-center gap-2 transition-colors hover:bg-t-text/20`}
-            >
-              <Copy size={14} />
-              Copy CSS
-            </button>
-          </div>
-        </div>
 
-        <div className="flex flex-wrap gap-2">
-          {(['overview', 'tokens', 'delivery'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => handleWorkspaceTabChange(tab)}
-              className={`${rClass} px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors ${
-                activeWorkspaceTab === tab
-                  ? 'bg-t-primary/15 text-t-primary hover:bg-t-primary/20'
-                  : 'bg-t-text/10 text-t-text hover:bg-t-text/20 hover:text-t-primary'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {activeWorkspaceTab === 'overview' && (
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-5 space-y-4`}>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-t-textMuted">Readiness</p>
-                  <h3 className="text-lg font-semibold text-t-text">Theme checklist</h3>
-                </div>
-                <span className={`text-xs font-semibold ${rClass} bg-t-primary/15 text-t-primary px-2 py-1`}>
-                  {checklistProgress}% ready
-                </span>
+          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
+            <div className="flex items-center gap-2">
+              <div className={`w-8 h-8 ${rClass} ${gradientAccent} flex items-center justify-center text-t-accentFg`}>
+                <Bot size={16} />
               </div>
-              <div className="h-2 w-full rounded-full bg-t-text/10">
-                <div
-                  className={`h-full ${rClass} ${gradientClass}`}
-                  style={{ width: `${checklistProgress}%` }}
-                />
-              </div>
-              <div className="space-y-2">
-                {checklistItems.map((item) => (
-                  <label key={item.key} className="flex items-start gap-3 text-sm text-t-text">
-                    <input
-                      type="checkbox"
-                      checked={checklist[item.key]}
-                      onChange={() =>
-                        setChecklist((prev) => ({ ...prev, [item.key]: !prev[item.key] }))
-                      }
-                      className="mt-1 h-4 w-4"                    />
-                    <span>
-                      <span className="font-semibold">{item.label}</span>
-                      <span className="block text-xs text-t-textMuted">{item.helper}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-5 space-y-3`}>
-                <label className="text-xs font-semibold uppercase tracking-wider text-t-textMuted">
-                  Review Notes
-                </label>
-                <textarea
-                  value={reviewNotes}
-                  onChange={(e) => setReviewNotes(e.target.value)}
-                  rows={4}
-                  className={`w-full resize-none px-3 py-2 ${rClass} ${bClass} bg-t-bg text-sm text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
-                />
-                <label className="flex items-center justify-between text-xs text-t-textMuted">
-                  <span>Auto-sync preview: {isAutoSync ? 'On' : 'Off'}</span>
-                  <input
-                    type="checkbox"
-                    checked={isAutoSync}
-                    onChange={(e) => handleAutoSyncToggle(e.target.checked)}
-                    className="h-4 w-4"                  />
-                </label>
-              </div>
-              <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-5 space-y-3`}>
-                <label className="text-xs font-semibold uppercase tracking-wider text-t-textMuted">
-                  Review depth
-                </label>
-                <select
-                  value={reviewLevel}
-                  onChange={(e) => setReviewLevel(e.target.value as typeof reviewLevel)}
-                  className={`w-full px-3 py-2 ${rClass} ${bClass} bg-t-bg text-sm text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
-                >
-                  <option value="quick">Quick pass</option>
-                  <option value="balanced">Balanced review</option>
-                  <option value="deep">Deep audit</option>
-                </select>
-                <button
-                  onClick={onToggleTheme}
-                  disabled={!onToggleTheme}
-                  className={`w-full ${rClass} ${bClass} bg-t-card text-sm font-semibold text-t-text py-2 transition-colors hover:bg-t-card2 disabled:cursor-not-allowed disabled:opacity-60`}
-                >
-                  Toggle UI theme preview
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeWorkspaceTab === 'tokens' && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-xs uppercase tracking-wider text-t-textMuted">Token inventory</p>
-                <h3 className="text-lg font-semibold text-t-text">Core theme tokens</h3>
+                <p className="text-sm font-semibold text-t-text">MCP Server <span className={`ml-1 align-middle text-[10px] font-bold uppercase ${rClass} bg-t-accent/15 text-t-accent px-1.5 py-0.5`}>New</span></p>
+                <p className="text-[11px] text-t-textMuted">generate_theme · export_theme tools for AI agents</p>
               </div>
-              <input
-                value={tokenFilter}
-                onChange={(e) => setTokenFilter(e.target.value)}
-                placeholder="Filter tokens"
-                className={`w-full sm:w-56 px-3 py-2 ${rClass} ${bClass} bg-t-bg text-sm text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
-              />
             </div>
-            <div className="space-y-2">
-              {filteredTokens.map((token) => (
-                <div
-                  key={token.key}
-                  className={`flex flex-wrap items-center justify-between gap-3 ${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 px-3 py-2`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`h-8 w-8 ${rClass} ${bClass}`}
-                      style={{ backgroundColor: token.value }}
-                    />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-t-text truncate">{token.label}</p>
-                      <p className="text-[11px] text-t-textMuted">{token.varName}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs font-mono text-t-text">
-                    <span className="truncate">{token.value}</span>
-                    <button
-                      onClick={() => handleCopyToken(token.key, token.value)}
-                      className={`flex items-center justify-center ${rClass} ${bClass} bg-t-card px-2 py-1 text-xs transition-colors hover:bg-t-card2`}
-                    >
-                      {copiedToken === token.key ? (
-                        <Check size={12} className="text-t-good" />
-                      ) : (
-                        <Copy size={12} className="text-t-textMuted" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {filteredTokens.length === 0 && (
-                <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 px-3 py-6 text-center text-sm text-t-textMuted`}>
-                  No tokens match that filter.
-                </div>
+            <button
+              onClick={handleCopyMcpCommand}
+              className={`w-full text-left ${rClass} bg-t-text/10 px-3 py-2 font-mono text-xs text-t-text flex items-center justify-between gap-2 transition-colors hover:bg-t-text/20`}
+              title="Copy command"
+            >
+              <span className="truncate">claude mcp add --transport http taichi …/api/mcp</span>
+              {copiedCommand ? (
+                <Check size={12} className="text-t-good shrink-0" />
+              ) : (
+                <Copy size={12} className="text-t-textMuted shrink-0" />
               )}
-            </div>
+            </button>
+            <p className="text-xs" style={{ color: cardReadableMuted }}>
+              Streamable HTTP, no session or auth needed — point any MCP client at{' '}
+              <span className="font-mono text-t-text">/api/mcp</span>.
+            </p>
           </div>
-        )}
-
-        {activeWorkspaceTab === 'delivery' && (
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-5 space-y-4`}>
-              <div>
-                <p className="text-xs uppercase tracking-wider text-t-textMuted">Deliverables</p>
-                <h3 className="text-lg font-semibold text-t-text">Exports & sharing</h3>
-              </div>
-              <p className="text-sm text-t-textMuted">
-                Package tokens for engineering or share a live URL with your team.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={handleDownloadCss}
-                  className={`${gradientClass} text-t-primaryFg px-3 py-2 ${rClass} ${sClass} text-xs font-semibold flex items-center gap-2 transition-all hover:scale-105 active:scale-95`}
-                >
-                  <Download size={14} />
-                  Download CSS
-                </button>
-                <button
-                  onClick={onExport}
-                  disabled={!onExport}
-                  className={`bg-t-text/10 text-t-text px-3 py-2 ${rClass} ${bClass} text-xs font-semibold flex items-center gap-2 transition-colors hover:bg-t-text/20 disabled:cursor-not-allowed disabled:opacity-60`}
-                >
-                  <Download size={14} />
-                  Export JSON
-                </button>
-                <button
-                  onClick={onShare}
-                  disabled={!onShare}
-                  className={`bg-t-text/10 text-t-text px-3 py-2 ${rClass} ${bClass} text-xs font-semibold flex items-center gap-2 transition-colors hover:bg-t-text/20 disabled:cursor-not-allowed disabled:opacity-60`}
-                >
-                  <Share2 size={14} />
-                  Share URL
-                </button>
-              </div>
-            </div>
-            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-5 space-y-4`}>
-              <div>
-                <p className="text-xs uppercase tracking-wider text-t-textMuted">Release note</p>
-                <h3 className="text-lg font-semibold text-t-text">Team update</h3>
-              </div>
-              <textarea
-                value={deliveryNote}
-                onChange={(e) => setDeliveryNote(e.target.value)}
-                rows={5}
-                className={`w-full resize-none px-3 py-2 ${rClass} ${bClass} bg-t-bg text-sm text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
-              />
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => {
-                    if (!navigator.clipboard) return;
-                    navigator.clipboard.writeText(deliveryNote);
-                  }}
-                  className={`bg-t-text/10 text-t-text px-3 py-2 ${rClass} ${bClass} text-xs font-semibold flex items-center gap-2 transition-colors hover:bg-t-text/20`}
-                >
-                  <Copy size={14} />
-                  Copy note
-                </button>
-                <button
-                  onClick={onShare}
-                  disabled={!onShare}
-                  className={`${gradientSecondary} text-t-secondaryFg px-3 py-2 ${rClass} ${sClass} text-xs font-semibold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60`}
-                >
-                  <Share2 size={14} />
-                  Open share sheet
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </section>
 
       <section className={`relative overflow-hidden ${bClass} ${rClass} ${sClass} ${hoverLiftClass} ${hoverCardClass} bg-t-card p-6`}>
@@ -1220,6 +961,14 @@ const PreviewSection: React.FC<PreviewProps> = ({
                 <polyline points="8 6 2 12 8 18"></polyline>
               </svg>
               API
+            </a>
+            <a
+              href="/api-docs.html#mcp"
+              className="flex items-center gap-1.5 text-xs text-t-textMuted hover:text-t-primary transition-colors"
+              title="MCP Server for AI Agents"
+            >
+              <Bot size={16} />
+              MCP
             </a>
             <a href="https://github.com/BucaaStudio/Taichi-Theme-Generator" target="_blank" rel="noopener noreferrer" className="text-t-textMuted hover:text-t-primary transition-colors">
               <Github size={20} />

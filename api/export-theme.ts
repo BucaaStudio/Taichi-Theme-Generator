@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { buildThemeExport, VALID_EXPORT_FORMATS, type ExportFormat } from './utils/theme-export';
 
 // Inline rate limiting
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
@@ -29,9 +30,9 @@ async function rateLimit(req: VercelRequest, max: number, windowMs: number) {
 
 /**
  * API Endpoint: Export Theme
- * 
+ *
  * Exports a theme in various formats (CSS, JSON, Tailwind config, etc.)
- * 
+ *
  * Rate Limit: 15 requests per minute per IP
  */
 export default async function handler(
@@ -81,11 +82,10 @@ export default async function handler(
       });
     }
 
-    const validFormats = ['css', 'json', 'tailwind', 'scss', 'less'];
-    if (!validFormats.includes(format)) {
+    if (!VALID_EXPORT_FORMATS.includes(format)) {
       return res.status(400).json({
         success: false,
-        error: `Invalid format. Must be one of: ${validFormats.join(', ')}`,
+        error: `Invalid format. Must be one of: ${VALID_EXPORT_FORMATS.join(', ')}`,
         code: 'INVALID_FORMAT'
       });
     }
@@ -93,31 +93,7 @@ export default async function handler(
     const prefix = options.prefix || 'taichi';
     const includeComments = options.includeComments !== false;
 
-    let content: string;
-    let filename: string;
-
-    switch (format) {
-      case 'css':
-        content = exportAsCSS(theme, prefix, includeComments);
-        filename = `${prefix}-theme.css`;
-        break;
-      case 'scss':
-        content = exportAsSCSS(theme, prefix, includeComments);
-        filename = `${prefix}-theme.scss`;
-        break;
-      case 'less':
-        content = exportAsLESS(theme, prefix, includeComments);
-        filename = `${prefix}-theme.less`;
-        break;
-      case 'tailwind':
-        content = exportAsTailwind(theme, includeComments);
-        filename = 'tailwind.config.js';
-        break;
-      case 'json':
-      default:
-        content = JSON.stringify(theme, null, 2);
-        filename = `${prefix}-theme.json`;
-    }
+    const { content, filename } = buildThemeExport(theme, format as ExportFormat, prefix, includeComments);
 
     return res.status(200).json({
       success: true,
@@ -134,116 +110,4 @@ export default async function handler(
       code: 'INTERNAL_ERROR'
     });
   }
-}
-
-function exportAsCSS(theme: Record<string, string>, prefix: string, includeComments: boolean): string {
-  const lines: string[] = [];
-  
-  if (includeComments) {
-    lines.push('/**');
-    lines.push(' * Taichi Theme Generator - Theme Export');
-    lines.push(` * Generated: ${new Date().toISOString()}`);
-    lines.push(' * Format: CSS Custom Properties');
-    lines.push(' */\n');
-  }
-  
-  lines.push(':root {');
-  Object.entries(theme).forEach(([key, value]) => {
-    const varName = `--${prefix}-${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
-    lines.push(`  ${varName}: ${value};`);
-  });
-  lines.push('}\n');
-  
-  if (includeComments) {
-    lines.push('/* Usage example:');
-    lines.push(` * color: var(--${prefix}-primary);`);
-    lines.push(' */');
-  }
-  
-  return lines.join('\n');
-}
-
-function exportAsSCSS(theme: Record<string, string>, prefix: string, includeComments: boolean): string {
-  const lines: string[] = [];
-  
-  if (includeComments) {
-    lines.push('//');
-    lines.push('// Taichi Theme Generator - Theme Export');
-    lines.push(`// Generated: ${new Date().toISOString()}`);
-    lines.push('// Format: SCSS Variables');
-    lines.push('//\n');
-  }
-  
-  Object.entries(theme).forEach(([key, value]) => {
-    const varName = `$${prefix}-${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
-    lines.push(`${varName}: ${value};`);
-  });
-  
-  if (includeComments) {
-    lines.push('\n// Usage example:');
-    lines.push(`// color: $${prefix}-primary;`);
-  }
-  
-  return lines.join('\n');
-}
-
-function exportAsLESS(theme: Record<string, string>, prefix: string, includeComments: boolean): string {
-  const lines: string[] = [];
-  
-  if (includeComments) {
-    lines.push('//');
-    lines.push('// Taichi Theme Generator - Theme Export');
-    lines.push(`// Generated: ${new Date().toISOString()}`);
-    lines.push('// Format: LESS Variables');
-    lines.push('//\n');
-  }
-  
-  Object.entries(theme).forEach(([key, value]) => {
-    const varName = `@${prefix}-${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
-    lines.push(`${varName}: ${value};`);
-  });
-  
-  if (includeComments) {
-    lines.push('\n// Usage example:');
-    lines.push(`// color: @${prefix}-primary;`);
-  }
-  
-  return lines.join('\n');
-}
-
-function exportAsTailwind(theme: Record<string, string>, includeComments: boolean): string {
-  const lines: string[] = [];
-  
-  if (includeComments) {
-    lines.push('/**');
-    lines.push(' * Taichi Theme Generator - Theme Export');
-    lines.push(` * Generated: ${new Date().toISOString()}`);
-    lines.push(' * Format: Tailwind CSS Configuration');
-    lines.push(' */\n');
-  }
-  
-  lines.push('module.exports = {');
-  lines.push('  theme: {');
-  lines.push('    extend: {');
-  lines.push('      colors: {');
-  lines.push('        taichi: {');
-  
-  Object.entries(theme).forEach(([key, value], index, array) => {
-    const isLast = index === array.length - 1;
-    const kebabKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
-    lines.push(`          '${kebabKey}': '${value}'${isLast ? '' : ','}`);
-  });
-  
-  lines.push('        }');
-  lines.push('      }');
-  lines.push('    }');
-  lines.push('  }');
-  lines.push('}');
-  
-  if (includeComments) {
-    lines.push('\n// Usage example:');
-    lines.push('// <div className="bg-taichi-primary text-taichi-text">...');
-  }
-  
-  return lines.join('\n');
 }

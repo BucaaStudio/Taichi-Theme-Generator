@@ -15,6 +15,7 @@ free tier:
 
 - **Generate Theme:** 10 requests/minute
 - **Export Theme:** 15 requests/minute
+- **MCP:** 30 requests/minute
 
 When rate limited, you'll receive a `429` status code with a `retryAfter` field
 indicating seconds until reset.
@@ -199,6 +200,37 @@ Convert a theme object into developer-ready code formats.
     "filename": "taichi-theme.css"
 }
 ```
+
+---
+
+### 3. MCP Server
+
+An MCP (Model Context Protocol) endpoint that exposes the theme generator to
+AI agents over streamable HTTP. It runs in stateless mode: every POST carries
+a self-contained JSON-RPC message and no session is required.
+
+**Endpoint:** `POST /api/mcp`
+
+**Rate Limit:** 30 requests/minute
+
+#### Tools
+
+| Tool             | Description                                                                                        |
+| ---------------- | -------------------------------------------------------------------------------------------------- |
+| `generate_theme` | Generate a dual (light + dark) theme. Same parameters as `/api/generate-theme` (style, baseColor, adjustment levels, darkFirst, splitAdjustments). |
+| `export_theme`   | Export a token → hex map as CSS, SCSS, LESS, Tailwind config, or JSON. Same options as `/api/export-theme`. |
+
+#### Connecting
+
+Claude Code:
+
+```bash
+claude mcp add --transport http taichi https://taichi.bucaastudio.com/api/mcp
+```
+
+Any MCP client supporting streamable HTTP can connect with the URL alone — no
+authentication needed. Clients that only send `Accept: application/json` are
+also accepted; responses are always plain JSON.
 
 ---
 

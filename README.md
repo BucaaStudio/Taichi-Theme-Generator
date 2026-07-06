@@ -222,6 +222,17 @@ const { light, dark, metadata } = await response.json();
 - **POST /api/generate-theme** - Generate balanced light/dark themes (10
   req/min)
 - **POST /api/export-theme** - Export themes in multiple formats (15 req/min)
+- **POST /api/mcp** - MCP server (streamable HTTP) exposing `generate_theme`
+  and `export_theme` tools for AI agents (30 req/min)
+
+### MCP (Model Context Protocol)
+
+AI agents can use the theme generator directly through the MCP endpoint. Add
+it to any MCP client that supports streamable HTTP, e.g. Claude Code:
+
+```bash
+claude mcp add --transport http taichi https://taichi.bucaastudio.com/api/mcp
+```
 
 ### Documentation
 

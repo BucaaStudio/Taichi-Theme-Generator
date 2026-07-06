@@ -1,7 +1,7 @@
 {
   "name": "taichi-theme-generator",
   "private": true,
-  "version": "26.2.5",
+  "version": "26.7.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,11 +13,13 @@
   },
   "dependencies": {
     "@bucaastudio/versioned-footer": "^1.0.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "lucide-react": "^0.562.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "vercel": "^25.2.0"
+    "vercel": "^25.2.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
