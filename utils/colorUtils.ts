@@ -163,7 +163,11 @@ export function applyAdjustments(
     'primaryFg', 'secondaryFg', 'accentFg', 'goodFg', 'warnFg', 'badFg',
   ] as const;
 
-  const finalizeAdjustedTokens = (adjusted: Record<string, string>, contrastForReadability: number): ThemeTokens => {
+  const finalizeAdjustedTokens = (
+    adjusted: Record<string, string>,
+    contrastForReadability: number,
+    desiredOccupancy?: Record<string, number>
+  ): ThemeTokens => {
     // Verify Fg tokens still contrast against their bg; fall back to re-derivation
     // if needed. When the user has intentionally lowered contrast, scale the
     // thresholds so re-derivation doesn't undo the compression.
@@ -338,6 +342,36 @@ export function applyAdjustments(
         if (worstRatio >= minRatio) break;
         color = adjustForContrast(color, toOklch(adjusted[worstKey]), minRatio);
       }
+
+      // Contrast fitting moves lightness into a narrower gamut slice, which
+      // flattens the saturation slider for luminance-bright hues (yellow-greens
+      // converge to one constrained color at every saturation setting). Restore
+      // the slider's intended gamut occupancy at the settled lightness, backing
+      // off only if that would break the contrast floor.
+      const desired = desiredOccupancy?.[key];
+      if (desired !== undefined) {
+        const cMax = Math.max(0.001, maxGamutChromaAt(color.L, color.H));
+        const targetC = Math.min(cMax, desired * cMax);
+        if (targetC > color.C + 0.001) {
+          // Extra chroma adds luminance on bright hues, so pair each chroma
+          // candidate with a small compensating darkening step.
+          const halfC = (color.C + targetC) / 2;
+          const candidates: Array<[number, number]> = [
+            [color.L, targetC],
+            [color.L - 0.02, targetC],
+            [color.L, halfC],
+            [color.L - 0.02, halfC],
+          ];
+          for (const [candL, candC] of candidates) {
+            const boosted = clampToSRGBGamut({ L: Math.max(0.1, candL), C: candC, H: color.H });
+            if (boosted.C <= color.C + 0.001) continue;
+            if (getWorstSurface(toHex(boosted), surfaces).ratio >= minRatio - 0.05) {
+              color = boosted;
+              break;
+            }
+          }
+        }
+      }
       adjusted[key] = toHex(color);
     };
 
@@ -424,19 +458,61 @@ export function applyAdjustments(
   const chromaticKeys = new Set([
     'primary', 'secondary', 'accent', 'good', 'warn', 'bad', 'ring',
   ]);
+  // Surfaces must never cross the light/dark midline: a dark theme whose bg
+  // brightens past L≈0.5 flips the readability guardrails into light-theme
+  // mode and text polarity inverts mid-slider.
+  const surfaceKeys = new Set(['bg', 'card', 'card2']);
+  const isDarkSource = toOklch(tokens.bg).L < 0.5;
+  const satNorm = Math.max(-1, Math.min(1, saturation / 5));
+  const desiredOccupancy: Record<string, number> = {};
   for (const key of allKeys) {
     const isChromatic = chromaticKeys.has(key);
+    const isSurface = surfaceKeys.has(key);
     let L = midpoint + (brightened[key].L - midpoint) * contrastFactor;
     // Keep chromatic tokens away from pure black/white, even at high contrast,
     // so hue identity does not collapse to achromatic output.
-    const minL = isChromatic ? (isLightTheme ? 0.12 : 0.10) : 0.03;
-    const maxL = isChromatic ? (isLightTheme ? 0.92 : 0.90) : 0.97;
+    let minL = isChromatic ? (isLightTheme ? 0.12 : 0.10) : 0.03;
+    let maxL = isChromatic ? (isLightTheme ? 0.92 : 0.90) : 0.97;
+    if (isSurface) {
+      if (isDarkSource) maxL = Math.min(maxL, 0.45);
+      else minL = Math.max(minL, 0.55);
+    }
     L = Math.max(minL, Math.min(maxL, L));
-    const C = Math.max(0.008, brightened[key].C * satFactor * contrastChromaFactor);
+    let C: number;
+    if (isChromatic) {
+      // Saturation works on relative gamut occupancy: a plain chroma multiplier
+      // dies against the sRGB clamp near the top (steps +3..+5 become invisible,
+      // earliest for hues that generate near their gamut limit). Interpolating
+      // occupancy toward a 0.97 ceiling keeps every step equally visible and
+      // hue-balanced; the negative side scales multiplicatively toward gray.
+      // High positive saturation also nudges lightness toward the hue's chroma
+      // cusp, buying headroom where the gamut is narrow (greens, teals).
+      if (satNorm > 0) {
+        let cuspL = L;
+        let cuspC = 0;
+        for (let l = 0.35; l <= 0.78; l += 0.05) {
+          const c = maxGamutChromaAt(l, brightened[key].H);
+          if (c > cuspC) {
+            cuspC = c;
+            cuspL = l;
+          }
+        }
+        L = Math.max(minL, Math.min(maxL, L + (cuspL - L) * satNorm * 0.12));
+      }
+      const cMax = Math.max(0.001, maxGamutChromaAt(L, brightened[key].H));
+      const rel = Math.min(1, brightened[key].C / cMax);
+      const relOut = satNorm >= 0
+        ? rel + Math.max(0, 0.97 - rel) * satNorm * 0.85
+        : rel * (1 + satNorm * 0.94);
+      desiredOccupancy[key] = relOut * contrastChromaFactor;
+      C = Math.max(0.008, relOut * cMax * contrastChromaFactor);
+    } else {
+      C = Math.max(0.008, brightened[key].C * satFactor * contrastChromaFactor);
+    }
     adjusted[key] = toHex(clampToSRGBGamut({ L, C, H: brightened[key].H }));
   }
 
-  return finalizeAdjustedTokens(adjusted, contrast);
+  return finalizeAdjustedTokens(adjusted, contrast, desiredOccupancy);
 }
 
 interface ParityOptions {
@@ -500,6 +576,14 @@ function harmonizeSemanticContrastBetweenModes(
   const balance = Math.max(0, Math.min(1, strength * 0.85));
   if (balance <= 0) return { light: tunedLight, dark: tunedDark };
 
+  // Fit against whichever surface is binding (the one producing the measured
+  // worst-case ratio); fitting against bg alone under-corrects when card is
+  // the limiting surface.
+  const bindingSurface = (theme: ThemeTokens, key: keyof ThemeTokens): string =>
+    contrastRatio(theme[key], theme.bg) <= contrastRatio(theme[key], theme.card)
+      ? theme.bg
+      : theme.card;
+
   for (const key of keys) {
     const lightRatio = tokenSurfaceContrast(tunedLight, key);
     const darkRatio = tokenSurfaceContrast(tunedDark, key);
@@ -507,16 +591,38 @@ function harmonizeSemanticContrastBetweenModes(
     // Shared perceptual target:
     // - geometric mean keeps both sides moving toward each other
     // - clamped band prevents over-inked light colors and blown-out dark colors
+    // - the pull strengthens with the cross-mode gap: a partial pull on an
+    //   extreme gap (e.g. 18:1 vs 3:1) would still leave the modes feeling
+    //   like different designs
     const sharedTarget = Math.max(2.7, Math.min(6.2, Math.sqrt(lightRatio * darkRatio)));
-    const targetLight = lightRatio + (sharedTarget - lightRatio) * balance;
-    const targetDark = darkRatio + (sharedTarget - darkRatio) * balance;
+    const gap = Math.abs(lightRatio - darkRatio);
+    const keyBalance = Math.min(1, balance + Math.max(0, (gap - 3) * 0.05));
+    const targetLight = lightRatio + (sharedTarget - lightRatio) * keyBalance;
+    const targetDark = darkRatio + (sharedTarget - darkRatio) * keyBalance;
 
     tunedLight[key] = toHex(
-      fitContrastTowardTarget(toOklch(tunedLight[key]), tunedLight.bg, targetLight)
+      fitContrastTowardTarget(toOklch(tunedLight[key]), bindingSurface(tunedLight, key), targetLight)
     );
     tunedDark[key] = toHex(
-      fitContrastTowardTarget(toOklch(tunedDark[key]), tunedDark.bg, targetDark)
+      fitContrastTowardTarget(toOklch(tunedDark[key]), bindingSurface(tunedDark, key), targetDark)
     );
+
+    // Contrast fitting re-clamps both modes at different lightnesses, and the
+    // gamut clamp tolerates a few degrees of hue bend at the sRGB edge — in
+    // opposite directions per mode. Re-anchor the dark hue on light so the
+    // pair never reads as two different colors.
+    const lightColor = toOklch(tunedLight[key]);
+    const darkColor = toOklch(tunedDark[key]);
+    if (Math.min(lightColor.C, darkColor.C) >= 0.02) {
+      const hueDelta = ((((lightColor.H - darkColor.H) % 360) + 540) % 360) - 180;
+      if (Math.abs(hueDelta) > 1) {
+        tunedDark[key] = toHex(clampToSRGBGamut({
+          L: darkColor.L,
+          C: darkColor.C,
+          H: ((darkColor.H + hueDelta * balance) % 360 + 360) % 360,
+        }));
+      }
+    }
   }
 
   // Keep foreground tokens coherent with any semantic color changes.

@@ -16,17 +16,11 @@ import {
   toOklch,
   toHex,
   clampToSRGBGamut,
-  deltaE,
   hueDifference,
-  adjustLightness,
-  adjustChroma,
-  shiftHue,
-  createNeutral,
   generateScale,
-  hexToRgb,
 } from './oklch.js';
-import { contrastRatio, selectForeground, selectForegroundHex, adjustForContrast, meetsWCAG } from './contrast.js';
-import { evaluatePalette, selectBestPalette, ScoredPalette } from './scoringEngine.js';
+import { selectForeground, selectForegroundHex } from './contrast.js';
+import { evaluatePalette } from './scoringEngine.js';
 
 // --- Seeded Random ---
 
@@ -168,8 +162,9 @@ function buildNeutralFoundation(
   const brightnessMod = brightnessLevel * 0.02;
   
   // Saturation level affects the chroma/tint of neutral colors
-  // (-5 to 5): negative = more neutral, positive = more tinted
-  const chromaMod = Math.max(0, saturationLevel * 0.003);
+  // (-5 to 5): negative = more neutral, positive = more tinted.
+  // A small warmth-driven base tint keeps surfaces from reading as dead gray.
+  const chromaMod = 0.0025 + Math.abs(warmth) * 0.005 + Math.max(0, saturationLevel * 0.003);
   
   // Apply brightness to lightness targets
   const bgL = Math.max(0.85, Math.min(0.99, targets.bg + brightnessMod + contrastMod));
@@ -196,55 +191,39 @@ interface ColorCandidate {
   score: number;
 }
 
-function generateChromaSamples(
+/**
+ * Build a vivid, hue-balanced color for a semantic role.
+ *
+ * Absolute chroma targets make vividness hue-dependent (at L≈0.52 sRGB allows
+ * C≈0.21 for blue but only ≈0.11 for yellow), so palettes mixed dull teals
+ * with punchy blues. Instead:
+ * 1. Bias lightness toward the hue's chroma cusp (the L with the most gamut
+ *    headroom) within a role-appropriate band, so e.g. yellows lift out of
+ *    muddy olive territory.
+ * 2. Target a fraction of the max in-gamut chroma at that lightness
+ *    (occupancy), capped absolutely so low-cusp hues don't scream.
+ */
+function buildRoleColor(
   hue: number,
-  lightness: number,
-  rng: SeededRandom,
-  count: number = 8
-): OklchColor[] {
-  const samples: OklchColor[] = [];
-  
-  for (let i = 0; i < count; i++) {
-    const chroma = rng.nextFloat(0.08, 0.22);
-    samples.push(clampToSRGBGamut({ L: lightness, C: chroma, H: hue }));
-  }
-  
-  return samples;
-}
-
-function selectBestCandidate(
-  candidates: OklchColor[],
-  bg: OklchColor,
-  existingColors: OklchColor[]
+  baseL: number,
+  lRange: [number, number],
+  occupancy: number,
+  chromaCap: number
 ): OklchColor {
-  let bestScore = -Infinity;
-  let best = candidates[0];
-  
-  for (const candidate of candidates) {
-    let score = 0;
-    
-    // Contrast with background
-    const contrast = contrastRatio(toHex(candidate), toHex(bg));
-    score += contrast * 2;
-    
-    // Separation from existing colors
-    for (const existing of existingColors) {
-      const delta = deltaE(candidate, existing);
-      score += delta * 10;
-    }
-    
-    // Prefer colors with moderate chroma
-    if (candidate.C >= 0.1 && candidate.C <= 0.2) {
-      score += 5;
-    }
-    
-    if (score > bestScore) {
-      bestScore = score;
-      best = candidate;
+  // Coarse cusp search: L with maximum in-gamut chroma for this hue.
+  let cuspL = baseL;
+  let cuspC = 0;
+  for (let l = 0.35; l <= 0.78; l += 0.05) {
+    const c = maxGamutChromaAt(l, hue);
+    if (c > cuspC) {
+      cuspC = c;
+      cuspL = l;
     }
   }
-  
-  return best;
+  const L = Math.max(lRange[0], Math.min(lRange[1], baseL + (cuspL - baseL) * 0.35));
+  const cMax = maxGamutChromaAt(L, hue);
+  const C = Math.max(0.03, Math.min(chromaCap, cMax * occupancy));
+  return clampToSRGBGamut({ L, C, H: hue });
 }
 
 // --- Primary & Accent Construction ---
@@ -265,54 +244,29 @@ function constructBrandColors(
   contrastLevel: number
 ): BrandColors {
   // Brightness affects base lightness of all brand colors
-  // Range: -5 to 5 maps to lightness adjustments
   const baseL = 0.52 + brightnessLevel * 0.025;
-  
-  // Saturation level strongly affects chroma
-  // Range: -5 (grayscale) to 5 (vivid)
-  // Map from -5..5 to 0.02..0.28 chroma range
-  const satNormalized = (saturationLevel + 5) / 10; // 0 to 1
-  const baseC = 0.02 + satNormalized * 0.24;
-  
+
+  // Saturation maps to gamut occupancy so vividness reads the same at every hue
+  const satNormalized = (saturationLevel + 5) / 10; // 0 to 1, 0.5 at defaults
+  const occ = 0.2 + satNormalized;                  // 0.70 at defaults
+
   // Contrast affects the lightness difference between colors
   const contrastMod = contrastLevel * 0.02;
-  
-  // Generate candidates for primary
-  const primaryCandidates = generateChromaSamples(hues[0], baseL, rng);
-  const primary = selectBestCandidate(primaryCandidates, bg, []);
-  
-  // Apply saturation and brightness to primary
-  const adjustedPrimary = clampToSRGBGamut({
-    L: Math.max(0.35, Math.min(0.70, baseL - contrastMod)),
-    C: Math.max(0.03, baseC),
-    H: primary.H,
-  });
-  
+
+  const primaryL = Math.max(0.35, Math.min(0.70, baseL - contrastMod));
+  const adjustedPrimary = buildRoleColor(hues[0], primaryL, [0.44, 0.62], occ, 0.20);
+
   // Generate scale for primary
   const primaryScale = generateScale(adjustedPrimary);
-  
-  // Secondary - slightly less saturated, different lightness
+
+  // Secondary - softer occupancy, slightly lighter
   const secondaryL = Math.max(0.40, Math.min(0.75, baseL + 0.08));
-  const secondaryCandidates = generateChromaSamples(hues[1], secondaryL, rng);
-  const secondary = selectBestCandidate(secondaryCandidates, bg, [adjustedPrimary]);
-  
-  const adjustedSecondary = clampToSRGBGamut({
-    L: secondaryL,
-    C: Math.max(0.02, baseC * 0.75),
-    H: secondary.H,
-  });
-  
-  // Accent - slightly more saturated, brighter
+  const adjustedSecondary = buildRoleColor(hues[1], secondaryL, [0.48, 0.68], occ * 0.74, 0.15);
+
+  // Accent - most vivid of the three
   const accentL = Math.max(0.45, Math.min(0.72, baseL + 0.05));
-  const accentCandidates = generateChromaSamples(hues[2], accentL, rng);
-  const accent = selectBestCandidate(accentCandidates, bg, [adjustedPrimary, adjustedSecondary]);
-  
-  const adjustedAccent = clampToSRGBGamut({
-    L: accentL,
-    C: Math.max(0.03, baseC * 1.1),
-    H: accent.H,
-  });
-  
+  const adjustedAccent = buildRoleColor(hues[2], accentL, [0.46, 0.66], Math.min(0.95, occ * 1.12), 0.22);
+
   return {
     primary: adjustedPrimary,
     primaryScale,
@@ -374,17 +328,17 @@ function constructStatusColors(
   brightnessLevel: number
 ): StatusColors {
   const { goodHue, badHue } = resolveStatusHues(hues);
-  
-  // Saturation affects chroma of status colors
+
+  // Saturation maps to gamut occupancy (see buildRoleColor)
   const satNormalized = (saturationLevel + 5) / 10; // 0 to 1
-  const baseC = 0.08 + satNormalized * 0.16;
-  
+  const occ = 0.14 + satNormalized * 0.96;          // 0.62 at defaults
+
   // Brightness affects lightness
   const baseL = 0.52 + brightnessLevel * 0.025;
-  
-  const good = clampToSRGBGamut({ L: baseL, C: baseC, H: goodHue });
-  const bad = clampToSRGBGamut({ L: baseL, C: baseC, H: badHue });
-  const warn = clampToSRGBGamut({ L: baseL + 0.12, C: baseC * 0.9, H: 60 }); // Yellow-ish
+
+  const good = buildRoleColor(goodHue, baseL, [0.44, 0.62], occ, 0.17);
+  const bad = buildRoleColor(badHue, baseL, [0.44, 0.60], occ, 0.18);
+  const warn = buildRoleColor(60, baseL + 0.12, [0.58, 0.72], occ * 0.92, 0.15); // Yellow-ish
   
   return {
     good,
@@ -872,7 +826,8 @@ export function generatePaletteDarkFirst(
   // Apply brightness/contrast/saturation for dark mode
   const brightnessMod = brightnessLevel * 0.015;
   const contrastMod = contrastLevel * 0.012;
-  const chromaMod = Math.max(0, saturationLevel * 0.003);
+  // Warmth-driven base tint keeps dark surfaces from reading as dead gray.
+  const chromaMod = 0.003 + Math.abs(warmth) * 0.006 + Math.max(0, saturationLevel * 0.003);
 
   // Build dark neutral foundation directly
   const darkNeutrals = {
@@ -884,26 +839,27 @@ export function generatePaletteDarkFirst(
     border: clampToSRGBGamut({ L: Math.min(0.40, darkTargets.border - brightnessMod * 0.2), C: chromaMod * 0.2, H: warmth > 0 ? 60 : 240 }),
   };
 
-  // Build brand colors for dark mode (higher lightness for visibility)
+  // Build brand colors for dark mode (higher lightness for visibility);
+  // saturation maps to gamut occupancy so vividness is hue-balanced.
   const satNormalized = (saturationLevel + 5) / 10;
-  const baseC = 0.02 + satNormalized * 0.20;
+  const occ = 0.17 + satNormalized * 0.94; // 0.64 at defaults
   const baseL = 0.58 + brightnessLevel * 0.02;
 
   const darkBrand = {
-    primary: clampToSRGBGamut({ L: baseL, C: baseC, H: hues[0] }),
-    secondary: clampToSRGBGamut({ L: baseL - 0.05, C: baseC * 0.8, H: hues[1] }),
-    accent: clampToSRGBGamut({ L: baseL + 0.05, C: baseC * 1.1, H: hues[2] }),
+    primary: buildRoleColor(hues[0], baseL, [0.52, 0.68], occ, 0.17),
+    secondary: buildRoleColor(hues[1], baseL - 0.05, [0.48, 0.64], occ * 0.74, 0.13),
+    accent: buildRoleColor(hues[2], baseL + 0.05, [0.54, 0.72], Math.min(0.92, occ * 1.1), 0.19),
   };
 
   // Status colors for dark
-  const statusC = 0.08 + satNormalized * 0.14;
+  const statusOcc = 0.12 + satNormalized * 0.9; // 0.57 at defaults
   const statusL = 0.55 + brightnessLevel * 0.02;
   const { goodHue, badHue } = resolveStatusHues(hues);
 
   const darkStatus = {
-    good: clampToSRGBGamut({ L: statusL, C: statusC, H: goodHue }),
-    bad: clampToSRGBGamut({ L: statusL, C: statusC, H: badHue }),
-    warn: clampToSRGBGamut({ L: statusL + 0.1, C: statusC * 0.9, H: 60 }),
+    good: buildRoleColor(goodHue, statusL, [0.50, 0.66], statusOcc, 0.15),
+    bad: buildRoleColor(badHue, statusL, [0.50, 0.64], statusOcc, 0.16),
+    warn: buildRoleColor(60, statusL + 0.1, [0.60, 0.74], statusOcc * 0.92, 0.14),
   };
 
   // Destructure overrides (handles both 5-color and 10-color layouts)
