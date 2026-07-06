@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { generateTheme as sharedGenerateTheme } from '../utils/colorUtils';
+import { generateTheme as sharedGenerateTheme } from '../utils/colorUtils.js';
 
 /**
  * Taichi Theme Generator API

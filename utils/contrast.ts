@@ -4,7 +4,7 @@
  * Version: 25.12.2
  */
 
-import { OklchColor, toOklch, toHex, hexToRgb, clampToSRGBGamut } from './oklch';
+import { OklchColor, toOklch, toHex, hexToRgb, clampToSRGBGamut } from './oklch.js';
 
 // --- Luminance Calculation ---
 

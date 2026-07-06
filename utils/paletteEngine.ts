@@ -10,7 +10,7 @@
  * 4. Every palette is scored, validated, and reproducible
  */
 
-import { ThemeTokens, GenerationMode } from '../types';
+import { ThemeTokens, GenerationMode } from '../types.js';
 import {
   OklchColor,
   toOklch,
@@ -24,9 +24,9 @@ import {
   createNeutral,
   generateScale,
   hexToRgb,
-} from './oklch';
-import { contrastRatio, selectForeground, selectForegroundHex, adjustForContrast, meetsWCAG } from './contrast';
-import { evaluatePalette, selectBestPalette, ScoredPalette } from './scoringEngine';
+} from './oklch.js';
+import { contrastRatio, selectForeground, selectForegroundHex, adjustForContrast, meetsWCAG } from './contrast.js';
+import { evaluatePalette, selectBestPalette, ScoredPalette } from './scoringEngine.js';
 
 // --- Seeded Random ---
 
@@ -1013,5 +1013,5 @@ export function generateTheme(
 }
 
 // --- Re-export utilities for convenience ---
-export { toOklch, toHex, hexToRgb } from './oklch';
-export { contrastRatio, meetsWCAG } from './contrast';
+export { toOklch, toHex, hexToRgb } from './oklch.js';
+export { contrastRatio, meetsWCAG } from './contrast.js';

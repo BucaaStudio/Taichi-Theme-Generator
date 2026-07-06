@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { buildThemeExport, VALID_EXPORT_FORMATS, type ExportFormat } from './utils/theme-export';
+import { buildThemeExport, VALID_EXPORT_FORMATS, type ExportFormat } from './utils/theme-export.js';
 
 // Inline rate limiting
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();

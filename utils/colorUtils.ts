@@ -1,7 +1,7 @@
-import { ThemeTokens, GenerationMode, ColorFormat } from '../types';
-import { generateTheme as paletteEngineGenerateTheme } from './paletteEngine';
-import { toOklch, toHex, clampToSRGBGamut } from './oklch';
-import { selectForeground, selectForegroundHex, contrastRatio, adjustForContrast } from './contrast';
+import { ThemeTokens, GenerationMode, ColorFormat } from '../types.js';
+import { generateTheme as paletteEngineGenerateTheme } from './paletteEngine.js';
+import { toOklch, toHex, clampToSRGBGamut } from './oklch.js';
+import { selectForeground, selectForegroundHex, contrastRatio, adjustForContrast } from './contrast.js';
 
 // --- Conversions ---
 

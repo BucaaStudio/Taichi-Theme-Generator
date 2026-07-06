@@ -2,10 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
-import { generateTheme } from '../utils/colorUtils';
-import type { GenerationMode } from '../types';
-import { rateLimit } from './utils/rate-limit';
-import { buildThemeExport, VALID_EXPORT_FORMATS } from './utils/theme-export';
+import { generateTheme } from '../utils/colorUtils.js';
+import type { GenerationMode } from '../types.js';
+import { rateLimit } from './utils/rate-limit.js';
+import { buildThemeExport, VALID_EXPORT_FORMATS } from './utils/theme-export.js';
 
 /**
  * MCP Endpoint: /api/mcp

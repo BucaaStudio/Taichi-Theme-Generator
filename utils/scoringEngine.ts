@@ -4,8 +4,8 @@
  * Version: 25.12.2
  */
 
-import { OklchColor, toOklch, toHex, deltaE, hueDifference, clampToSRGBGamut, isInSRGBGamut } from './oklch';
-import { contrastRatio, meetsWCAG, getContrastHeadroom } from './contrast';
+import { OklchColor, toOklch, toHex, deltaE, hueDifference, clampToSRGBGamut, isInSRGBGamut } from './oklch.js';
+import { contrastRatio, meetsWCAG, getContrastHeadroom } from './contrast.js';
 
 // --- Score Weights ---
 
