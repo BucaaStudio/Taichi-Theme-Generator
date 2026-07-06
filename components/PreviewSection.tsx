@@ -621,22 +621,22 @@ const PreviewSection: React.FC<PreviewProps> = ({
           </a>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-            <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 ${rClass} ${gradientClass} flex items-center justify-center text-t-primaryFg`}>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3 min-w-0`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className={`w-8 h-8 shrink-0 ${rClass} ${gradientClass} flex items-center justify-center text-t-primaryFg`}>
                 <Server size={16} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-t-text">REST API</p>
                 <p className="text-[11px] text-t-textMuted">No auth · rate-limited · JSON</p>
               </div>
             </div>
             <div className="space-y-1.5 font-mono text-xs">
-              <p className={`${rClass} bg-t-text/10 px-3 py-2 text-t-text`}>
+              <p className={`${rClass} bg-t-text/10 px-3 py-2 text-t-text truncate`}>
                 <span className="text-t-primary font-bold">POST</span> /api/generate-theme
               </p>
-              <p className={`${rClass} bg-t-text/10 px-3 py-2 text-t-text`}>
+              <p className={`${rClass} bg-t-text/10 px-3 py-2 text-t-text truncate`}>
                 <span className="text-t-primary font-bold">POST</span> /api/export-theme
               </p>
             </div>
@@ -645,22 +645,22 @@ const PreviewSection: React.FC<PreviewProps> = ({
             </p>
           </div>
 
-          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-            <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 ${rClass} ${gradientAccent} flex items-center justify-center text-t-accentFg`}>
+          <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3 min-w-0`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className={`w-8 h-8 shrink-0 ${rClass} ${gradientAccent} flex items-center justify-center text-t-accentFg`}>
                 <Bot size={16} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-t-text">MCP Server <span className={`ml-1 align-middle text-[10px] font-bold uppercase ${rClass} bg-t-accent/15 text-t-accent px-1.5 py-0.5`}>New</span></p>
                 <p className="text-[11px] text-t-textMuted">generate_theme · export_theme tools for AI agents</p>
               </div>
             </div>
             <button
               onClick={handleCopyMcpCommand}
-              className={`w-full text-left ${rClass} bg-t-text/10 px-3 py-2 font-mono text-xs text-t-text flex items-center justify-between gap-2 transition-colors hover:bg-t-text/20`}
+              className={`w-full min-w-0 text-left ${rClass} bg-t-text/10 px-3 py-2 font-mono text-xs text-t-text flex items-center justify-between gap-2 transition-colors hover:bg-t-text/20`}
               title="Copy command"
             >
-              <span className="truncate">claude mcp add --transport http taichi …/api/mcp</span>
+              <span className="truncate min-w-0">claude mcp add --transport http taichi …/api/mcp</span>
               {copiedCommand ? (
                 <Check size={12} className="text-t-good shrink-0" />
               ) : (
