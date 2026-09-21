@@ -189,6 +189,61 @@ export function parseToHex(input: string, format?: ColorFormat): string | null {
  * Saturation: Chroma scaling — C_out = C_in * (1 + saturation * 0.2)
  */
 
+const CHROMATIC_TONE_KEYS = [
+  'primary', 'secondary', 'accent', 'good', 'warn', 'bad', 'ring',
+] as const;
+
+/** Yellow–chartreuse need a higher L floor or they read as olive, not brand. */
+function isHighCuspHue(hue: number): boolean {
+  return hue >= 55 && hue <= 130;
+}
+
+function chromaticToneBand(hue: number, isDark: boolean): { min: number; max: number } {
+  if (isDark) {
+    return isHighCuspHue(hue) ? { min: 0.62, max: 0.82 } : { min: 0.56, max: 0.76 };
+  }
+  return isHighCuspHue(hue) ? { min: 0.50, max: 0.72 } : { min: 0.48, max: 0.58 };
+}
+
+function mutedToneBand(isDark: boolean): { min: number; max: number } {
+  return isDark ? { min: 0.56, max: 0.76 } : { min: 0.38, max: 0.54 };
+}
+
+function rederiveForegrounds(theme: ThemeTokens): ThemeTokens {
+  return {
+    ...theme,
+    textOnColor: selectForegroundHex(theme.primary),
+    primaryFg: selectForegroundHex(theme.primary),
+    secondaryFg: selectForegroundHex(theme.secondary),
+    accentFg: selectForegroundHex(theme.accent),
+    goodFg: selectForegroundHex(theme.good),
+    warnFg: selectForegroundHex(theme.warn),
+    badFg: selectForegroundHex(theme.bad),
+  };
+}
+
+// `pinned` holds slots the user imported or locked; those stay exact.
+function clampChromaticToneBands(
+  theme: ThemeTokens,
+  contrastLevel: number,
+  pinned: Partial<Record<keyof ThemeTokens, string>> = {}
+): ThemeTokens {
+  if (contrastLevel < 3) return theme;
+  const isDark = toOklch(theme.bg).L < 0.5;
+  const next: ThemeTokens = { ...theme };
+  for (const key of CHROMATIC_TONE_KEYS) {
+    if (pinned[key]) continue;
+    const color = toOklch(next[key]);
+    const band = chromaticToneBand(color.H, isDark);
+    const nextL = Math.max(band.min, Math.min(band.max, color.L));
+    if (Math.abs(nextL - color.L) > 0.0005) {
+      next[key] = toHex(clampToSRGBGamut({ L: nextL, C: color.C, H: color.H }));
+    }
+  }
+  const rederived = rederiveForegrounds(next);
+  return pinned.textOnColor ? { ...rederived, textOnColor: pinned.textOnColor } : rederived;
+}
+
 /** WCAG AA at defaults (4.5 / 3.0). Negative contrast lowers floors continuously. */
 export function readabilityFloors(contrast: number, isDark: boolean): { text: number; muted: number } {
   if (contrast >= 0) {
@@ -288,7 +343,8 @@ export function applyAdjustments(
           clampTokenL('card2', Math.min(0.50, card.L + step * 0.75), 0.52);
           clampTokenL('text', 0.84, 0.96);
           const text = toOklch(adjusted.text);
-          clampTokenL('textMuted', 0.56, Math.min(0.76, text.L - 0.12));
+          const mutedBand = mutedToneBand(true);
+          clampTokenL('textMuted', mutedBand.min, Math.min(mutedBand.max, text.L - 0.12));
           clampTokenL('border', bg.L + 0.07, 0.44);
         }
       } else {
@@ -302,7 +358,8 @@ export function applyAdjustments(
           clampTokenL('card2', Math.min(0.52, card2Max), card2Max);
           clampTokenL('text', 0.08, 0.26);
           const text = toOklch(adjusted.text);
-          clampTokenL('textMuted', Math.max(0.30, text.L + 0.12), 0.52);
+          const mutedBand = mutedToneBand(false);
+          clampTokenL('textMuted', Math.max(mutedBand.min, text.L + 0.16), mutedBand.max);
           clampTokenL('border', Math.min(0.58, bg.L - 0.07), bg.L - 0.07);
         }
       }
@@ -463,6 +520,16 @@ export function applyAdjustments(
           }
         }
       }
+      if (contrastForReadability >= 3) {
+        const band = chromaticToneBand(color.H, isDarkTheme);
+        if (color.L < band.min || color.L > band.max) {
+          color = clampToSRGBGamut({
+            L: Math.max(band.min, Math.min(band.max, color.L)),
+            C: color.C,
+            H: color.H,
+          });
+        }
+      }
       adjusted[key] = toHex(color);
     };
 
@@ -493,6 +560,11 @@ export function applyAdjustments(
     applyToneBands();
     ensureSeparation('textMuted', 'text', 0.10);
     enforceSurfaceContrast('textMuted', ['bg', 'card', 'card2'], mutedMinRatio);
+    if (!isDarkTheme && contrastForReadability > 0) {
+      const mutedBand = mutedToneBand(false);
+      const text = toOklch(adjusted.text);
+      clampTokenL('textMuted', Math.max(mutedBand.min, text.L + 0.16), mutedBand.max);
+    }
 
     return {
       bg: adjusted.bg, card: adjusted.card, card2: adjusted.card2,
@@ -593,7 +665,15 @@ export function applyAdjustments(
     const isSurface = surfaceKeys.has(key) || key === 'border';
     let L = surfaceLadder && isSurface
       ? surfaceLadder[key]
-      : midpoint + (brightened[key].L - midpoint) * contrastFactor;
+      : contrast >= 3 && isChromatic
+        ? (isDarkSource
+          ? brightened[key].L + punch * 0.05
+          : brightened[key].L - punch * 0.03)
+        : contrast >= 3 && key === 'textMuted'
+          ? (isDarkSource
+            ? brightened[key].L - punch * 0.04
+            : brightened[key].L - punch * 0.02)
+          : midpoint + (brightened[key].L - midpoint) * contrastFactor;
     // Keep chromatic tokens away from pure black/white, even at high contrast,
     // so hue identity does not collapse to achromatic output.
     let minL = isChromatic ? (isLightTheme ? 0.12 : 0.10) : 0.06;
@@ -615,23 +695,14 @@ export function applyAdjustments(
         maxL = 0.26;
       }
     } else if (contrast > 0 && key === 'textMuted') {
-      if (isDarkSource) {
-        minL = 0.56;
-        maxL = 0.76;
-      } else {
-        minL = 0.30;
-        maxL = 0.52;
-      }
+      const mutedBand = mutedToneBand(isDarkSource);
+      minL = mutedBand.min;
+      maxL = mutedBand.max;
     } else if (contrast >= 3 && isChromatic) {
-      // Only lock the brand band at the high-contrast steps. Mid contrast
-      // must still let the brightness slider move chromatic tokens.
-      if (isLightTheme) {
-        minL = 0.28;
-        maxL = 0.62;
-      } else {
-        minL = 0.48;
-        maxL = 0.76;
-      }
+      // High contrast may deepen light brand slightly, but never to navy-black.
+      const band = chromaticToneBand(brightened[key].H, isDarkSource);
+      minL = band.min;
+      maxL = band.max;
     }
     L = Math.max(minL, Math.min(maxL, L));
     let C: number;
@@ -751,18 +822,29 @@ function harmonizeSemanticContrastBetweenModes(
     // - the pull strengthens with the cross-mode gap: a partial pull on an
     //   extreme gap (e.g. 18:1 vs 3:1) would still leave the modes feeling
     //   like different designs
-    const cap = contrastLevel >= 3 ? 8.2 : 6.2;
-    const sharedTarget = Math.max(2.7, Math.min(cap, Math.sqrt(lightRatio * darkRatio)));
+    const lightCap = contrastLevel >= 3 ? 6.5 : 6.2;
+    const darkCap = contrastLevel >= 3 ? 7.5 : 6.2;
+    const sharedTarget = Math.max(
+      2.7,
+      Math.min(Math.min(lightCap, darkCap), Math.sqrt(lightRatio * darkRatio))
+    );
     const gap = Math.abs(lightRatio - darkRatio);
     const keyBalance = Math.min(1, balance + Math.max(0, (gap - 3) * 0.05));
     let targetLight = lightRatio + (sharedTarget - lightRatio) * keyBalance;
     let targetDark = darkRatio + (sharedTarget - darkRatio) * keyBalance;
-    if (contrastLevel > 0) {
-      // Lift a weak side, but keep brand colors in a usable contrast band.
-      targetLight = Math.min(cap, Math.max(lightRatio, targetLight));
-      targetDark = Math.min(cap, Math.max(darkRatio, targetDark));
-      if (lightRatio > cap) targetLight = cap;
-      if (darkRatio > cap) targetDark = cap;
+    if (contrastLevel >= 3) {
+      // Light brand already at AA+ should stay there. Pulling toward 8–10:1
+      // is what turns +5 buttons into navy-black.
+      targetLight = lightRatio >= 4.5
+        ? Math.min(lightCap, lightRatio)
+        : Math.min(lightCap, Math.max(lightRatio, targetLight));
+      targetDark = Math.min(darkCap, Math.max(darkRatio, targetDark));
+      if (darkRatio > darkCap) targetDark = darkCap;
+    } else if (contrastLevel > 0) {
+      targetLight = Math.min(lightCap, Math.max(lightRatio, targetLight));
+      targetDark = Math.min(darkCap, Math.max(darkRatio, targetDark));
+      if (lightRatio > lightCap) targetLight = lightCap;
+      if (darkRatio > darkCap) targetDark = darkCap;
     }
 
     tunedLight[key] = toHex(
@@ -1139,6 +1221,12 @@ function finishPalettePair(
       dark = balanced.dark;
     }
   }
+
+  const importedSide = Object.keys(importedSlots).length > 0
+    ? (imageImportSourceSide ?? (darkFirst ? 'dark' : 'light'))
+    : undefined;
+  light = clampChromaticToneBands(light, contrastLevel, importedSide === 'light' ? importedSlots : {});
+  dark = clampChromaticToneBands(dark, dCon, importedSide === 'dark' ? importedSlots : {});
 
   return {
     light,

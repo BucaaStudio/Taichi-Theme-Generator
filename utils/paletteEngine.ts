@@ -414,10 +414,13 @@ interface StatusColors {
   warnFg: OklchColor;
 }
 
-const STATUS_GREEN_HUE = 140;
-const STATUS_RED_HUE = 0;
-const STATUS_GREEN_RANGE = 40;
-const STATUS_RED_RANGE = 32;
+// OKLCH hue angles. Status colors stay conventional green and red in every
+// harmony; the harmony only nudges them within a narrow band.
+const STATUS_GREEN_HUE = 148;
+const STATUS_RED_HUE = 27;
+const STATUS_AMBER_HUE = 78;
+const STATUS_GREEN_RANGE = 12;
+const STATUS_RED_RANGE = 8;
 
 const normalizeHue = (hue: number) => ((hue % 360) + 360) % 360;
 
@@ -429,7 +432,7 @@ const clampHueToBand = (hue: number, center: number, maxDelta: number) => {
   return normalizeHue(center + Math.sign(diff) * maxDelta);
 };
 
-const resolveStatusHues = (hues: number[], harmonyMode: GenerationMode) => {
+const resolveStatusHues = (hues: number[], _harmonyMode: GenerationMode) => {
   let goodHue = hues[3] ?? hues[0];
   let badHue = hues[4] ?? hues[1] ?? hues[0];
 
@@ -440,19 +443,6 @@ const resolveStatusHues = (hues: number[], harmonyMode: GenerationMode) => {
 
   if (badToGreen < goodToGreen || goodToRed < badToRed) {
     [goodHue, badHue] = [badHue, goodHue];
-  }
-
-  if (isNarrowHarmony(harmonyMode)) {
-    if (harmonyMode === 'monochrome' && hueDifference(goodHue, badHue) < 8) {
-      return {
-        goodHue: normalizeHue(goodHue + 8),
-        badHue: normalizeHue(badHue - 8),
-      };
-    }
-    return {
-      goodHue: normalizeHue(goodHue),
-      badHue: normalizeHue(badHue),
-    };
   }
 
   return {
@@ -470,7 +460,7 @@ function constructStatusColors(
   harmonyMode: GenerationMode = 'analogous'
 ): StatusColors {
   const { goodHue, badHue } = resolveStatusHues(hues, harmonyMode);
-  const warnHue = isNarrowHarmony(harmonyMode) ? (hues[2] ?? hues[0]) : 60;
+  const warnHue = STATUS_AMBER_HUE;
 
   // Saturation maps to gamut occupancy (see buildRoleColor)
   const satNormalized = (saturationLevel + 5) / 10; // 0 to 1
@@ -904,7 +894,7 @@ export function generatePaletteDarkFirst(
   const statusOcc = Math.max(0.35, Math.min(0.95, 0.12 + satNormalized * 0.9 + occupancy));
   const statusL = 0.55 + brightnessLevel * 0.02;
   const { goodHue, badHue } = resolveStatusHues(hues, harmonyMode);
-  const warnHue = isNarrowHarmony(harmonyMode) ? (hues[2] ?? hues[0]) : 60;
+  const warnHue = STATUS_AMBER_HUE;
 
   const darkStatus = {
     good: ensureSurfaceContrast(buildRoleColor(goodHue, statusL, [0.50, 0.66], statusOcc, 0.15), darkNeutrals.bg, 3),

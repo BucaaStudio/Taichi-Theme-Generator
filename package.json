@@ -7,13 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "jest tests/api.test.ts",
+    "test": "jest tests",
     "test:manual": "node tests/manual-api-test.js",
-    "test:watch": "jest tests/api.test.ts --watch"
+    "test:watch": "jest tests --watch"
   },
   "dependencies": {
     "@bucaastudio/versioned-footer": "^1.0.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "ai": "^7.0.99",
     "lucide-react": "^0.562.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.3",

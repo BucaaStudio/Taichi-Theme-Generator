@@ -83,6 +83,21 @@ export function assertMutedHierarchy(theme: ThemeTokens, context: string): void 
   }
 }
 
+export function assertLightMutedNotInk(theme: ThemeTokens, context: string): void {
+  const text = toOklch(theme.text);
+  const muted = toOklch(theme.textMuted);
+  if (muted.L < 0.36) {
+    fail(context, `light muted over-inked L=${muted.L.toFixed(3)} ${theme.textMuted}`);
+  }
+  if (muted.L - text.L < 0.14) {
+    fail(
+      context,
+      `light muted too close to body ΔL=${(muted.L - text.L).toFixed(3)} ` +
+        `text=${theme.text} muted=${theme.textMuted}`
+    );
+  }
+}
+
 export function assertBrandLooksLikeColor(
   theme: ThemeTokens,
   polarity: 'light' | 'dark',
@@ -94,7 +109,7 @@ export function assertBrandLooksLikeColor(
     if (color.C < 0.04) {
       fail(context, `${key} lost chroma C=${color.C.toFixed(3)} ${theme[key]}`);
     }
-    if (polarity === 'light' && (color.L < 0.26 || color.L > 0.64)) {
+    if (polarity === 'light' && (color.L < 0.46 || color.L > 0.74)) {
       fail(context, `light ${key} crushed/washed L=${color.L.toFixed(3)} ${theme[key]}`);
     }
     if (polarity === 'dark' && (color.L < 0.45 || color.L > 0.84)) {
@@ -200,5 +215,8 @@ export function assertHighContrastVisuals(
 ): void {
   assertSurfaceLadder(theme, polarity, context);
   assertMutedHierarchy(theme, context);
+  if (polarity === 'light') {
+    assertLightMutedNotInk(theme, context);
+  }
   assertBrandLooksLikeColor(theme, polarity, seedHue, context);
 }

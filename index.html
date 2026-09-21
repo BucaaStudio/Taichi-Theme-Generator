@@ -20,10 +20,10 @@
     </script>
 
     <!-- Primary Meta Tags -->
-    <title>Taichi Theme Generator - Light & Dark Color Palette Generator</title>
+    <title>Taichi AI Dual Theme Generator - Light & Dark Color Palette Generator</title>
     <meta
       name="title"
-      content="Taichi Theme Generator - Light & Dark Color Palette Generator"
+      content="Taichi AI Dual Theme Generator - Light & Dark Color Palette Generator"
     />
     <meta
       name="description"
@@ -40,7 +40,7 @@
     <meta property="og:url" content="https://taichi.bucaastudio.com/" />
     <meta
       property="og:title"
-      content="Taichi Theme Generator - Light & Dark Color Palette Generator"
+      content="Taichi AI Dual Theme Generator - Light & Dark Color Palette Generator"
     />
     <meta
       property="og:description"
@@ -56,7 +56,7 @@
     <meta property="twitter:url" content="https://taichi.bucaastudio.com/" />
     <meta
       property="twitter:title"
-      content="Taichi Theme Generator - Light & Dark Color Palette Generator"
+      content="Taichi AI Dual Theme Generator - Light & Dark Color Palette Generator"
     />
     <meta
       property="twitter:description"
@@ -73,6 +73,10 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+      // Colors are CSS variables; color-mix lets opacity modifiers (bg-t-text/10)
+      // work on them, which a bare var() cannot.
+      const withAlpha = (name) =>
+        `color-mix(in oklab, var(${name}) calc(<alpha-value> * 100%), transparent)`;
       tailwind.config = {
         theme: {
           extend: {
@@ -83,27 +87,27 @@
             colors: {
               // We map tailwind utility classes to CSS variables we will inject dynamically
               t: {
-                bg: "var(--bg)",
-                card: "var(--card)",
-                card2: "var(--card2)",
-                text: "var(--text)",
-                muted: "var(--text-muted)",
-                textMuted: "var(--text-muted)",
-                textOnColor: "var(--text-on-color)",
-                primary: "var(--primary)",
-                primaryFg: "var(--primary-fg)",
-                secondary: "var(--secondary)",
-                secondaryFg: "var(--secondary-fg)",
-                accent: "var(--accent)",
-                accentFg: "var(--accent-fg)",
-                border: "var(--border)",
-                ring: "var(--ring)",
-                good: "var(--good)",
-                goodFg: "var(--good-fg)",
-                warn: "var(--warn)",
-                warnFg: "var(--warn-fg)",
-                bad: "var(--bad)",
-                badFg: "var(--bad-fg)",
+                bg: withAlpha("--bg"),
+                card: withAlpha("--card"),
+                card2: withAlpha("--card2"),
+                text: withAlpha("--text"),
+                muted: withAlpha("--text-muted"),
+                textMuted: withAlpha("--text-muted"),
+                textOnColor: withAlpha("--text-on-color"),
+                primary: withAlpha("--primary"),
+                primaryFg: withAlpha("--primary-fg"),
+                secondary: withAlpha("--secondary"),
+                secondaryFg: withAlpha("--secondary-fg"),
+                accent: withAlpha("--accent"),
+                accentFg: withAlpha("--accent-fg"),
+                border: withAlpha("--border"),
+                ring: withAlpha("--ring"),
+                good: withAlpha("--good"),
+                goodFg: withAlpha("--good-fg"),
+                warn: withAlpha("--warn"),
+                warnFg: withAlpha("--warn-fg"),
+                bad: withAlpha("--bad"),
+                badFg: withAlpha("--bad-fg"),
               },
             },
           },
@@ -245,6 +249,41 @@
       .border-themed {
         border-color: var(--border);
       }
+
+      /* Soft / ghost / tinted surfaces mix into --card so high-contrast
+         primaries stay a wash, not a second filled button. */
+      .tint-primary { background-color: color-mix(in oklab, var(--primary) 16%, var(--card)); color: var(--primary); }
+      .tint-secondary { background-color: color-mix(in oklab, var(--secondary) 16%, var(--card)); color: var(--secondary); }
+      .tint-accent { background-color: color-mix(in oklab, var(--accent) 16%, var(--card)); color: var(--accent); }
+      .tint-good { background-color: color-mix(in oklab, var(--good) 14%, var(--card)); color: var(--good); }
+      .tint-warn { background-color: color-mix(in oklab, var(--warn) 14%, var(--card)); color: var(--warn); }
+      .tint-bad { background-color: color-mix(in oklab, var(--bad) 14%, var(--card)); color: var(--bad); }
+      .tint-neutral { background-color: color-mix(in oklab, var(--text) 7%, var(--card)); color: var(--text); }
+      .btn-soft {
+        background-color: color-mix(in oklab, var(--primary) 16%, var(--card));
+        color: var(--primary);
+      }
+      .btn-soft:hover {
+        background-color: color-mix(in oklab, var(--primary) 26%, var(--card));
+      }
+      .btn-ghost {
+        background-color: transparent;
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+      }
+      .btn-ghost:hover {
+        background-color: color-mix(in oklab, var(--text) 8%, var(--card));
+        color: var(--text);
+      }
+      .badge-outline {
+        background-color: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      .alert-good { background-color: color-mix(in oklab, var(--good) 14%, var(--card)); color: var(--good); border-color: color-mix(in oklab, var(--good) 40%, var(--border)); }
+      .alert-warn { background-color: color-mix(in oklab, var(--warn) 14%, var(--card)); color: var(--warn); border-color: color-mix(in oklab, var(--warn) 40%, var(--border)); }
+      .alert-bad { background-color: color-mix(in oklab, var(--bad) 14%, var(--card)); color: var(--bad); border-color: color-mix(in oklab, var(--bad) 40%, var(--border)); }
+      .alert-info { background-color: color-mix(in oklab, var(--primary) 12%, var(--card)); color: var(--primary); border-color: color-mix(in oklab, var(--primary) 36%, var(--border)); }
 
       /* Themed placeholder text — Tailwind /opacity modifiers can't decompose
          CSS variables into RGB channels, so we style ::placeholder globally */

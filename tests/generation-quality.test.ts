@@ -120,19 +120,15 @@ describe('Brand-tinted neutrals', () => {
 });
 
 describe('On-palette status hues', () => {
-  it('keeps monochrome and analogous status near the seed', () => {
+  it('keeps status colors conventional green and red in every harmony', () => {
     const seed = seedFromHue(250);
-    for (const mode of ['monochrome', 'analogous'] as const) {
-      const { light } = generateTheme(mode, seed, 0, 0, 0);
-      expect(hueDifference(toOklch(light.good).H, 250)).toBeLessThan(40);
-      expect(hueDifference(toOklch(light.bad).H, 250)).toBeLessThan(40);
+    for (const mode of ['monochrome', 'analogous', 'complementary', 'triadic'] as const) {
+      const { light, dark } = generateTheme(mode, seed, 0, 0, 0);
+      for (const side of [light, dark]) {
+        expect(hueDifference(toOklch(side.good).H, 148)).toBeLessThanOrEqual(14);
+        expect(hueDifference(toOklch(side.bad).H, 27)).toBeLessThanOrEqual(10);
+      }
     }
-  });
-
-  it('still snaps wide harmonies toward green and red', () => {
-    const { light } = generateTheme('complementary', seedFromHue(250), 0, 0, 0);
-    expect(hueDifference(toOklch(light.good).H, 140)).toBeLessThanOrEqual(40);
-    expect(hueDifference(toOklch(light.bad).H, 0)).toBeLessThanOrEqual(32);
   });
 });
 

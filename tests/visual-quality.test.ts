@@ -105,6 +105,74 @@ describe('High contrast visuals', () => {
     }
   });
 
+  it('does not over-ink light brand colors at +3 +4 +5', () => {
+    for (const mode of ['analogous', 'complementary', 'triadic'] as const) {
+      for (const hue of VISUAL_HUES) {
+        const seed = seedForHue(hue);
+        const baseline = generateTheme(mode, seed, 0, 0, 0);
+        for (const contrast of HIGH_CONTRAST_STEPS) {
+          const { light, dark } = generateTheme(mode, seed, 0, contrast, 0);
+          for (const key of ['primary', 'secondary', 'accent'] as const) {
+            const baseL = toOklch(baseline.light[key]).L;
+            const lightColor = toOklch(light[key]);
+            const darkColor = toOklch(dark[key]);
+            if (lightColor.L < 0.46) {
+              throw new Error(
+                `light ${key} over-inked mode=${mode} hue=${hue} con=${contrast} L=${lightColor.L.toFixed(3)} ${light[key]}`
+              );
+            }
+            const highCusp = lightColor.H >= 55 && lightColor.H <= 130;
+            if (key === 'primary' && !highCusp && lightColor.L < baseL - 0.12) {
+              throw new Error(
+                `light primary dropped too far from default mode=${mode} hue=${hue} con=${contrast} ` +
+                  `base=${baseL.toFixed(3)} now=${lightColor.L.toFixed(3)} ${light[key]}`
+              );
+            }
+            if (darkColor.L - lightColor.L > 0.30) {
+              throw new Error(
+                `light/dark ${key} no longer feel like a pair mode=${mode} hue=${hue} con=${contrast} ` +
+                  `lightL=${lightColor.L.toFixed(3)} darkL=${darkColor.L.toFixed(3)}`
+              );
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('does not over-ink light muted text at +3 +4 +5', () => {
+    for (const mode of ['analogous', 'complementary', 'triadic'] as const) {
+      for (const hue of VISUAL_HUES) {
+        const seed = seedForHue(hue);
+        const baseline = generateTheme(mode, seed, 0, 0, 0).light;
+        for (const contrast of HIGH_CONTRAST_STEPS) {
+          const { light } = generateTheme(mode, seed, 0, contrast, 0);
+          const muted = toOklch(light.textMuted);
+          const text = toOklch(light.text);
+          if (muted.L < 0.36) {
+            throw new Error(
+              `light muted over-inked mode=${mode} hue=${hue} con=${contrast} ` +
+                `L=${muted.L.toFixed(3)} ${light.textMuted}`
+            );
+          }
+          if (muted.L - text.L < 0.14) {
+            throw new Error(
+              `light muted collapsed toward body mode=${mode} hue=${hue} con=${contrast} ` +
+                `text=${light.text} muted=${light.textMuted}`
+            );
+          }
+          const baseMuted = toOklch(baseline.textMuted);
+          if (muted.L < baseMuted.L - 0.10) {
+            throw new Error(
+              `light muted dropped too far from default mode=${mode} hue=${hue} con=${contrast} ` +
+                `base=${baseMuted.L.toFixed(3)} now=${muted.L.toFixed(3)} ${light.textMuted}`
+            );
+          }
+        }
+      }
+    }
+  });
+
   it('keeps the screenshot seed charcoal in dark mode at +5', () => {
     const { light, dark } = generateTheme('analogous', '#3a5cb8', 0, 5, 0);
     const seedHue = toOklch('#3a5cb8').H;

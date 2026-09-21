@@ -6,10 +6,75 @@
  * Or for manual testing: npm run test:manual
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { afterAll, beforeAll, describe, it, expect } from '@jest/globals';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import generateThemeHandler from '../api/generate-theme';
+import exportThemeHandler from '../api/export-theme';
 
 // Test configuration
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/api';
+// Set API_BASE_URL to test a deployment; otherwise the handlers run in a local
+// HTTP server, so no `vercel dev` is needed.
+let API_BASE_URL = process.env.API_BASE_URL || '';
+let localServer: Server | undefined;
+let requestCount = 0;
+
+const HANDLERS: Record<string, (req: any, res: any) => unknown> = {
+  '/api/generate-theme': generateThemeHandler,
+  '/api/export-theme': exportThemeHandler,
+};
+
+beforeAll(async () => {
+  if (API_BASE_URL) return;
+  localServer = createServer((req, res) => {
+    let data = '';
+    req.on('data', (chunk) => (data += chunk));
+    req.on('end', () => {
+      const url = new URL(req.url ?? '/', 'http://localhost');
+      const anyReq = req as any;
+      const anyRes = res as any;
+      try {
+        anyReq.body = data ? JSON.parse(data) : undefined;
+      } catch {
+        anyReq.body = undefined;
+      }
+      anyReq.query = Object.fromEntries(url.searchParams);
+      // The limiter is per client IP; the suite is one client making dozens of
+      // calls, so each request gets its own address.
+      req.headers['x-forwarded-for'] = `10.0.${Math.floor(requestCount / 250)}.${(requestCount % 250) + 1}`;
+      requestCount += 1;
+      anyRes.status = (code: number) => {
+        res.statusCode = code;
+        return anyRes;
+      };
+      anyRes.json = (obj: unknown) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(obj));
+        return anyRes;
+      };
+      anyRes.send = (body: unknown) => {
+        res.end(typeof body === 'string' ? body : JSON.stringify(body));
+        return anyRes;
+      };
+      const handler = HANDLERS[url.pathname];
+      if (!handler) {
+        anyRes.status(404).json({ success: false, error: 'Not found' });
+        return;
+      }
+      void handler(anyReq, anyRes);
+    });
+  });
+  await new Promise<void>((resolve) => localServer!.listen(0, '127.0.0.1', resolve));
+  const { port } = localServer.address() as AddressInfo;
+  API_BASE_URL = `http://127.0.0.1:${port}/api`;
+});
+
+afterAll(async () => {
+  if (!localServer) return;
+  await new Promise<void>((resolve, reject) =>
+    localServer!.close((err) => (err ? reject(err) : resolve()))
+  );
+});
 const DELAY_BETWEEN_TESTS = 500; // Delay to avoid rate limiting during tests
 
 // Helper function to delay between tests
@@ -275,7 +340,7 @@ describe('API Test Suite', () => {
       
       expect(data.success).toBe(false);
       expect(data.code).toBe('INVALID_STYLE');
-      expect(data.error).toContain('Invalid style');
+      expect(data.error).toContain('Invalid mode/style');
       
       await delay(DELAY_BETWEEN_TESTS);
     });

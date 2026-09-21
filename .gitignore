@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 .vercel
 .env*
+
+# Local QA captures
+/*.png
+/prompt-bar-after-type.yml
+.playwright-mcp/
