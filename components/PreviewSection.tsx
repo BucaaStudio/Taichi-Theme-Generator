@@ -3,10 +3,11 @@ import {
   Palette, Shuffle,
   ChevronRight, Check, Copy, Download, Share2,
   Sliders, Sparkles, Upload, Github,
-  Lock, Server, Bot
+  Lock, Server, Bot, Eye
 } from 'lucide-react';
 import { DesignOptions, ThemeTokens } from '../types';
 import ThemeShowcase from './ThemeShowcase';
+import { auditContrast, fixContrast } from '../utils/contrastReport';
 import { contrastRatio, selectForegroundHex } from '../utils/contrast';
 
 type AdjustmentOptionKey =
@@ -30,6 +31,7 @@ interface PreviewProps {
   onRandomize?: () => void;
   onExport?: () => void;
   onShare?: () => void;
+  onFixContrast?: (updates: Partial<ThemeTokens>) => void;
 }
 
 // Controlled Slider Component
@@ -109,6 +111,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
   onRandomize,
   onExport,
   onShare,
+  onFixContrast,
   isAiTheme
 }) => {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => ({
@@ -287,6 +290,9 @@ const PreviewSection: React.FC<PreviewProps> = ({
     setCopiedCommand(true);
     setTimeout(() => setCopiedCommand(false), 1500);
   };
+
+  const contrastResults = auditContrast(themeTokens);
+  const contrastFailures = contrastResults.filter((result) => !result.pass);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({
@@ -468,6 +474,60 @@ const PreviewSection: React.FC<PreviewProps> = ({
             )}
           </section>
         </div>
+
+        {/* Contrast check */}
+        <section className={`${bClass} ${rClass} ${sClass} bg-t-card overflow-hidden`}>
+          <div className="flex items-center gap-3 p-4">
+            <button
+              onClick={() => toggleSection('contrast')}
+              className="flex flex-1 min-w-0 items-center gap-3 text-left"
+              aria-expanded={Boolean(expandedSections.contrast)}
+            >
+              <div className={`w-10 h-10 shrink-0 ${rClass} flex items-center justify-center ${contrastFailures.length ? 'tint-warn' : 'tint-good'}`}>
+                {contrastFailures.length ? <Eye size={20} /> : <Check size={20} />}
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-bold text-t-text">Contrast check</h2>
+                <p className="text-sm text-t-textMuted">
+                  {contrastFailures.length
+                    ? `${contrastFailures.length} of ${contrastResults.length} pairs below WCAG AA in ${themeName.toLowerCase()} mode`
+                    : `All ${contrastResults.length} pairs pass WCAG AA in ${themeName.toLowerCase()} mode`}
+                </p>
+              </div>
+            </button>
+            {contrastFailures.length > 0 && onFixContrast && (
+              <button
+                onClick={() => onFixContrast(fixContrast(themeTokens))}
+                className={`shrink-0 ${gradientClass} text-t-primaryFg px-3 py-1.5 ${rClass} ${sClass} text-xs font-semibold transition-all hover:scale-105 active:scale-95`}
+              >
+                Fix all
+              </button>
+            )}
+            <ChevronRight
+              onClick={() => toggleSection('contrast')}
+              className={`shrink-0 cursor-pointer text-t-textMuted transition-transform ${expandedSections.contrast ? 'rotate-90' : ''}`}
+            />
+          </div>
+          {expandedSections.contrast && (
+            <div className="border-t border-themed p-4 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+              {contrastResults.map((result) => (
+                <div key={result.label} className="flex items-center gap-2 text-xs">
+                  <span
+                    className={`flex h-5 w-8 shrink-0 items-center justify-center ${rClass} border border-themed text-[10px] font-bold`}
+                    style={{ backgroundColor: themeTokens[result.bg], color: themeTokens[result.fg] }}
+                  >
+                    Aa
+                  </span>
+                  <span className="flex-1 min-w-0 truncate text-t-text">{result.label}</span>
+                  <span className="font-mono text-t-textMuted">{result.ratio.toFixed(1)}</span>
+                  <span className={`${rClass} ${result.pass ? 'tint-good' : 'tint-bad'} px-1.5 py-0.5 text-[10px] font-semibold`}>
+                    {result.pass ? 'Pass' : `Needs ${result.required}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         <div className="grid gap-4 lg:grid-cols-2 items-start">
           {/* Color Tokens */}

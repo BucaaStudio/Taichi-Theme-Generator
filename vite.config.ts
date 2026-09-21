@@ -81,36 +81,19 @@ export default defineConfig(({ mode }) => {
               }
               try {
                 applyGatewayEnv();
-                const promptTheme = await server.ssrLoadModule('/utils/promptTheme.ts');
-                const interpret = await server.ssrLoadModule('/utils/interpretThemePrompt.ts');
-                const parsed = promptTheme.normalizeThemeRequest(body);
-                if (parsed.error) {
-                  res.statusCode = 400;
-                  res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ success: false, error: parsed.error, code: parsed.code }));
+                const handler = await server.ssrLoadModule('/utils/promptThemeHandler.ts');
+                if ((body as { stream?: unknown }).stream === true) {
+                  res.statusCode = 200;
+                  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+                  res.setHeader('Cache-Control', 'no-cache, no-transform');
+                  await handler.streamPromptTheme(body, (line: string) => res.write(line));
+                  res.end();
                   return;
                 }
-                const intent = await interpret.interpretThemePrompt(parsed.prompt, parsed.image);
-                const result = promptTheme.buildThemeFromIntent(intent);
-                res.statusCode = 200;
+                const { status, payload } = await handler.runPromptTheme(body);
+                res.statusCode = status;
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({
-                  success: true,
-                  light: result.light,
-                  dark: result.dark,
-                  intent,
-                  metadata: {
-                    mode: result.mode,
-                    style: result.mode,
-                    seed: result.seed,
-                    timestamp: Date.now(),
-                    colorSpace: 'OKLCH',
-                    philosophy: promptTheme.AI_PHILOSOPHY,
-                    prompt: parsed.prompt,
-                    rationale: intent.rationale,
-                    options: intent.options,
-                  },
-                }));
+                res.end(JSON.stringify(payload));
               } catch (error) {
                 const status = error?.status ?? 502;
                 res.statusCode = typeof status === 'number' ? status : 502;

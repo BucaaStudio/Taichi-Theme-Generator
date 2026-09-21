@@ -85,6 +85,8 @@ export interface AiThemeBase {
   // Slider positions the model says its tokens already represent. Sliders
   // adjust relative to these, so the theme is untouched until the user moves one.
   levels?: AiLevels;
+  // Only set when light and dark sliders were split at the time the base was taken.
+  darkLevels?: AiLevels;
 }
 
 export const AI_PHILOSOPHY = 'Every token chosen by AI from your description, then fine-tuned with the sliders.';
@@ -134,6 +136,24 @@ export function normalizeThemeImage(
     return { error: 'Image must be a JPEG, PNG, WebP or GIF data URL.', code: 'INVALID_IMAGE' };
   }
   return { image: { mediaType: match[1], data: match[2] } };
+}
+
+export interface ThemePromptCurrent {
+  light: AiTokens;
+  dark: AiTokens;
+  options: AiOptions;
+}
+
+// The theme on screen, sent along so a follow-up prompt can refine it.
+// Malformed input is dropped rather than rejected: refining is an enhancement.
+export function normalizeThemeCurrent(value: unknown): ThemePromptCurrent | null {
+  if (!value || typeof value !== 'object') return null;
+  try {
+    const { light, dark, options } = clampThemePromptIntent({ ...(value as object), rationale: 'current' });
+    return { light, dark, options };
+  } catch {
+    return null;
+  }
 }
 
 // A request needs a description, an image, or both.
@@ -231,15 +251,23 @@ export function encodeAiBase(base: AiThemeBase): string {
   const hex = (['light', 'dark'] as const)
     .flatMap((side) => AI_TOKEN_KEYS.map((key) => base[side][key].replace('#', '')))
     .join('');
-  const { levels } = base;
-  return levels ? `${hex}.${levels.saturation}.${levels.contrast}.${levels.brightness}` : hex;
+  const { levels, darkLevels } = base;
+  const numbers = [levels, darkLevels]
+    .filter((entry): entry is AiLevels => Boolean(entry))
+    .flatMap((entry) => [entry.saturation, entry.contrast, entry.brightness]);
+  return levels ? `${hex}.${numbers.join('.')}` : hex;
 }
 
 export function decodeAiBase(encoded: string | null): AiThemeBase | null {
   const count = AI_TOKEN_KEYS.length;
   const [value, ...rawLevels] = (encoded ?? '').split('.');
   if (!new RegExp(`^[0-9A-Fa-f]{${count * 12}}$`).test(value)) return null;
-  const [saturation, contrast, brightness] = rawLevels.map((raw) => clampInt(Number(raw) || 0, -5, 5));
+  const numbers = rawLevels.map((raw) => clampInt(Number(raw) || 0, -5, 5));
+  const toLevels = (offset: number): AiLevels => ({
+    saturation: numbers[offset],
+    contrast: numbers[offset + 1],
+    brightness: numbers[offset + 2],
+  });
   const side = (offset: number) => {
     const tokens = {} as AiTokens;
     AI_TOKEN_KEYS.forEach((key, index) => {
@@ -251,7 +279,8 @@ export function decodeAiBase(encoded: string | null): AiThemeBase | null {
   return {
     light: side(0),
     dark: side(count),
-    ...(rawLevels.length === 3 ? { levels: { saturation, contrast, brightness } } : {}),
+    ...(numbers.length >= 3 ? { levels: toLevels(0) } : {}),
+    ...(numbers.length === 6 ? { darkLevels: toLevels(3) } : {}),
   };
 }
 

@@ -6,6 +6,8 @@ import { imageFileToPromptDataUrl } from '../utils/imageResize';
 interface PromptBarProps {
   value: string;
   image: string | null;
+  // An AI theme is on screen, so short follow-ups edit it.
+  canRefine: boolean;
   busy: boolean;
   error: string | null;
   rationale: string | null;
@@ -23,6 +25,7 @@ interface PromptBarProps {
 const PromptBar: React.FC<PromptBarProps> = ({
   value,
   image,
+  canRefine,
   busy,
   error,
   rationale,
@@ -117,7 +120,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 ? 'Drop the image to use its colors'
                 : image
                   ? 'Optional: steer it — "calmer", "make the blue primary"'
-                  : 'Describe a theme, or paste an image'
+                  : canRefine
+                    ? 'Refine it — "warmer", "make secondary teal" — or describe a new theme'
+                    : 'Describe a theme, or paste an image'
             }
             disabled={busy}
             maxLength={400}

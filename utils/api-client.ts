@@ -1,5 +1,5 @@
 import { ThemeTokens, GenerationMode } from '../types';
-import type { ThemePromptIntent } from './promptTheme';
+import type { ThemePromptCurrent, ThemePromptIntent } from './promptTheme';
 
 /**
  * API Client for Taichi Theme Generator
@@ -175,25 +175,73 @@ export async function generateTheme(
   }
 }
 
-export async function promptTheme(prompt: string, image?: string | null): Promise<PromptThemeResponse> {
+export interface PromptThemeRequestOptions {
+  image?: string | null;
+  // Theme on screen, so a follow-up prompt can refine it instead of starting over.
+  current?: ThemePromptCurrent | null;
+  // Bypass the server cache to get a new take on the same prompt.
+  fresh?: boolean;
+  // Called with the partially generated intent while the model is writing.
+  onPartial?: (partial: PartialThemeIntent) => void;
+}
+
+export type PartialThemeIntent = {
+  light?: Partial<Record<string, string>>;
+  dark?: Partial<Record<string, string>>;
+};
+
+export async function promptTheme(
+  prompt: string,
+  { image, current, fresh, onPartial }: PromptThemeRequestOptions = {}
+): Promise<PromptThemeResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/prompt-theme`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(image ? { prompt, image } : { prompt }),
+      body: JSON.stringify({
+        prompt,
+        ...(image ? { image } : {}),
+        ...(current ? { current } : {}),
+        ...(fresh ? { fresh: true } : {}),
+        stream: true,
+      }),
     });
-    const data = await response.json();
-    if (!response.ok) {
-      return {
-        success: false,
-        error: data.error || 'Failed to generate theme from prompt',
-        code: data.code,
-        retryAfter: data.retryAfter,
-      };
+
+    // Errors before the stream starts (rate limit, bad method) are plain JSON.
+    if (!response.ok || !response.body || !response.headers.get('Content-Type')?.includes('ndjson')) {
+      const data = await response.json();
+      return response.ok
+        ? data
+        : {
+            success: false,
+            error: data.error || 'Failed to generate theme from prompt',
+            code: data.code,
+            retryAfter: data.retryAfter,
+          };
     }
-    return data;
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffered = '';
+    let done: PromptThemeResponse | null = null;
+    const handleLine = (line: string) => {
+      if (!line.trim()) return;
+      const message = JSON.parse(line);
+      if (message.type === 'partial') onPartial?.(message.intent ?? {});
+      if (message.type === 'done') done = message;
+    };
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buffered += decoder.decode(chunk.value, { stream: true });
+      const lines = buffered.split('\n');
+      buffered = lines.pop() ?? '';
+      lines.forEach(handleLine);
+    }
+    handleLine(buffered);
+    return done ?? { success: false, error: 'The theme stream ended early.', code: 'STREAM_ENDED' };
   } catch (error) {
     console.error('Error prompting theme:', error);
     return {

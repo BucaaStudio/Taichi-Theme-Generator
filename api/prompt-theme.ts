@@ -1,12 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { rateLimit } from './utils/rate-limit.js';
-import { interpretThemePrompt } from '../utils/interpretThemePrompt.js';
-import {
-  PromptThemeError,
-  AI_PHILOSOPHY,
-  buildThemeFromIntent,
-  normalizeThemeRequest,
-} from '../utils/promptTheme.js';
+import { runPromptTheme, streamPromptTheme } from '../utils/promptThemeHandler.js';
 
 function setCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -42,46 +36,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  try {
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const parsed = normalizeThemeRequest(body);
-    if ('error' in parsed) {
-      return res.status(400).json({
-        success: false,
-        error: parsed.error,
-        code: parsed.code,
-      });
-    }
-
-    const intent = await interpretThemePrompt(parsed.prompt, parsed.image);
-    const result = buildThemeFromIntent(intent);
-
-    return res.status(200).json({
-      success: true,
-      light: result.light,
-      dark: result.dark,
-      intent,
-      metadata: {
-        mode: result.mode,
-        style: result.mode,
-        seed: result.seed,
-        timestamp: Date.now(),
-        colorSpace: 'OKLCH',
-        philosophy: AI_PHILOSOPHY,
-        prompt: parsed.prompt,
-        rationale: intent.rationale,
-        options: intent.options,
-      },
-    });
-  } catch (error) {
-    const mapped = error instanceof PromptThemeError
-      ? error
-      : new PromptThemeError('Could not generate a theme from that prompt.', 'AI_FAILED', 502);
-    console.error('Error prompting theme:', mapped);
-    return res.status(mapped.status).json({
-      success: false,
-      error: mapped.message,
-      code: mapped.code,
-    });
+  if (req.body && typeof req.body === 'object' && req.body.stream === true) {
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.status(200);
+    await streamPromptTheme(req.body, (line) => res.write(line));
+    res.end();
+    return;
   }
+
+  const { status, payload } = await runPromptTheme(req.body);
+  return res.status(status).json(payload);
 }

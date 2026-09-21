@@ -7,6 +7,7 @@ import {
   decodeAiBase,
   encodeAiBase,
   normalizeSeedHex,
+  normalizeThemeCurrent,
   normalizeThemePrompt,
   normalizeThemeRequest,
 } from '../utils/promptTheme';
@@ -91,5 +92,13 @@ describe('Theme prompt application', () => {
     const base = buildThemeFromIntent({ light: LIGHT, dark: DARK, options: OPTIONS, rationale: 'x' });
     expect(decodeAiBase(encodeAiBase(base))).toEqual({ light: base.light, dark: base.dark, levels: base.levels });
     expect(decodeAiBase('nope')).toBeNull();
+    const split = { ...base, darkLevels: { saturation: -2, contrast: 4, brightness: 1 } };
+    expect(decodeAiBase(encodeAiBase(split))?.darkLevels).toEqual(split.darkLevels);
+  });
+
+  it('accepts a valid current theme for refining and drops a malformed one', () => {
+    expect(normalizeThemeCurrent({ light: LIGHT, dark: DARK, options: OPTIONS })).toEqual({ light: LIGHT, dark: DARK, options: OPTIONS });
+    expect(normalizeThemeCurrent({ light: LIGHT })).toBeNull();
+    expect(normalizeThemeCurrent('warm')).toBeNull();
   });
 });

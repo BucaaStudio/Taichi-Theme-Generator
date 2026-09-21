@@ -39,6 +39,7 @@ export interface DualTheme {
     light: ThemeTokens;
     dark: ThemeTokens;
     levels?: { saturation: number; contrast: number; brightness: number };
+    darkLevels?: { saturation: number; contrast: number; brightness: number };
   };
 }
 

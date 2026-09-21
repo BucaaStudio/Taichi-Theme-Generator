@@ -1,9 +1,11 @@
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import {
   PromptThemeError,
   clampThemePromptIntent,
   themePromptIntentSchema,
+  type ThemePromptCurrent,
   type ThemePromptImage,
   type ThemePromptIntent,
 } from './promptTheme.js';
@@ -57,16 +59,74 @@ If an image is attached, it is the source of truth. Take the palette from what i
 
 rationale: one short clause naming the colors, no marketing fluff.`;
 
+export interface InterpretOptions {
+  // Theme on screen, so "warmer" or "make secondary teal" can edit it.
+  current?: ThemePromptCurrent | null;
+  // Receives the partially generated intent as the model streams it.
+  onPartial?: (partial: unknown) => void;
+  // Skip the cache (the user asked for the same thing again to get a new take).
+  fresh?: boolean;
+}
+
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 200;
+// Per-instance and best effort: identical requests skip the model while the
+// function instance stays warm.
+const intentCache = new Map<string, { intent: ThemePromptIntent; at: number }>();
+
+function cacheKey(prompt: string, image: ThemePromptImage | URL | null | undefined, current: ThemePromptCurrent | null | undefined): string {
+  const imageKey = !image ? '' : image instanceof URL ? image.href : image.data;
+  return createHash('sha256')
+    .update(JSON.stringify([prompt.toLowerCase(), imageKey, current ?? null]))
+    .digest('hex');
+}
+
+function readCache(key: string): ThemePromptIntent | null {
+  const hit = intentCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > CACHE_TTL_MS) {
+    intentCache.delete(key);
+    return null;
+  }
+  // Re-insert so the Map's insertion order doubles as LRU order.
+  intentCache.delete(key);
+  intentCache.set(key, hit);
+  return hit.intent;
+}
+
+function writeCache(key: string, intent: ThemePromptIntent) {
+  intentCache.set(key, { intent, at: Date.now() });
+  while (intentCache.size > CACHE_MAX_ENTRIES) {
+    intentCache.delete(intentCache.keys().next().value as string);
+  }
+}
+
+function describeCurrent(current: ThemePromptCurrent): string {
+  return [
+    'CURRENT THEME (what the user is looking at):',
+    JSON.stringify(current),
+    'If the request adjusts this theme ("warmer", "make secondary teal", "less rounded", "darker background"), return the current theme with ONLY the requested change and anything that must follow from it; copy every other value exactly. If the request names a new subject, ignore the current theme and design from scratch.',
+  ].join('\n');
+}
+
 export async function interpretThemePrompt(
   prompt: string,
-  image?: ThemePromptImage | URL | null
+  image?: ThemePromptImage | URL | null,
+  options: InterpretOptions = {}
 ): Promise<ThemePromptIntent> {
+  const { current, onPartial, fresh } = options;
+  const key = cacheKey(prompt, image, current);
+  if (!fresh) {
+    const cached = readCache(key);
+    if (cached) return cached;
+  }
+
   ensureGatewayEnv();
   // Loaded on demand: the SDK is ESM-only, and importers like the MCP server
   // should not pay for (or break on) it until a prompt is actually run.
-  const { generateText, Output, gateway, APICallError } = await import('ai');
+  const { generateText, streamText, Output, gateway, APICallError } = await import('ai');
   try {
-    const { output } = await generateText({
+    const request = {
       model: gateway('google/gemini-3.8-flash'),
       instructions: INTERPRET_INSTRUCTIONS,
       output: Output.object({
@@ -76,9 +136,10 @@ export async function interpretThemePrompt(
       }),
       messages: [
         {
-          role: 'user',
+          role: 'user' as const,
           content: [
-            { type: 'text', text: prompt || 'Design a theme from this image.' },
+            ...(current ? [{ type: 'text' as const, text: describeCurrent(current) }] : []),
+            { type: 'text' as const, text: prompt || 'Design a theme from this image.' },
             ...(image
               ? [
                   image instanceof URL
@@ -96,12 +157,25 @@ export async function interpretThemePrompt(
           tags: ['feature:prompt-theme'],
         },
       },
-    });
+    };
+
+    let output: unknown;
+    if (onPartial) {
+      let streamError: unknown;
+      const result = streamText({ ...request, onError: ({ error }) => { streamError = error; } });
+      for await (const partial of result.partialOutputStream) onPartial(partial);
+      if (streamError) throw streamError;
+      output = await result.output;
+    } else {
+      ({ output } = await generateText(request));
+    }
 
     if (!output) {
       throw new Error('The model did not return a theme.');
     }
-    return clampThemePromptIntent(output);
+    const intent = clampThemePromptIntent(output);
+    writeCache(key, intent);
+    return intent;
   } catch (error) {
     throw toPromptThemeError(error, APICallError.isInstance(error) ? error.statusCode : undefined);
   }

@@ -521,6 +521,21 @@ curl -X POST https://taichi.bucaastudio.com/api/generate-theme \
                         <td><span class="param-type">string</span></td>
                         <td>Optional base64 data URL (JPEG, PNG, WebP or GIF, under 1.5 MB). The AI takes the palette from the image; <code>prompt</code> then only steers it. Image requests are limited to 4 per minute.</td>
                     </tr>
+                    <tr>
+                        <td><span class="param-name">current</span></td>
+                        <td><span class="param-type">object</span></td>
+                        <td>Optional <code>{ light, dark, options }</code> in the same shape as <code>intent</code>. When sent, a prompt like <code>warmer</code> or <code>make secondary teal</code> edits that theme instead of starting over.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">stream</span></td>
+                        <td><span class="param-type">boolean</span></td>
+                        <td>Optional. Responds with newline-delimited JSON: <code>{"type":"partial","intent":{…}}</code> lines while the model writes, then one <code>{"type":"done", …}</code> line carrying the normal response.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">fresh</span></td>
+                        <td><span class="param-type">boolean</span></td>
+                        <td>Optional. Identical requests are cached for up to 24 hours; <code>true</code> skips the cache for a new take.</td>
+                    </tr>
                 </table>
 
                 <h3>Example Request</h3>

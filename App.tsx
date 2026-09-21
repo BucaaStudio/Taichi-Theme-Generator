@@ -12,8 +12,8 @@ import PromptBar from './components/PromptBar';
 import SwatchStrip from './components/SwatchStrip';
 import ShareModal from './components/ShareModal';
 import ImagePickerModal from './components/ImagePickerModal';
-import { promptTheme } from './utils/api-client';
-import { buildThemeFromIntent, decodeAiBase, encodeAiBase, type AiThemeBase } from './utils/promptTheme';
+import { promptTheme, type PartialThemeIntent } from './utils/api-client';
+import { AI_TOKEN_KEYS, buildThemeFromIntent, decodeAiBase, encodeAiBase, type AiThemeBase, type AiTokens } from './utils/promptTheme';
 
 const MAX_HISTORY = 20;
 type ImportSourceSide = 'light' | 'dark';
@@ -128,6 +128,7 @@ const App: React.FC = () => {
   const [lockedOptions, setLockedOptions] = useState<LockedOptions>({});
   const [themePrompt, setThemePrompt] = useState('');
   const [promptImage, setPromptImage] = useState<string | null>(null);
+  const lastPromptKeyRef = useRef<string | null>(null);
   const [promptBusy, setPromptBusy] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
   const [promptRationale, setPromptRationale] = useState<string | null>(null);
@@ -424,6 +425,7 @@ const App: React.FC = () => {
     // from them is applied.
     const level = (value: number, base = 0) => Math.max(-5, Math.min(5, value - base));
     const aiLevels = aiBase?.levels;
+    const aiDarkLevels = aiBase?.darkLevels ?? aiLevels;
     const { light, dark, seed: newSeed, mode: resolvedMode } = aiBase
       ? {
           light: applyAdjustments(
@@ -432,7 +434,7 @@ const App: React.FC = () => {
           ),
           dark: applyAdjustments(
             aiBase.dark,
-            level(darkBri, aiLevels?.brightness), level(darkCon, aiLevels?.contrast), level(darkSat, aiLevels?.saturation)
+            level(darkBri, aiDarkLevels?.brightness), level(darkCon, aiDarkLevels?.contrast), level(darkSat, aiDarkLevels?.saturation)
           ),
           seed: aiBase.light.primary,
           mode: 'ai' as GenerationMode,
@@ -513,13 +515,11 @@ const App: React.FC = () => {
   }, [computeRandomizedOptions, designOptions, generateNewTheme]);
 
   // Update a single token (manual edit)
-  const handleTokenUpdate = useCallback((side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => {
+  // Apply manual edits (one swatch, or a batch from the contrast fixer).
+  const handleTokensUpdate = useCallback((side: 'light' | 'dark', updates: Partial<ThemeTokens>) => {
     if (!currentTheme) return;
 
-    const nextSide = {
-      ...currentTheme[side],
-      [key]: value
-    };
+    const nextSide = { ...currentTheme[side], ...updates };
     const fgCompanions: Partial<Record<keyof ThemeTokens, (keyof ThemeTokens)[]>> = {
       primary: ['primaryFg', 'textOnColor'],
       secondary: ['secondaryFg'],
@@ -528,14 +528,40 @@ const App: React.FC = () => {
       bad: ['badFg'],
       warn: ['warnFg'],
     };
-    for (const fgKey of fgCompanions[key] ?? []) {
-      nextSide[fgKey] = selectForegroundHex(value);
+    for (const key of Object.keys(updates) as (keyof ThemeTokens)[]) {
+      for (const fgKey of fgCompanions[key] ?? []) {
+        if (!(fgKey in updates)) nextSide[fgKey] = selectForegroundHex(nextSide[key]);
+      }
     }
 
-    const updatedTheme = {
+    const updatedTheme: DualTheme = {
       ...currentTheme,
       [side]: nextSide
     };
+    // AI themes are re-derived from their base whenever a slider moves, which
+    // would drop the edit. Re-base on what is on screen at the current slider
+    // positions so the edit survives and sliders keep working from here.
+    if (updatedTheme.mode === 'ai' && updatedTheme.aiBase) {
+      const split = designOptions.splitAdjustments;
+      updatedTheme.aiBase = {
+        light: updatedTheme.light,
+        dark: updatedTheme.dark,
+        levels: {
+          saturation: split ? designOptions.lightSaturationLevel : designOptions.saturationLevel,
+          contrast: split ? designOptions.lightContrastLevel : designOptions.contrastLevel,
+          brightness: split ? designOptions.lightBrightnessLevel : designOptions.brightnessLevel,
+        },
+        ...(split
+          ? {
+              darkLevels: {
+                saturation: designOptions.darkSaturationLevel,
+                contrast: designOptions.darkContrastLevel,
+                brightness: designOptions.darkBrightnessLevel,
+              },
+            }
+          : {}),
+      };
+    }
     
     // Push modification to history
     // This allows Undo (Cmd+Z) to revert this change
@@ -546,7 +572,11 @@ const App: React.FC = () => {
     });
     setHistoryIndex(0);
     setCurrentTheme(updatedTheme);
-  }, [currentTheme]);
+  }, [currentTheme, designOptions]);
+
+  const handleTokenUpdate = useCallback((side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => {
+    handleTokensUpdate(side, { [key]: value });
+  }, [handleTokensUpdate]);
 
   // Toggle lock on a color token
   const toggleColorLock = useCallback((key: keyof ThemeTokens) => {
@@ -757,9 +787,65 @@ const App: React.FC = () => {
     if (nextPrompt) setThemePrompt(nextPrompt);
     setPromptBusy(true);
     setPromptError(null);
+
+    // Asking for the same thing twice means "give me another take".
+    const requestKey = `${prompt.toLowerCase()}|${promptImage ?? ''}`;
+    const fresh = lastPromptKeyRef.current === requestKey;
+    lastPromptKeyRef.current = requestKey;
+
+    const themeBeforePrompt = currentTheme;
+    const pickTokens = (tokens: ThemeTokens) =>
+      Object.fromEntries(AI_TOKEN_KEYS.map((key) => [key, tokens[key]])) as AiTokens;
+    // A repeat is a re-roll, so it must not be anchored to the current result.
+    const current = themeBeforePrompt && !fresh
+      ? {
+          light: pickTokens(themeBeforePrompt.light),
+          dark: pickTokens(themeBeforePrompt.dark),
+          options: {
+            borderWidth: designOptions.borderWidth,
+            shadowStrength: designOptions.shadowStrength,
+            shadowOpacity: designOptions.shadowOpacity,
+            radius: designOptions.radius,
+            gradients: designOptions.gradients,
+            darkFirst: designOptions.darkFirst,
+            saturation: designOptions.saturationLevel,
+            contrast: designOptions.contrastLevel,
+            brightness: designOptions.brightnessLevel,
+          },
+        }
+      : null;
+
+    // Paint colors into the preview as the model writes them. This is a
+    // transient view only: no history entry until the theme is complete.
+    const paintPartial = (partial: PartialThemeIntent) => {
+      setCurrentTheme((theme) => {
+        if (!theme) return theme;
+        const overlay = (tokens: ThemeTokens, incoming?: Partial<Record<string, string>>) => {
+          const next = { ...tokens };
+          for (const key of AI_TOKEN_KEYS) {
+            const hex = incoming?.[key];
+            if (hex && /^#[0-9a-fA-F]{6}$/.test(hex)) next[key] = hex;
+          }
+          return {
+            ...next,
+            textOnColor: selectForegroundHex(next.primary),
+            primaryFg: selectForegroundHex(next.primary),
+            secondaryFg: selectForegroundHex(next.secondary),
+            accentFg: selectForegroundHex(next.accent),
+            goodFg: selectForegroundHex(next.good),
+            warnFg: selectForegroundHex(next.warn),
+            badFg: selectForegroundHex(next.bad),
+            ring: next.primary,
+          };
+        };
+        return { ...theme, light: overlay(theme.light, partial.light), dark: overlay(theme.dark, partial.dark) };
+      });
+    };
+
     try {
-      const result = await promptTheme(prompt, promptImage);
+      const result = await promptTheme(prompt, { image: promptImage, current, fresh, onPartial: paintPartial });
       if (!result.success || !result.intent) {
+        setCurrentTheme(themeBeforePrompt);
         setPromptError(result.error || 'Could not generate that theme.');
         return;
       }
@@ -804,11 +890,12 @@ const App: React.FC = () => {
       });
       setPromptRationale(intent.rationale);
     } catch (error) {
+      setCurrentTheme(themeBeforePrompt);
       setPromptError(error instanceof Error ? error.message : 'Could not generate that theme.');
     } finally {
       setPromptBusy(false);
     }
-  }, [themePrompt, promptImage, promptBusy, designOptions, lockedOptions, generateNewTheme]);
+  }, [themePrompt, promptImage, promptBusy, currentTheme, designOptions, lockedOptions, generateNewTheme]);
 
   const handleShare = useCallback(() => setShowShareModal(true), []);
   
@@ -1027,6 +1114,7 @@ const App: React.FC = () => {
         <PromptBar
           value={themePrompt}
           image={promptImage}
+          canRefine={currentTheme.mode === 'ai'}
           busy={promptBusy}
           error={promptError}
           rationale={promptRationale}
@@ -1676,6 +1764,7 @@ const App: React.FC = () => {
              <PreviewSection
                themeName="Light"
                themeTokens={currentTheme.light}
+               onFixContrast={(updates) => handleTokensUpdate('light', updates)}
                options={designOptions}
                onUpdateOption={updateOption}
                onOpenImagePicker={() => setShowImagePickerModal(true)}
@@ -1694,6 +1783,7 @@ const App: React.FC = () => {
              <PreviewSection
                themeName="Dark"
                themeTokens={currentTheme.dark}
+               onFixContrast={(updates) => handleTokensUpdate('dark', updates)}
                options={designOptions}
                onUpdateOption={updateOption}
                onOpenImagePicker={() => setShowImagePickerModal(true)}
