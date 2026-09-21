@@ -1,4 +1,5 @@
 import { ThemeTokens, GenerationMode } from '../types';
+import type { ThemePromptIntent } from './promptTheme';
 
 /**
  * API Client for Taichi Theme Generator
@@ -44,6 +45,10 @@ export interface GenerateThemeResponse {
   error?: string;
   code?: string;
   retryAfter?: number;
+}
+
+export interface PromptThemeResponse extends GenerateThemeResponse {
+  intent?: ThemePromptIntent;
 }
 
 export interface ExportThemeResponse {
@@ -166,6 +171,35 @@ export async function generateTheme(
       success: false,
       error: 'Network error while generating theme',
       code: 'NETWORK_ERROR'
+    };
+  }
+}
+
+export async function promptTheme(prompt: string, image?: string | null): Promise<PromptThemeResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/prompt-theme`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(image ? { prompt, image } : { prompt }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to generate theme from prompt',
+        code: data.code,
+        retryAfter: data.retryAfter,
+      };
+    }
+    return data;
+  } catch (error) {
+    console.error('Error prompting theme:', error);
+    return {
+      success: false,
+      error: 'Network error while generating theme from prompt',
+      code: 'NETWORK_ERROR',
     };
   }
 }

@@ -6,6 +6,7 @@ import {
   Lock, Server, Bot
 } from 'lucide-react';
 import { DesignOptions, ThemeTokens } from '../types';
+import ThemeShowcase from './ThemeShowcase';
 import { contrastRatio, selectForegroundHex } from '../utils/contrast';
 
 type AdjustmentOptionKey =
@@ -20,6 +21,7 @@ type AdjustmentOptionKey =
   | 'darkContrastLevel';
 
 interface PreviewProps {
+  isAiTheme?: boolean;
   themeName: string;
   themeTokens: ThemeTokens;
   options: DesignOptions;
@@ -106,10 +108,11 @@ const PreviewSection: React.FC<PreviewProps> = ({
   onOpenImagePicker,
   onRandomize,
   onExport,
-  onShare
+  onShare,
+  isAiTheme
 }) => {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => ({
-    start: true,
+    start: false,
     adjust: true,
     swatches: false,
     export: false
@@ -251,7 +254,12 @@ const PreviewSection: React.FC<PreviewProps> = ({
       ['--bad-fg', themeTokens.badFg]
     ];
     const lines = cssTokens.map(([key, value]) => `  ${key}: ${value};`);
-    return `:root {\n${lines.join('\n')}\n}\n`;
+    const mixes = [
+      '  --primary-soft: color-mix(in oklab, var(--primary) 16%, var(--card));',
+      '  --secondary-soft: color-mix(in oklab, var(--secondary) 16%, var(--card));',
+      '  --accent-soft: color-mix(in oklab, var(--accent) 16%, var(--card));',
+    ];
+    return `:root {\n${lines.join('\n')}\n${mixes.join('\n')}\n}\n`;
   };
 
   const handleDownloadCss = () => {
@@ -288,11 +296,11 @@ const PreviewSection: React.FC<PreviewProps> = ({
   };
 
   return (
-    <div className="p-6 md:p-10 space-y-10 bg-t-bg min-h-full">
+    <div className="p-4 md:p-6 space-y-6 bg-t-bg min-h-full">
       
       {/* Hero Section with Background Image */}
       <section
-        className={`relative overflow-hidden ${rClass} ${bClass} ${sClass} ${hoverLiftClass} p-6 md:p-8`}
+        className={`relative overflow-hidden ${rClass} ${bClass} ${sClass} ${hoverLiftClass} p-4 md:p-5`}
         style={{
           backgroundImage: `url('/hero-bg.jpg')`,
           backgroundSize: 'cover',
@@ -308,28 +316,25 @@ const PreviewSection: React.FC<PreviewProps> = ({
 
         {/* Content */}
         <div className="relative z-10 space-y-2 pt-6">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tight text-left leading-tight">
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-left leading-tight">
             <span className="text-t-text">Taichi </span>
             <span
               className={useGradientHeading ? 'bg-clip-text text-transparent bg-t-primary bg-[linear-gradient(to_bottom,color-mix(in_oklab,var(--primary),white_18%),color-mix(in_oklab,var(--primary),black_10%))]' : ''}
               style={!useGradientHeading ? { color: headingAccent } : undefined}
             >
-              Theme Generator
+              AI Dual Theme Generator
             </span>
           </h1>
-          <p className="text-base text-t-textMuted max-w-xl text-left pt-2">
+          <p className="text-sm text-t-textMuted max-w-xl text-left pt-1">
             Generate balanced <strong style={{ color: interactiveAccent }}>OKLCH</strong> palettes with matching light and dark modes across{' '}
             <span className={`text-t-bg ${neutralChipClass}`}>background</span>,{' '}
             <span className="text-t-text font-semibold">text</span>,{' '}
             <span className={`text-t-primary ${tokenChipClass}`}>primary</span>,{' '}
             <span className={`text-t-secondary ${tokenChipClass}`}>secondary</span>,{' '}
             <span className={`text-t-accent ${tokenChipClass}`}>accent</span>, and{' '}
-            <span className={`text-t-good ${tokenChipClass}`}>semantic</span> tokens. Export CSS variables, share by URL, or generate programmatically through the{' '}
+            <span className={`text-t-good ${tokenChipClass}`}>semantic</span> tokens. Also available through the{' '}
             <a href="/api-docs.html" className="font-semibold underline decoration-2 underline-offset-2 transition-opacity hover:opacity-80" style={{ color: interactiveAccent }}>REST API</a> and{' '}
-            <a href="/api-docs.html#mcp" className="font-semibold underline decoration-2 underline-offset-2 transition-opacity hover:opacity-80" style={{ color: interactiveAccent }}>MCP server</a> for AI agents.
-          </p>
-          <p className="text-sm text-t-textMuted max-w-xl text-left pt-1">
-            Press [Space] to Generate a new theme
+            <a href="/api-docs.html#mcp" className="font-semibold underline decoration-2 underline-offset-2 transition-opacity hover:opacity-80" style={{ color: interactiveAccent }}>MCP server</a>.
           </p>
         </div>
         
@@ -337,100 +342,17 @@ const PreviewSection: React.FC<PreviewProps> = ({
         <div className={`absolute inset-0 ${rClass} ${bClass} pointer-events-none`} />
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="space-y-6">
-          {/* Generator Actions */}
-          <section className={`${bClass} ${rClass} ${sClass} ${hoverLiftClass} ${hoverCardClass} bg-t-card overflow-hidden`}>
-            <button 
-              onClick={() => toggleSection('start')}
-              className="w-full flex items-center justify-between p-4 hover:bg-t-card2 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${rClass} ${gradientClass} flex items-center justify-center text-t-primaryFg`}>
-                  <Shuffle size={20} />
-                </div>
-                <div className="text-left">
-                  <h2 className="font-bold text-t-text">Generator Actions</h2>
-                  <p className="text-sm text-t-textMuted">Upload an image or press Space to randomize</p>
-                </div>
-              </div>
-              <ChevronRight className={`text-t-textMuted transition-transform ${expandedSections.start ? 'rotate-90' : ''}`} />
-            </button>
-            
-            {expandedSections.start && (
-              <div className="border-t border-themed p-6 space-y-4">
-                <p className="text-sm text-t-textMuted">
-                  Start by uploading an image to extract colors, or press <kbd className="px-2 py-1 bg-t-text/10 rounded text-t-text font-mono text-xs">Space</kbd> to generate a random harmonious palette.
-                </p>
-                
-                <div className="flex flex-wrap gap-3">
-                  <button 
-                    onClick={() => onOpenImagePicker?.()}
-                    className={`${gradientAccent} text-t-accentFg px-6 py-3 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2`}
-                  >
-                    <Upload size={18} />
-                    Upload Image
-                  </button>
-                  
-                  <button
-                    onClick={onRandomize}
-                    disabled={!onRandomize}
-                    className={`${gradientClass} text-t-primaryFg px-6 py-3 ${rClass} font-semibold ${sClass} transition-all hover:scale-105 active:scale-95 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60`}
-                  >
-                    <Shuffle size={18} />
-                    Randomize
-                    <span className="text-xs opacity-75 ml-1 px-2 py-0.5 rounded" style={{ backgroundColor: `${themeTokens.primaryFg}25` }}>Space</span>
-                  </button>
-                </div>
-                
-                <div className={`p-4 ${rClass} ${bClass} bg-t-card2/80 border-themed transition-colors hover:bg-t-card2`}>
-                  <p className="text-sm flex items-start gap-2" style={{ color: cardReadableText }}>
-                    <Sparkles size={16} className="shrink-0 mt-0.5" style={{ color: interactiveAccent }} />
-                    <span><strong>Pro tip:</strong> Lock colors or options you want to keep, then generate to only change the unlocked ones.</span>
-                  </p>
-                </div>
-              </div>
-            )}
-          </section>
+      <ThemeShowcase
+        rClass={rClass}
+        bClass={bClass}
+        sClass={sClass}
+        gradientClass={gradientClass}
+        gradientSecondary={gradientSecondary}
+        gradientAccent={gradientAccent}
+      />
 
-          {/* Color Tokens */}
-          <section className={`${bClass} ${rClass} ${sClass} ${hoverLiftClass} ${hoverCardClass} bg-t-card overflow-hidden`}>
-            <button 
-              onClick={() => toggleSection('swatches')}
-              className="w-full flex items-center justify-between p-4 hover:bg-t-card2 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${rClass} bg-t-good flex items-center justify-center text-t-goodFg`}>
-                  <Palette size={20} />
-                </div>
-                <div className="text-left">
-                  <h2 className="font-bold text-t-text">Color Tokens</h2>
-                  <p className="text-sm text-t-textMuted">Click any token to copy its CSS variable</p>
-                </div>
-              </div>
-              <ChevronRight className={`text-t-textMuted transition-transform ${expandedSections.swatches ? 'rotate-90' : ''}`} />
-            </button>
-            
-            {expandedSections.swatches && (
-              <div className="border-t border-themed p-6 space-y-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                  <ColorSwatch name="primary" colorClass="bg-t-primary" description="Main brand" rClass={rClass} />
-                  <ColorSwatch name="secondary" colorClass="bg-t-secondary" description="Supporting" rClass={rClass} />
-                  <ColorSwatch name="accent" colorClass="bg-t-accent" description="Highlight" rClass={rClass} />
-                  <ColorSwatch name="bg" colorClass={`bg-t-bg ${bClass}`} description="Background" rClass={rClass} />
-                  <ColorSwatch name="card" colorClass={`bg-t-card ${bClass}`} description="Cards" rClass={rClass} />
-                  <ColorSwatch name="text" colorClass="bg-t-text" description="Primary text" rClass={rClass} />
-                  <ColorSwatch name="textMuted" colorClass="bg-t-textMuted" description="Muted text" rClass={rClass} />
-                  <ColorSwatch name="good" colorClass="bg-t-good" description="Success" rClass={rClass} />
-                  <ColorSwatch name="warn" colorClass="bg-t-warn" description="Warning" rClass={rClass} />
-                  <ColorSwatch name="bad" colorClass="bg-t-bad" description="Error" rClass={rClass} />
-                </div>
-              </div>
-            )}
-          </section>
-        </div>
-
-        <div className="space-y-6">
+      <section className="space-y-4">
+        <div>
           {/* Palette Controls */}
           <section className={`${bClass} ${rClass} ${sClass} ${hoverLiftClass} ${hoverCardClass} bg-t-card overflow-hidden`}>
             <button 
@@ -450,11 +372,13 @@ const PreviewSection: React.FC<PreviewProps> = ({
             </button>
             
             {expandedSections.adjust && (
-              <div className="border-t border-themed p-6 space-y-6">
+              <div className="border-t border-themed p-4 space-y-4">
                 <p className="text-sm text-t-textMuted">
                   {options.splitAdjustments
                     ? `These sliders control ${themeName.toLowerCase()} mode only. Changes apply in real-time.`
-                    : 'These sliders affect how colors are generated. Changes apply in real-time.'}
+                    : isAiTheme
+                      ? 'The AI set these to match its theme. Move them to fine-tune; its colors are adjusted, not regenerated.'
+                      : 'These sliders affect how colors are generated. Changes apply in real-time.'}
                 </p>
                 
                 {onUpdateOption ? (
@@ -488,7 +412,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
                   <p className="text-sm italic" style={{ color: cardReadableMuted }}>Controls not available in this view</p>
                 )}
                 
-                <div className="flex flex-wrap gap-6 pt-4 border-t border-themed">
+                <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3 pt-4 border-t border-themed">
                   <button
                     onClick={() => onUpdateOption?.('darkFirst', !options.darkFirst)}
                     onMouseDown={(e) => e.preventDefault()}
@@ -543,6 +467,44 @@ const PreviewSection: React.FC<PreviewProps> = ({
               </div>
             )}
           </section>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2 items-start">
+          {/* Color Tokens */}
+          <section className={`${bClass} ${rClass} ${sClass} ${hoverLiftClass} ${hoverCardClass} bg-t-card overflow-hidden`}>
+            <button 
+              onClick={() => toggleSection('swatches')}
+              className="w-full flex items-center justify-between p-4 hover:bg-t-card2 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 ${rClass} bg-t-good flex items-center justify-center text-t-goodFg`}>
+                  <Palette size={20} />
+                </div>
+                <div className="text-left">
+                  <h2 className="font-bold text-t-text">Color Tokens</h2>
+                  <p className="text-sm text-t-textMuted">Click a token to copy its variable</p>
+                </div>
+              </div>
+              <ChevronRight className={`text-t-textMuted transition-transform ${expandedSections.swatches ? 'rotate-90' : ''}`} />
+            </button>
+            
+            {expandedSections.swatches && (
+              <div className="border-t border-themed p-4 space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                  <ColorSwatch name="primary" colorClass="bg-t-primary" description="Main brand" rClass={rClass} />
+                  <ColorSwatch name="secondary" colorClass="bg-t-secondary" description="Supporting" rClass={rClass} />
+                  <ColorSwatch name="accent" colorClass="bg-t-accent" description="Highlight" rClass={rClass} />
+                  <ColorSwatch name="bg" colorClass={`bg-t-bg ${bClass}`} description="Background" rClass={rClass} />
+                  <ColorSwatch name="card" colorClass={`bg-t-card ${bClass}`} description="Cards" rClass={rClass} />
+                  <ColorSwatch name="text" colorClass="bg-t-text" description="Primary text" rClass={rClass} />
+                  <ColorSwatch name="textMuted" colorClass="bg-t-textMuted" description="Muted text" rClass={rClass} />
+                  <ColorSwatch name="good" colorClass="bg-t-good" description="Success" rClass={rClass} />
+                  <ColorSwatch name="warn" colorClass="bg-t-warn" description="Warning" rClass={rClass} />
+                  <ColorSwatch name="bad" colorClass="bg-t-bad" description="Error" rClass={rClass} />
+                </div>
+              </div>
+            )}
+          </section>
 
           {/* Export & Share */}
           <section className={`${bClass} ${rClass} ${sClass} ${hoverLiftClass} ${hoverCardClass} bg-t-card overflow-hidden`}>
@@ -563,7 +525,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
             </button>
             
             {expandedSections.export && (
-              <div className="border-t border-themed p-6 space-y-4">
+              <div className="border-t border-themed p-4 space-y-4">
                 <div className="flex flex-wrap gap-3">
                   <button
                     onClick={handleDownloadCss}
@@ -585,7 +547,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
                   <button
                     onClick={onExport}
                     disabled={!onExport}
-                    className={`bg-t-text/10 text-t-text px-5 py-2.5 ${rClass} font-medium ${bClass} ${sClass} transition-all hover:bg-t-text/20 active:scale-95 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60`}
+                    className={`btn-ghost px-5 py-2.5 ${rClass} font-medium transition-all active:scale-95 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60`}
                   >
                     <Download size={16} />
                     Export JSON
@@ -593,7 +555,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
 
                   <button
                     onClick={handleCopyTokens}
-                    className={`bg-t-text/10 text-t-text px-5 py-2.5 ${rClass} font-medium ${bClass} ${sClass} transition-all hover:bg-t-text/20 active:scale-95 flex items-center gap-2`}
+                    className={`btn-ghost px-5 py-2.5 ${rClass} font-medium transition-all active:scale-95 flex items-center gap-2`}
                   >
                     <Copy size={16} />
                     Copy All Tokens
@@ -606,7 +568,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
       </section>
 
       {/* Developer Access: REST API + MCP */}
-      <section className={`${bClass} ${rClass} ${sClass} ${hoverLiftClass} ${hoverCardClass} bg-t-card p-6 space-y-4`}>
+      <section className={`${bClass} ${rClass} ${sClass} ${hoverLiftClass} ${hoverCardClass} bg-t-card p-4 md:p-5 space-y-4`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-wider text-t-textMuted">Developer Access</p>
@@ -637,6 +599,9 @@ const PreviewSection: React.FC<PreviewProps> = ({
                 <span className="text-t-primary font-bold">POST</span> /api/generate-theme
               </p>
               <p className={`${rClass} bg-t-text/10 px-3 py-2 text-t-text truncate`}>
+                <span className="text-t-primary font-bold">POST</span> /api/prompt-theme
+              </p>
+              <p className={`${rClass} bg-t-text/10 px-3 py-2 text-t-text truncate`}>
                 <span className="text-t-primary font-bold">POST</span> /api/export-theme
               </p>
             </div>
@@ -651,8 +616,8 @@ const PreviewSection: React.FC<PreviewProps> = ({
                 <Bot size={16} />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-t-text">MCP Server <span className={`ml-1 align-middle text-[10px] font-bold uppercase ${rClass} bg-t-accent/15 text-t-accent px-1.5 py-0.5`}>New</span></p>
-                <p className="text-[11px] text-t-textMuted">generate_theme · export_theme tools for AI agents</p>
+                <p className="text-sm font-semibold text-t-text">MCP Server <span className={`ml-1 align-middle text-[10px] font-bold uppercase ${rClass} tint-accent px-1.5 py-0.5`}>New</span></p>
+                <p className="text-[11px] text-t-textMuted">generate_theme · generate_theme_from_prompt · export_theme</p>
               </div>
             </div>
             <button
@@ -671,262 +636,6 @@ const PreviewSection: React.FC<PreviewProps> = ({
               Streamable HTTP, no session or auth needed — point any MCP client at{' '}
               <span className="font-mono text-t-text">/api/mcp</span>.
             </p>
-          </div>
-        </div>
-      </section>
-
-      <section className={`relative overflow-hidden ${bClass} ${rClass} ${sClass} ${hoverLiftClass} ${hoverCardClass} bg-t-card p-6`}>
-        <div className="absolute -top-20 -right-16 h-44 w-44 rounded-full bg-t-primary/15 blur-3xl" />
-        <div className="absolute -bottom-24 left-12 h-52 w-52 rounded-full bg-t-accent/15 blur-3xl" />
-        <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,var(--primary)_0%,transparent_70%)] opacity-10" />
-
-        <div className="relative z-10 space-y-6">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-wider text-t-textMuted">
-              <span className="h-2.5 w-2.5 rounded-full bg-t-primary" />
-              Component Showcase
-            </div>
-            <h2 className="text-lg font-bold">
-              <span className="text-t-primary">Your Theme</span>{' '}
-              <span className="text-t-accent">In Action</span>
-            </h2>
-            <p className="text-sm text-t-textMuted max-w-xl">
-              Every component below uses your generated tokens. Press <kbd className="px-1.5 py-0.5 rounded bg-t-text/10 font-mono text-[10px] text-t-text">Space</kbd> to regenerate and watch them all update.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-
-            {/* Buttons */}
-            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Buttons</p>
-              <div className="flex flex-wrap gap-2">
-                <button className={`${gradientClass} text-t-primaryFg px-4 py-2 ${rClass} ${sClass} text-xs font-semibold transition-all hover:scale-105 active:scale-95`}>
-                  Primary
-                </button>
-                <button className={`${gradientSecondary} text-t-secondaryFg px-4 py-2 ${rClass} ${sClass} text-xs font-semibold transition-all hover:scale-105 active:scale-95`}>
-                  Secondary
-                </button>
-                <button className={`${gradientAccent} text-t-accentFg px-4 py-2 ${rClass} ${sClass} text-xs font-semibold transition-all hover:scale-105 active:scale-95`}>
-                  Accent
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button className={`bg-t-primary/15 text-t-primary px-4 py-2 ${rClass} ${bClass} text-xs font-semibold transition-colors hover:bg-t-primary/25`}>
-                  Soft
-                </button>
-                <button className={`bg-t-text/10 text-t-text px-4 py-2 ${rClass} ${bClass} text-xs font-semibold transition-colors hover:bg-t-text/20`}>
-                  Ghost
-                </button>
-                <button className={`bg-t-bad text-t-badFg px-4 py-2 ${rClass} ${sClass} text-xs font-semibold transition-all hover:scale-105 active:scale-95`}>
-                  Danger
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button disabled className={`${gradientClass} text-t-primaryFg px-4 py-2 ${rClass} text-xs font-semibold opacity-50 cursor-not-allowed`}>
-                  Disabled
-                </button>
-                <button className={`bg-transparent text-t-primary px-4 py-2 ${rClass} text-xs font-semibold underline underline-offset-2 transition-colors hover:text-t-accent`}>
-                  Link
-                </button>
-              </div>
-            </div>
-
-            {/* Badges & Tags */}
-            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Badges & Tags</p>
-              <div className="flex flex-wrap gap-2">
-                <span className={`${rClass} bg-t-primary/15 px-2.5 py-1 text-[11px] font-semibold text-t-primary`}>Primary</span>
-                <span className={`${rClass} bg-t-secondary/15 px-2.5 py-1 text-[11px] font-semibold text-t-secondary`}>Secondary</span>
-                <span className={`${rClass} bg-t-accent/15 px-2.5 py-1 text-[11px] font-semibold text-t-accent`}>Accent</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <span className={`${rClass} bg-t-good/15 px-2.5 py-1 text-[11px] font-semibold text-t-good`}>Deployed</span>
-                <span className={`${rClass} bg-t-warn/15 px-2.5 py-1 text-[11px] font-semibold text-t-warn`}>Pending</span>
-                <span className={`${rClass} bg-t-bad/15 px-2.5 py-1 text-[11px] font-semibold text-t-bad`}>Failed</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <span className={`${rClass} ${bClass} px-2.5 py-1 text-[11px] font-semibold text-t-text`}>Outlined</span>
-                <span className={`${rClass} bg-t-primary text-t-primaryFg px-2.5 py-1 text-[11px] font-semibold`}>Solid</span>
-                <span className={`rounded-full bg-t-accent/15 px-2.5 py-1 text-[11px] font-semibold text-t-accent`}>Pill</span>
-              </div>
-            </div>
-
-            {/* Typography */}
-            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Typography</p>
-              <div className="space-y-1.5">
-                <p className="text-xl font-black text-t-text leading-tight">Display Heading</p>
-                <p className="text-sm font-semibold text-t-text">Section Title</p>
-                <p className="text-xs text-t-text">Body text uses your primary text token for maximum readability on the background surface.</p>
-                <p className="text-xs text-t-textMuted">Muted text for secondary information and helpers.</p>
-                <p className="text-xs"><span className="text-t-primary font-semibold">Primary link</span> &middot; <span className="text-t-accent font-semibold">Accent link</span> &middot; <span className="text-t-secondary font-semibold">Secondary link</span></p>
-              </div>
-            </div>
-
-            {/* Form Controls */}
-            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Form Controls</p>
-              <input
-                type="text"
-                placeholder="Email address"
-                className={`w-full px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <select className={`w-full px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs text-t-text cursor-pointer focus:outline-none focus:ring-2 focus:ring-t-primary/30`}>
-                  <option>Designer</option>
-                  <option>Developer</option>
-                  <option>Product</option>
-                </select>
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className={`w-full px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <label className="flex items-center gap-2 text-xs text-t-text cursor-pointer">
-                  <input type="checkbox" defaultChecked className="h-4 w-4" />
-                  <span>Remember me</span>
-                </label>
-                <label className="flex items-center gap-2 text-xs text-t-text cursor-pointer">
-                  <input type="radio" name="demo" defaultChecked className="h-4 w-4" />
-                  <span>Option A</span>
-                </label>
-              </div>
-              <textarea
-                rows={2}
-                placeholder="Leave a note..."
-                className={`w-full resize-none px-3 py-2 ${rClass} ${bClass} bg-t-card text-xs text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`}
-              />
-            </div>
-
-            {/* Alerts & Banners */}
-            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Alerts & Banners</p>
-              <div className={`${rClass} ${bClass} bg-t-good/15 border-t-good/30 px-3 py-2.5 text-xs text-t-good flex items-center gap-2`}>
-                <Check size={14} className="shrink-0" />
-                <span><strong>Success:</strong> Changes saved to your theme.</span>
-              </div>
-              <div className={`${rClass} ${bClass} bg-t-warn/15 border-t-warn/30 px-3 py-2.5 text-xs text-t-warn flex items-center gap-2`}>
-                <Sparkles size={14} className="shrink-0" />
-                <span><strong>Warning:</strong> Low contrast on muted text.</span>
-              </div>
-              <div className={`${rClass} ${bClass} bg-t-bad/15 border-t-bad/30 px-3 py-2.5 text-xs text-t-bad flex items-center gap-2`}>
-                <Lock size={14} className="shrink-0" />
-                <span><strong>Error:</strong> Export failed. Retry?</span>
-              </div>
-              <div className={`${rClass} ${bClass} bg-t-primary/10 border-t-primary/30 px-3 py-2.5 text-xs text-t-primary flex items-center gap-2`}>
-                <Sparkles size={14} className="shrink-0" />
-                <span><strong>Info:</strong> New palette generated.</span>
-              </div>
-            </div>
-
-            {/* Cards & Surfaces */}
-            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Cards & Surfaces</p>
-              <div className={`${rClass} ${bClass} ${sClass} bg-t-card p-3 space-y-2`}>
-                <div className="flex items-center gap-2">
-                  <div className={`w-8 h-8 ${rClass} ${gradientClass} flex items-center justify-center text-t-primaryFg text-xs font-bold`}>T</div>
-                  <div>
-                    <p className="text-xs font-semibold text-t-text">Theme Card</p>
-                    <p className="text-[10px] text-t-textMuted">bg-t-card surface</p>
-                  </div>
-                </div>
-                <div className={`${rClass} bg-t-card2 p-2 text-[10px] text-t-textMuted`}>
-                  Nested bg-t-card2 surface
-                </div>
-              </div>
-              <div className={`${rClass} ${bClass} bg-t-bg p-3 space-y-1`}>
-                <p className="text-xs font-semibold text-t-text">Base Surface</p>
-                <p className="text-[10px] text-t-textMuted">bg-t-bg — the page background itself</p>
-              </div>
-            </div>
-
-            {/* Progress & Metrics */}
-            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Progress & Metrics</p>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-t-text font-semibold">Primary</span>
-                  <span className="text-t-primary font-semibold">72%</span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-t-text/10">
-                  <div className={`h-full rounded-full ${gradientClass}`} style={{ width: '72%' }} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-t-text font-semibold">Accent</span>
-                  <span className="text-t-accent font-semibold">45%</span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-t-text/10">
-                  <div className={`h-full rounded-full ${gradientAccent}`} style={{ width: '45%' }} />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 pt-1">
-                <div className={`${rClass} ${bClass} bg-t-card p-2 text-center`}>
-                  <p className="text-lg font-bold text-t-primary">24</p>
-                  <p className="text-[10px] text-t-textMuted">Tokens</p>
-                </div>
-                <div className={`${rClass} ${bClass} bg-t-card p-2 text-center`}>
-                  <p className="text-lg font-bold text-t-accent">2</p>
-                  <p className="text-[10px] text-t-textMuted">Themes</p>
-                </div>
-                <div className={`${rClass} ${bClass} bg-t-card p-2 text-center`}>
-                  <p className="text-lg font-bold text-t-good">AA</p>
-                  <p className="text-[10px] text-t-textMuted">WCAG</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Navigation */}
-            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">Navigation</p>
-              <div className="flex gap-1">
-                <button className={`${rClass} bg-t-primary/15 px-3 py-1.5 text-[11px] font-semibold text-t-primary`}>Active</button>
-                <button className={`${rClass} bg-t-text/10 px-3 py-1.5 text-[11px] font-semibold text-t-text hover:bg-t-text/20 transition-colors`}>Tokens</button>
-                <button className={`${rClass} bg-t-text/10 px-3 py-1.5 text-[11px] font-semibold text-t-text hover:bg-t-text/20 transition-colors`}>Export</button>
-              </div>
-              <div className="flex items-center gap-1 text-[11px] text-t-textMuted">
-                <span className="text-t-primary">Home</span>
-                <ChevronRight size={10} />
-                <span className="text-t-primary">Themes</span>
-                <ChevronRight size={10} />
-                <span className="text-t-text font-semibold">Current</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-t-text font-semibold">Page 2 of 5</span>
-                <div className="flex items-center gap-1">
-                  <button className={`${rClass} ${bClass} bg-t-card px-2 py-1 text-[11px] text-t-text transition-colors hover:bg-t-card2`}>1</button>
-                  <button className={`${rClass} ${bClass} bg-t-primary/15 px-2 py-1 text-[11px] text-t-primary font-semibold`}>2</button>
-                  <button className={`${rClass} ${bClass} bg-t-card px-2 py-1 text-[11px] text-t-text transition-colors hover:bg-t-card2`}>3</button>
-                  <button className={`${rClass} ${bClass} bg-t-card px-2 py-1 text-[11px] text-t-text transition-colors hover:bg-t-card2`}>4</button>
-                  <button className={`${rClass} ${bClass} bg-t-card px-2 py-1 text-[11px] text-t-text transition-colors hover:bg-t-card2`}>5</button>
-                </div>
-              </div>
-            </div>
-
-            {/* List Items */}
-            <div className={`${rClass} ${bClass} ${hoverPanelClass} bg-t-bg/60 p-4 space-y-3`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-t-textMuted">List Items</p>
-              <div className="space-y-1.5">
-                {[
-                  { name: 'Background', token: '--bg', color: 'bg-t-bg' },
-                  { name: 'Primary', token: '--primary', color: 'bg-t-primary' },
-                  { name: 'Accent', token: '--accent', color: 'bg-t-accent' },
-                ].map((item) => (
-                  <div key={item.token} className={`flex items-center gap-3 ${rClass} ${bClass} bg-t-card px-3 py-2 transition-colors hover:bg-t-card2`}>
-                    <div className={`w-5 h-5 ${rClass} ${item.color} shrink-0`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-t-text">{item.name}</p>
-                      <p className="text-[10px] text-t-textMuted font-mono">{item.token}</p>
-                    </div>
-                    <Copy size={12} className="text-t-textMuted shrink-0" />
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -978,7 +687,7 @@ const PreviewSection: React.FC<PreviewProps> = ({
 
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-t-textMuted">
           <p>
-            Taichi Theme Generator © 2025 - 2026 |{' '}
+            Taichi AI Dual Theme Generator © 2025 - 2026 |{' '}
             <a
               href="https://www.bucaastudio.com/"
               target="_blank"

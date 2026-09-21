@@ -34,9 +34,15 @@ export interface DualTheme {
   dark: ThemeTokens;
   seed: string; // The base hue or hex used to generate
   mode: GenerationMode;
+  // AI-authored tokens before slider adjustments; sliders re-apply on top of this.
+  aiBase?: {
+    light: ThemeTokens;
+    dark: ThemeTokens;
+    levels?: { saturation: number; contrast: number; brightness: number };
+  };
 }
 
-export type GenerationMode = 'random' | 'monochrome' | 'analogous' | 'complementary' | 'split-complementary' | 'triadic' | 'tetradic' | 'compound' | 'triadic-split' | 'image';
+export type GenerationMode = 'random' | 'monochrome' | 'analogous' | 'complementary' | 'split-complementary' | 'triadic' | 'tetradic' | 'compound' | 'triadic-split' | 'image' | 'ai';
 
 export type ColorFormat = 'hex' | 'rgb' | 'cmyk' | 'hsl' | 'lab' | 'lch' | 'oklch' | 'display-p3';
 

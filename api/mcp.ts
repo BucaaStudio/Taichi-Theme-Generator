@@ -6,6 +6,8 @@ import { generateTheme } from '../utils/colorUtils.js';
 import type { GenerationMode } from '../types.js';
 import { rateLimit } from './utils/rate-limit.js';
 import { buildThemeExport, VALID_EXPORT_FORMATS } from './utils/theme-export.js';
+import { interpretThemePrompt } from '../utils/interpretThemePrompt.js';
+import { buildThemeFromIntent, normalizeThemeRequest, type ThemePromptImage } from '../utils/promptTheme.js';
 
 /**
  * MCP Endpoint: /api/mcp
@@ -32,7 +34,7 @@ function buildServer(): McpServer {
     {
       instructions:
         'Generates accessible OKLCH-based light/dark UI color themes. ' +
-        'Call generate_theme to create a palette (optionally seeded by a base color), ' +
+        'Call generate_theme for explicit knobs, generate_theme_from_prompt for a mood like "spring morning", ' +
         'then export_theme to render it as CSS, SCSS, LESS, Tailwind config, or JSON.',
     }
   );
@@ -103,6 +105,58 @@ function buildServer(): McpServer {
         style: result.mode,
       };
 
+      return {
+        content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+        structuredContent: structured,
+      };
+    }
+  );
+
+  server.registerTool(
+    'generate_theme_from_prompt',
+    {
+      title: 'Generate theme from prompt',
+      description:
+        'Interpret a natural-language mood (e.g. "a bright colorful theme that feels like spring") ' +
+        'and/or an image into a complete dual light/dark theme. The AI chooses every color token. ' +
+        'Provide prompt, an image, or both; with both, the image sets the palette and the prompt steers it.',
+      inputSchema: {
+        prompt: z.string().max(400).optional().describe('Theme mood or description'),
+        imageUrl: z.string().url().optional().describe('Public https URL of an image to take the palette from'),
+        imageDataUrl: z.string().optional().describe('Image as a base64 data URL (JPEG, PNG, WebP or GIF, under 1.5 MB)'),
+      },
+      outputSchema: {
+        light: themeRecord.describe('Light-mode tokens (hex colors)'),
+        dark: themeRecord.describe('Dark-mode tokens (hex colors)'),
+        seed: z.string(),
+        style: z.string(),
+        rationale: z.string(),
+        options: z.record(z.string(), z.union([z.number(), z.boolean()])).describe('Design controls chosen by the AI: borders, radius, shadows, gradients, darkFirst, slider levels'),
+      },
+    },
+    async ({ prompt, imageUrl, imageDataUrl }) => {
+      let image: ThemePromptImage | URL | null = null;
+      if (imageUrl) {
+        const url = new URL(imageUrl);
+        if (url.protocol !== 'https:') throw new Error('imageUrl must be an https URL.');
+        image = url;
+      }
+      const parsed = normalizeThemeRequest({ prompt, image: image ? undefined : imageDataUrl });
+      if ('error' in parsed) {
+        if (!image) throw new Error(parsed.error);
+      } else {
+        image = image ?? parsed.image;
+      }
+      const intent = await interpretThemePrompt('error' in parsed ? '' : parsed.prompt, image);
+      const result = buildThemeFromIntent(intent);
+      const structured = {
+        light: result.light as unknown as Record<string, string>,
+        dark: result.dark as unknown as Record<string, string>,
+        seed: result.seed,
+        style: result.mode,
+        rationale: intent.rationale,
+        options: intent.options as Record<string, number | boolean>,
+      };
       return {
         content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
         structuredContent: structured,

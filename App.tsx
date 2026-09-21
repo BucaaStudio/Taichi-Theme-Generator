@@ -5,12 +5,15 @@ import {
   Moon, Sun, SlidersHorizontal, ChevronUp, ChevronDown, Shuffle, PanelTopClose, PanelTopOpen, X, Menu
 } from 'lucide-react';
 import { ThemeTokens, DualTheme, GenerationMode, ColorFormat, DesignOptions, LockedColors, LockedOptions } from './types';
-import { generateTheme, extractPaletteFromImage, formatColor, mergeLockedSlots } from './utils/colorUtils';
+import { generateTheme, applyAdjustments, extractPaletteFromImage, formatColor, mergeLockedSlots } from './utils/colorUtils';
 import { selectForegroundHex } from './utils/contrast';
 import PreviewSection from './components/PreviewSection';
+import PromptBar from './components/PromptBar';
 import SwatchStrip from './components/SwatchStrip';
 import ShareModal from './components/ShareModal';
 import ImagePickerModal from './components/ImagePickerModal';
+import { promptTheme } from './utils/api-client';
+import { buildThemeFromIntent, decodeAiBase, encodeAiBase, type AiThemeBase } from './utils/promptTheme';
 
 const MAX_HISTORY = 20;
 type ImportSourceSide = 'light' | 'dark';
@@ -123,6 +126,11 @@ const App: React.FC = () => {
   
   const [lockedColors, setLockedColors] = useState<LockedColors>({});
   const [lockedOptions, setLockedOptions] = useState<LockedOptions>({});
+  const [themePrompt, setThemePrompt] = useState('');
+  const [promptImage, setPromptImage] = useState<string | null>(null);
+  const [promptBusy, setPromptBusy] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
+  const [promptRationale, setPromptRationale] = useState<string | null>(null);
 
   // Compute a randomized copy of the design options (respecting locks).
   // Pure with respect to state: callers decide when to commit it, so the same
@@ -255,7 +263,7 @@ const App: React.FC = () => {
         darkSaturationLevel: split ? dsat : (sat ?? designOptions.saturationLevel),
       };
       setDesignOptions(mergedOptions);
-      generateNewTheme(urlMode, urlSeed, undefined, undefined, mergedOptions);
+      generateNewTheme(urlMode, urlSeed, undefined, undefined, mergedOptions, decodeAiBase(params.get('ai')) ?? undefined);
       
       // Remove encoded params cleanly from URL bar to show pretty URL if desired, 
       // but we want to KEEP them for sharing.
@@ -287,6 +295,7 @@ const App: React.FC = () => {
     const params = new URLSearchParams();
     params.set('mode', currentTheme.mode);
     params.set('seed', currentTheme.seed);
+    if (currentTheme.aiBase) params.set('ai', encodeAiBase(currentTheme.aiBase));
     params.set('bw', designOptions.borderWidth.toString());
     params.set('sh', designOptions.shadowStrength.toString());
     params.set('so', designOptions.shadowOpacity.toString());
@@ -362,7 +371,8 @@ const App: React.FC = () => {
     seed?: string,
     overridePalette?: string[],
     overrideImportSourceSide?: ImportSourceSide,
-    overrideOptions?: DesignOptions
+    overrideOptions?: DesignOptions,
+    overrideAiBase?: AiThemeBase
   ) => {
     // Flows that update design options and generate in the same action pass
     // the new options directly, since the state update has not committed yet.
@@ -389,6 +399,14 @@ const App: React.FC = () => {
       darkBri = opts.brightnessLevel;
     }
 
+    // AI themes are authored token by token, so sliders adjust that base
+    // instead of regenerating from a seed.
+    const aiBase = genMode === 'ai' ? (overrideAiBase ?? currentTheme?.aiBase) : undefined;
+    if (genMode === 'ai' && !aiBase) {
+      genMode = 'random';
+      setMode('random');
+    }
+
     const imageOrExisting =
       overridePalette ?? (genMode === 'image' ? (imageOverridePalette ?? undefined) : undefined);
     const sourceSide = opts.darkFirst ? 'dark' : 'light';
@@ -402,10 +420,27 @@ const App: React.FC = () => {
         ? (overrideImportSourceSide ?? imageImportSourceSide ?? (opts.darkFirst ? 'dark' : 'light'))
         : undefined;
 
-    const { light, dark, seed: newSeed, mode: resolvedMode } = generateTheme(
-      genMode, seed, lightSat, lightCon, lightBri, effectiveOverridePalette, opts.darkFirst,
-      darkSat, darkCon, darkBri, effectiveImportSourceSide
-    );
+    // Slider positions the AI chose describe its tokens, so only the distance
+    // from them is applied.
+    const level = (value: number, base = 0) => Math.max(-5, Math.min(5, value - base));
+    const aiLevels = aiBase?.levels;
+    const { light, dark, seed: newSeed, mode: resolvedMode } = aiBase
+      ? {
+          light: applyAdjustments(
+            aiBase.light,
+            level(lightBri, aiLevels?.brightness), level(lightCon, aiLevels?.contrast), level(lightSat, aiLevels?.saturation)
+          ),
+          dark: applyAdjustments(
+            aiBase.dark,
+            level(darkBri, aiLevels?.brightness), level(darkCon, aiLevels?.contrast), level(darkSat, aiLevels?.saturation)
+          ),
+          seed: aiBase.light.primary,
+          mode: 'ai' as GenerationMode,
+        }
+      : generateTheme(
+          genMode, seed, lightSat, lightCon, lightBri, effectiveOverridePalette, opts.darkFirst,
+          darkSat, darkCon, darkBri, effectiveImportSourceSide
+        );
 
     lastGeneratedOptionsRef.current = colorOptionsKey(opts);
     
@@ -442,7 +477,8 @@ const App: React.FC = () => {
       light: mergedLight,
       dark: mergedDark,
       seed: newSeed,
-      mode: genMode === 'image' ? 'image' : resolvedMode
+      mode: genMode === 'image' ? 'image' : resolvedMode,
+      ...(aiBase ? { aiBase } : {}),
     };
 
     setHistory(prev => {
@@ -469,6 +505,10 @@ const App: React.FC = () => {
   const randomizeAndGenerate = useCallback((genMode: GenerationMode) => {
     const nextOptions = computeRandomizedOptions(designOptions);
     setDesignOptions(nextOptions);
+    if (genMode === 'ai') {
+      genMode = 'random';
+      setMode('random');
+    }
     generateNewTheme(genMode, undefined, undefined, undefined, nextOptions);
   }, [computeRandomizedOptions, designOptions, generateNewTheme]);
 
@@ -711,6 +751,65 @@ const App: React.FC = () => {
     randomizeAndGenerate(mode);
   }, [randomizeAndGenerate, mode]);
 
+  const handlePromptTheme = useCallback(async (nextPrompt?: string) => {
+    const prompt = (nextPrompt ?? themePrompt).trim();
+    if ((!prompt && !promptImage) || promptBusy) return;
+    if (nextPrompt) setThemePrompt(nextPrompt);
+    setPromptBusy(true);
+    setPromptError(null);
+    try {
+      const result = await promptTheme(prompt, promptImage);
+      if (!result.success || !result.intent) {
+        setPromptError(result.error || 'Could not generate that theme.');
+        return;
+      }
+      const intent = result.intent;
+      setImageOverridePalette(null);
+      setImageImportSourceSide(null);
+      setMode('ai');
+      // The AI sets every control it is allowed to; locked ones stay put.
+      const ai = intent.options;
+      const pick = <K extends keyof DesignOptions>(key: K, value: DesignOptions[K]) =>
+        lockedOptions[key] ? designOptions[key] : value;
+      const saturation = pick('saturationLevel', ai.saturation);
+      const contrast = pick('contrastLevel', ai.contrast);
+      const brightness = pick('brightnessLevel', ai.brightness);
+      const nextOptions: DesignOptions = {
+        ...designOptions,
+        borderWidth: pick('borderWidth', ai.borderWidth),
+        shadowStrength: pick('shadowStrength', ai.shadowStrength),
+        shadowOpacity: pick('shadowOpacity', ai.shadowOpacity),
+        radius: pick('radius', ai.radius),
+        gradients: pick('gradients', ai.gradients),
+        darkFirst: pick('darkFirst', ai.darkFirst),
+        splitAdjustments: false,
+        saturationLevel: saturation,
+        contrastLevel: contrast,
+        brightnessLevel: brightness,
+        lightSaturationLevel: saturation,
+        lightContrastLevel: contrast,
+        lightBrightnessLevel: brightness,
+        darkSaturationLevel: saturation,
+        darkContrastLevel: contrast,
+        darkBrightnessLevel: brightness,
+      };
+      setDesignOptions(nextOptions);
+      setIsDarkUI(nextOptions.darkFirst);
+      const { light, dark } = buildThemeFromIntent(intent);
+      // Locked sliders keep their value, so the theme sits at that position.
+      generateNewTheme('ai', undefined, undefined, undefined, nextOptions, {
+        light,
+        dark,
+        levels: { saturation, contrast, brightness },
+      });
+      setPromptRationale(intent.rationale);
+    } catch (error) {
+      setPromptError(error instanceof Error ? error.message : 'Could not generate that theme.');
+    } finally {
+      setPromptBusy(false);
+    }
+  }, [themePrompt, promptImage, promptBusy, designOptions, lockedOptions, generateNewTheme]);
+
   const handleShare = useCallback(() => setShowShareModal(true), []);
   
 
@@ -752,7 +851,7 @@ const App: React.FC = () => {
             <div className="w-8 h-8 rounded-lg shadow-sm flex items-center justify-center" style={{ backgroundColor: shellTheme.primary }}>
               <TaichiIcon size={24} lightColor={shellTheme.primaryFg} darkColor={shellTheme.primary} />
             </div>
-            <h1 className="font-bold text-lg hidden md:block">Taichi Theme Generator</h1>
+            <h1 className="font-bold text-lg hidden xl:block whitespace-nowrap">Taichi AI Dual Theme Generator</h1>
           </div>
 
           {/* Mobile: Generate + Palette + Options Buttons */}
@@ -764,7 +863,7 @@ const App: React.FC = () => {
             >
               <div className="px-3 py-2 flex items-center gap-1.5">
                 <Shuffle size={14} />
-                <span className="font-semibold text-xs">Generate</span>
+                <span className="font-semibold text-xs">Surprise me</span>
               </div>
             </button>
 
@@ -807,7 +906,7 @@ const App: React.FC = () => {
               >
                 <div className="pl-3 pr-2 py-1.5 flex items-center gap-2">
                   <Shuffle size={16} />
-                  <span className="font-semibold text-sm">Generate</span>
+                  <span className="font-semibold text-sm">Surprise me</span>
                 </div>
                 <div className="pr-1.5 py-1">
                   <div className="text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm" style={{ backgroundColor: `${shellTheme.primaryFg}20` }}>
@@ -834,6 +933,7 @@ const App: React.FC = () => {
                 <option value="compound">Compound</option>
                 <option value="triadic-split">Triadic Split</option>
                 {(mode === 'image' || imageOverridePalette) && <option value="image">Image</option>}
+                {mode === 'ai' && <option value="ai">AI</option>}
               </select>
 
               <select 
@@ -924,6 +1024,30 @@ const App: React.FC = () => {
           </button>
         </div>
 
+        <PromptBar
+          value={themePrompt}
+          image={promptImage}
+          busy={promptBusy}
+          error={promptError}
+          rationale={promptRationale}
+          inputStyle={inputStyle}
+          primary={shellTheme.primary}
+          primaryFg={shellTheme.primaryFg}
+          muted={shellTheme.textMuted}
+          border={shellTheme.border}
+          onChange={(value) => {
+            setThemePrompt(value);
+            if (promptError) setPromptError(null);
+          }}
+          onImageChange={(image) => {
+            setPromptImage(image);
+            setPromptError(null);
+            setPromptRationale(null);
+          }}
+          onError={setPromptError}
+          onSubmit={handlePromptTheme}
+        />
+
         {/* Mobile Menu Dropdown */}
         {showMobileMenu && (
           <div 
@@ -949,6 +1073,7 @@ const App: React.FC = () => {
                 <option value="compound">Compound</option>
                 <option value="triadic-split">Triadic Split</option>
                 {(mode === 'image' || imageOverridePalette) && <option value="image">Image</option>}
+                {mode === 'ai' && <option value="ai">AI</option>}
               </select>
             </div>
 
@@ -1529,7 +1654,8 @@ const App: React.FC = () => {
                  theme.mode === 'tetradic' ? 'Tetr' :
                  theme.mode === 'compound' ? 'Cmpd' :
                  theme.mode === 'triadic-split' ? 'TrSp' :
-                 theme.mode === 'image' ? 'Img' : theme.mode.slice(0,4)}
+                 theme.mode === 'image' ? 'Img' :
+                 theme.mode === 'ai' ? 'AI' : theme.mode.slice(0,4)}
               </div>
             </button>
           ))}
@@ -1556,6 +1682,7 @@ const App: React.FC = () => {
                onRandomize={handleRandomize}
                onExport={exportTheme}
                onShare={handleShare}
+               isAiTheme={currentTheme.mode === 'ai'}
              />
           </div>
 
@@ -1573,6 +1700,7 @@ const App: React.FC = () => {
                onRandomize={handleRandomize}
                onExport={exportTheme}
                onShare={handleShare}
+               isAiTheme={currentTheme.mode === 'ai'}
              />
           </div>
         </div>

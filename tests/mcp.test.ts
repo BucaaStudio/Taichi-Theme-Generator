@@ -83,10 +83,10 @@ describe('MCP endpoint (/api/mcp)', () => {
     expect(payload.result.capabilities.tools).toBeDefined();
   });
 
-  it('lists generate_theme and export_theme tools', async () => {
+  it('lists the generate, prompt and export tools', async () => {
     const payload = await rpc('tools/list');
     const names = payload.result.tools.map((t: any) => t.name).sort();
-    expect(names).toEqual(['export_theme', 'generate_theme']);
+    expect(names).toEqual(['export_theme', 'generate_theme', 'generate_theme_from_prompt']);
     for (const tool of payload.result.tools) {
       expect(tool.description.length).toBeGreaterThan(0);
       expect(tool.inputSchema.type).toBe('object');
@@ -164,6 +164,6 @@ describe('MCP endpoint (/api/mcp)', () => {
     });
     expect(response.status).toBe(200);
     const payload = await response.json();
-    expect(payload.result.tools.length).toBe(2);
+    expect(payload.result.tools.length).toBe(3);
   });
 });

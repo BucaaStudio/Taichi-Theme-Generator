@@ -3,10 +3,10 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>API Documentation - Taichi Theme Generator</title>
+        <title>API Documentation - Taichi AI Dual Theme Generator</title>
         <meta
             name="description"
-            content="Generate perfectly balanced light and dark UI themes programmatically using the Taichi Theme Generator API. OKLCH color space, 20 semantic tokens per mode, unified adjustments, and rate-limited endpoints."
+            content="Generate perfectly balanced light and dark UI themes programmatically using the Taichi AI Dual Theme Generator API. OKLCH color space, 20 semantic tokens per mode, unified adjustments, and rate-limited endpoints."
         >
 
         <!-- Fonts -->
@@ -333,7 +333,7 @@
                         <circle cx="50" cy="26" r="8" fill="currentColor" />
                         <circle cx="50" cy="74" r="8" fill="#0a0a0b" />
                     </svg>
-                    Taichi Theme Generator
+                    Taichi AI Dual Theme Generator
                 </a>
             </header>
 
@@ -488,6 +488,58 @@ curl -X POST https://taichi.bucaastudio.com/api/generate-theme \
   }
 }</pre
                 >
+            </div>
+
+            <!-- Prompt Theme -->
+            <div class="endpoint-card">
+                <div class="endpoint-header">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/prompt-theme</span>
+                    <span class="rate-limit">8 req/min</span>
+                </div>
+
+                <p>
+                    Turn a natural-language description into a complete light and dark
+                    theme. The AI chooses every color token; label colors on buttons
+                    are derived for legibility.
+                </p>
+
+                <h3>Request Body</h3>
+                <table class="param-table">
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">prompt</span></td>
+                        <td><span class="param-type">string</span></td>
+                        <td>Theme mood, up to 400 characters. Example: <code>a bright colorful theme that feels like spring</code>. Optional when <code>image</code> is sent.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">image</span></td>
+                        <td><span class="param-type">string</span></td>
+                        <td>Optional base64 data URL (JPEG, PNG, WebP or GIF, under 1.5 MB). The AI takes the palette from the image; <code>prompt</code> then only steers it. Image requests are limited to 4 per minute.</td>
+                    </tr>
+                </table>
+
+                <h3>Example Request</h3>
+                <pre>curl -X POST https://taichi.bucaastudio.com/api/prompt-theme \
+  -H "Content-Type: application/json" \
+  -d '{ "prompt": "a bright colorful theme that feels like spring" }'</pre>
+
+                <h3>Response</h3>
+                <pre>{
+  "success": true,
+  "light": { "bg": "#f7fbf4", "primary": "#3f9a3a", ... },
+  "dark": { "bg": "#141814", "primary": "#7ec850", ... },
+  "intent": {
+    "light": { "bg": "#f7fbf4", "card": "#ffffff", "text": "#16241a", "primary": "#3f9a3a", ... },
+    "dark": { "bg": "#141814", "card": "#1c221c", "text": "#eaf4ea", "primary": "#7ec850", ... },
+    "rationale": "Leaf green, blossom pink and daffodil yellow on fresh white."
+  },
+  "metadata": { "mode": "ai", "seed": "#3f9a3a", "prompt": "..." }
+}</pre>
             </div>
 
             <!-- Export Theme -->
@@ -723,7 +775,7 @@ curl -X POST https://taichi.bucaastudio.com/api/export-theme \
 
             <footer>
                 <p>
-                    Taichi Theme Generator API © 2025 ~ 2026·
+                    Taichi AI Dual Theme Generator API © 2025 ~ 2026·
                     <a href="https://www.bucaastudio.com/">Bucaa Studio</a> ·
                     <a
                         href="https://github.com/BucaaStudio/Taichi-Theme-Generator"
