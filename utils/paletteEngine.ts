@@ -245,12 +245,12 @@ const NEUTRAL_TARGETS = {
     border: 0.82,
   },
   dark: {
-    bg: 0.08,
-    card: 0.12,
-    card2: 0.15,
-    text: 0.92,
-    textMuted: 0.65,
-    border: 0.25,
+    bg: 0.20,
+    card: 0.26,
+    card2: 0.32,
+    text: 0.93,
+    textMuted: 0.70,
+    border: 0.38,
   },
 };
 
@@ -574,12 +574,12 @@ function deriveDarkMode(light: ThemeTokens, brightnessLevel: number = 0): ThemeT
   const lightWarn = toOklch(light.warn);
   
   // Neutral tokens with specific dark targets, adjusted by brightness
-  const darkBg = clampToSRGBGamut({ L: Math.max(0.03, Math.min(0.25, darkTargets.bg + brightnessMod)), C: lightBg.C * 0.5, H: lightBg.H });
-  const darkCard = clampToSRGBGamut({ L: Math.max(0.06, Math.min(0.30, darkTargets.card + brightnessMod)), C: lightCard.C * 0.5, H: lightCard.H });
-  const darkCard2 = clampToSRGBGamut({ L: Math.max(0.09, Math.min(0.35, darkTargets.card2 + brightnessMod)), C: lightCard2.C * 0.5, H: lightCard2.H });
+  const darkBg = clampToSRGBGamut({ L: Math.max(0.16, Math.min(0.34, darkTargets.bg + brightnessMod)), C: lightBg.C * 0.5, H: lightBg.H });
+  const darkCard = clampToSRGBGamut({ L: Math.max(0.22, Math.min(0.40, darkTargets.card + brightnessMod)), C: lightCard.C * 0.5, H: lightCard.H });
+  const darkCard2 = clampToSRGBGamut({ L: Math.max(0.26, Math.min(0.46, darkTargets.card2 + brightnessMod)), C: lightCard2.C * 0.5, H: lightCard2.H });
   const darkText = clampToSRGBGamut({ L: darkTargets.text, C: lightText.C * 0.3, H: lightText.H });
   const darkTextMuted = clampToSRGBGamut({ L: darkTargets.textMuted, C: lightTextMuted.C * 0.3, H: lightTextMuted.H });
-  const darkBorder = clampToSRGBGamut({ L: Math.max(0.15, Math.min(0.40, darkTargets.border + brightnessMod)), C: lightBorder.C * 0.5, H: lightBorder.H });
+  const darkBorder = clampToSRGBGamut({ L: Math.max(0.24, Math.min(0.46, darkTargets.border + brightnessMod)), C: lightBorder.C * 0.5, H: lightBorder.H });
   
   // Brand + status colors preserve relative chroma headroom so light/dark feel matched.
   const darkPrimary = deriveCompanionColor(lightPrimary, Math.min(0.65, lightPrimary.L + 0.1), {
@@ -880,9 +880,9 @@ export function generatePaletteDarkFirst(
 
   // Build dark neutral foundation directly
   const darkNeutrals = {
-    bg: clampToSRGBGamut({ L: Math.max(0.03, darkTargets.bg - brightnessMod - contrastMod), C: chromaMod * 0.5, H: surfaceHue }),
-    card: clampToSRGBGamut({ L: Math.max(0.06, darkTargets.card - brightnessMod * 0.8 - contrastMod * 0.5), C: chromaMod * 0.4, H: surfaceHue }),
-    card2: clampToSRGBGamut({ L: Math.max(0.09, darkTargets.card2 - brightnessMod * 0.6 - contrastMod * 0.3), C: chromaMod * 0.3, H: surfaceHue }),
+    bg: clampToSRGBGamut({ L: Math.max(0.16, darkTargets.bg - brightnessMod - contrastMod), C: chromaMod * 0.5, H: surfaceHue }),
+    card: clampToSRGBGamut({ L: Math.max(0.22, darkTargets.card - brightnessMod * 0.8 - contrastMod * 0.5), C: chromaMod * 0.4, H: surfaceHue }),
+    card2: clampToSRGBGamut({ L: Math.max(0.26, darkTargets.card2 - brightnessMod * 0.6 - contrastMod * 0.3), C: chromaMod * 0.3, H: surfaceHue }),
     text: clampToSRGBGamut({ L: Math.min(0.98, darkTargets.text + brightnessMod * 0.3 + contrastMod), C: chromaMod * 0.1, H: baseHue }),
     textMuted: clampToSRGBGamut({ L: Math.min(0.85, darkTargets.textMuted + brightnessMod * 0.2 + contrastMod * 0.5), C: chromaMod * 0.08, H: baseHue }),
     border: clampToSRGBGamut({ L: Math.min(0.40, darkTargets.border - brightnessMod * 0.2), C: chromaMod * 0.2, H: surfaceHue }),

@@ -182,9 +182,9 @@ export function parseToHex(input: string, format?: ColorFormat): string | null {
  * 2. Compute dynamic midpoint from brightness-adjusted values
  * 3. Apply contrast scaling around that midpoint
  *
- * Contrast: Midpoint scaling — L_out = mid + (L_in - mid) * factor
- *   factor = 2^(contrast * 0.35)
- *   mid = average lightness of all brightness-adjusted tokens
+ * Contrast: text/chroma expand around a structural midpoint;
+ *   surfaces use a directed ladder so +3..+5 never collapse to OLED black
+ *   or flatten cards into the page. factor = 2^(contrast * 0.28)
  *
  * Saturation: Chroma scaling — C_out = C_in * (1 + saturation * 0.2)
  */
@@ -216,7 +216,8 @@ export function applyAdjustments(
   const finalizeAdjustedTokens = (
     adjusted: Record<string, string>,
     contrastForReadability: number,
-    desiredOccupancy?: Record<string, number>
+    desiredOccupancy?: Record<string, number>,
+    isDarkTheme: boolean = toOklch(adjusted.bg).L < 0.5
   ): ThemeTokens => {
     // Verify Fg tokens still contrast against their bg; fall back to re-derivation
     // if needed. When the user has intentionally lowered contrast, scale the
@@ -262,23 +263,65 @@ export function applyAdjustments(
       const dir = direction
         ? (direction === 'lighter' ? 1 : -1)
         : (currentDelta >= 0 ? 1 : -1);
-      const targetL = Math.max(0.03, Math.min(0.97, a.L + dir * minLDelta));
+      const targetL = Math.max(0.06, Math.min(0.97, a.L + dir * minLDelta));
       adjusted[movableKey] = toHex(clampToSRGBGamut({ L: targetL, C: m.C, H: m.H }));
     };
 
+    const clampTokenL = (key: string, minL: number, maxL: number) => {
+      const color = toOklch(adjusted[key]);
+      const nextL = Math.max(minL, Math.min(maxL, color.L));
+      if (Math.abs(nextL - color.L) > 0.0005) {
+        adjusted[key] = toHex(clampToSRGBGamut({ L: nextL, C: color.C, H: color.H }));
+      }
+    };
+
+    const applyToneBands = () => {
+      const punch = Math.max(0, contrastForReadability) / 5;
+      const step = 0.055 + punch * 0.035;
+      if (isDarkTheme) {
+        // Charcoal page, lifted cards. Never OLED-black void.
+        clampTokenL('bg', punch > 0 ? 0.16 : 0.14, 0.36);
+        const bg = toOklch(adjusted.bg);
+        if (punch > 0) {
+          clampTokenL('card', Math.min(0.44, bg.L + step), 0.46);
+          const card = toOklch(adjusted.card);
+          clampTokenL('card2', Math.min(0.50, card.L + step * 0.75), 0.52);
+          clampTokenL('text', 0.84, 0.96);
+          const text = toOklch(adjusted.text);
+          clampTokenL('textMuted', 0.56, Math.min(0.76, text.L - 0.12));
+          clampTokenL('border', bg.L + 0.07, 0.44);
+        }
+      } else {
+        clampTokenL('bg', 0.55, 0.99);
+        const bg = toOklch(adjusted.bg);
+        if (punch > 0) {
+          const cardMax = bg.L - step;
+          clampTokenL('card', Math.min(0.58, cardMax), cardMax);
+          const card = toOklch(adjusted.card);
+          const card2Max = card.L - step * 0.75;
+          clampTokenL('card2', Math.min(0.52, card2Max), card2Max);
+          clampTokenL('text', 0.08, 0.26);
+          const text = toOklch(adjusted.text);
+          clampTokenL('textMuted', Math.max(0.30, text.L + 0.12), 0.52);
+          clampTokenL('border', Math.min(0.58, bg.L - 0.07), bg.L - 0.07);
+        }
+      }
+    };
+
+    applyToneBands();
+
     // Border must be visibly distinct from bg and card
-    const bgL = toOklch(adjusted.bg).L;
-    const borderDir = bgL > 0.5 ? 'darker' : 'lighter'; // light theme: border darker; dark theme: border lighter
+    const borderDir = isDarkTheme ? 'lighter' : 'darker';
     ensureSeparation('border', 'bg', 0.06, borderDir);
     ensureSeparation('border', 'card', 0.04, borderDir);
     ensureSeparation('border', 'card2', 0.03, borderDir);
 
-    // Card must be distinct from bg
-    ensureSeparation('card', 'bg', 0.03);
-    // Card2 must be distinct from card
-    ensureSeparation('card2', 'card', 0.02);
-    // textMuted must differ from text
-    ensureSeparation('textMuted', 'text', 0.08);
+    // Cards step away from the background; high contrast widens the ladder
+    // instead of slamming every surface to the same black or white rail.
+    const surfaceStep = 0.04 + Math.max(0, contrastForReadability) * 0.008;
+    ensureSeparation('card', 'bg', surfaceStep, isDarkTheme ? 'lighter' : 'darker');
+    ensureSeparation('card2', 'card', surfaceStep * 0.7, isDarkTheme ? 'lighter' : 'darker');
+    ensureSeparation('textMuted', 'text', 0.12);
 
     // Final dedup: if any two tokens share the exact same hex, nudge the
     // less critical one by a tiny lightness step to break the tie.
@@ -362,7 +405,6 @@ export function applyAdjustments(
       adjusted[fgKey] = fgHex;
     };
 
-    const isDarkTheme = toOklch(adjusted.bg).L < 0.5;
     const { text: textMinRatio, muted: mutedMinRatio } = readabilityFloors(contrastForReadability, isDarkTheme);
 
     enforceSurfaceContrast('text', ['bg', 'card', 'card2'], textMinRatio);
@@ -446,9 +488,11 @@ export function applyAdjustments(
 
     // Preserve visual hierarchy after readability correction, then recheck
     // muted contrast so the separation nudge cannot drop it below the floor.
-    ensureSeparation('textMuted', 'text', 0.06);
+    ensureSeparation('textMuted', 'text', 0.10);
     enforceSurfaceContrast('textMuted', ['bg', 'card', 'card2'], mutedMinRatio);
-    ensureSeparation('textMuted', 'text', 0.04);
+    applyToneBands();
+    ensureSeparation('textMuted', 'text', 0.10);
+    enforceSurfaceContrast('textMuted', ['bg', 'card', 'card2'], mutedMinRatio);
 
     return {
       bg: adjusted.bg, card: adjusted.card, card2: adjusted.card2,
@@ -473,7 +517,7 @@ export function applyAdjustments(
     for (const key of allKeys) {
       adjusted[key] = tokens[key];
     }
-    return finalizeAdjustedTokens(adjusted, contrast);
+    return finalizeAdjustedTokens(adjusted, contrast, undefined, toOklch(tokens.bg).L < 0.5);
   }
   
   const brightnessNorm = Math.max(-1, Math.min(1, brightness / 5));
@@ -482,20 +526,23 @@ export function applyAdjustments(
   const lowClip = Math.max(0, Math.min(0.2, Math.max(0, brightnessNorm) * 0.02));
   const highClip = Math.max(0.8, Math.min(1, 1 - Math.max(0, -brightnessNorm) * 0.08));
 
-  const contrastFactor = Math.pow(2, contrast * 0.35);
+  const contrastFactor = Math.pow(2, contrast * 0.28);
+  const punch = Math.max(0, contrast) / 5;
   const satFactor = Math.max(0.01, 1 + saturation * 0.2);
 
   // Pass 1: Apply brightness (gamma + range compression), collect lightness for midpoint
   const brightened: Record<string, { L: number; C: number; H: number }> = {};
-  let lightSum = 0;
   for (const key of allKeys) {
     const color = toOklch(tokens[key]);
     let L = Math.pow(Math.max(0.001, color.L), gamma) + lift;
     L = Math.max(lowClip, Math.min(highClip, L));
     brightened[key] = { L, C: color.C, H: color.H };
-    lightSum += L;
   }
-  const midpoint = lightSum / allKeys.length;
+  // Expand around surfaces + text only. Including on-color Fg tokens (near
+  // white/black) pulls the midpoint so far that high contrast slams every
+  // dark surface to #000 and every light surface to the same rail.
+  const midpointKeys = ['bg', 'card', 'card2', 'text', 'textMuted', 'border'] as const;
+  const midpoint = midpointKeys.reduce((sum, key) => sum + brightened[key].L, 0) / midpointKeys.length;
   const isLightTheme = brightened.bg.L > 0.5;
 
   // When contrast is reduced, also desaturate proportionally so chromatic
@@ -517,17 +564,74 @@ export function applyAdjustments(
   const isDarkSource = toOklch(tokens.bg).L < 0.5;
   const satNorm = Math.max(-1, Math.min(1, saturation / 5));
   const desiredOccupancy: Record<string, number> = {};
+
+  // High contrast must widen the surface stack, not slam every surface toward
+  // the poles. Midpoint expansion turns dark bg/card/card2 into #000.
+  const surfaceLadder: Record<string, number> | null = punch > 0
+    ? (() => {
+        if (isDarkSource) {
+          const bgL = Math.max(0.16, Math.min(0.32, brightened.bg.L - punch * 0.03));
+          const step = 0.06 + punch * 0.04;
+          const cardL = Math.max(0.24, Math.min(0.42, Math.max(brightened.card.L, bgL + step)));
+          const card2L = Math.max(0.30, Math.min(0.48, Math.max(brightened.card2.L, cardL + step * 0.75)));
+          const borderL = Math.max(bgL + 0.08, Math.min(0.44, (bgL + cardL) / 2));
+          return { bg: bgL, card: cardL, card2: card2L, border: borderL };
+        }
+        const bgL = Math.max(0.55, Math.min(0.99, brightened.bg.L + punch * 0.012));
+        const step = 0.04 + punch * 0.03;
+        const cardMax = bgL - Math.max(0.03, step);
+        const cardL = Math.min(cardMax, Math.max(0.50, Math.min(brightened.card.L, bgL - step)));
+        const card2Max = cardL - 0.02;
+        const card2L = Math.min(card2Max, Math.max(0.46, Math.min(brightened.card2.L, cardL - step * 0.75)));
+        const borderL = Math.min(bgL - 0.06, Math.max(cardL, (bgL + cardL) / 2));
+        return { bg: bgL, card: cardL, card2: card2L, border: borderL };
+      })()
+    : null;
+
   for (const key of allKeys) {
     const isChromatic = chromaticKeys.has(key);
-    const isSurface = surfaceKeys.has(key);
-    let L = midpoint + (brightened[key].L - midpoint) * contrastFactor;
+    const isSurface = surfaceKeys.has(key) || key === 'border';
+    let L = surfaceLadder && isSurface
+      ? surfaceLadder[key]
+      : midpoint + (brightened[key].L - midpoint) * contrastFactor;
     // Keep chromatic tokens away from pure black/white, even at high contrast,
     // so hue identity does not collapse to achromatic output.
-    let minL = isChromatic ? (isLightTheme ? 0.12 : 0.10) : 0.03;
-    let maxL = isChromatic ? (isLightTheme ? 0.92 : 0.90) : 0.97;
+    let minL = isChromatic ? (isLightTheme ? 0.12 : 0.10) : 0.06;
+    let maxL = isChromatic ? (isLightTheme ? 0.92 : 0.86) : 0.97;
     if (isSurface) {
-      if (isDarkSource) maxL = Math.min(maxL, 0.45);
-      else minL = Math.max(minL, 0.55);
+      if (isDarkSource) {
+        minL = punch > 0 ? 0.16 : 0.14;
+        maxL = 0.46;
+      } else {
+        minL = 0.52;
+        maxL = 0.99;
+      }
+    } else if (contrast > 0 && key === 'text') {
+      if (isDarkSource) {
+        minL = 0.84;
+        maxL = 0.96;
+      } else {
+        minL = 0.08;
+        maxL = 0.26;
+      }
+    } else if (contrast > 0 && key === 'textMuted') {
+      if (isDarkSource) {
+        minL = 0.56;
+        maxL = 0.76;
+      } else {
+        minL = 0.30;
+        maxL = 0.52;
+      }
+    } else if (contrast >= 3 && isChromatic) {
+      // Only lock the brand band at the high-contrast steps. Mid contrast
+      // must still let the brightness slider move chromatic tokens.
+      if (isLightTheme) {
+        minL = 0.28;
+        maxL = 0.62;
+      } else {
+        minL = 0.48;
+        maxL = 0.76;
+      }
     }
     L = Math.max(minL, Math.min(maxL, L));
     let C: number;
@@ -564,7 +668,7 @@ export function applyAdjustments(
     adjusted[key] = toHex(clampToSRGBGamut({ L, C, H: brightened[key].H }));
   }
 
-  return finalizeAdjustedTokens(adjusted, contrast, desiredOccupancy);
+  return finalizeAdjustedTokens(adjusted, contrast, desiredOccupancy, isDarkSource);
 }
 
 interface ParityOptions {
@@ -620,7 +724,8 @@ function fitContrastTowardTarget(
 function harmonizeSemanticContrastBetweenModes(
   light: ThemeTokens,
   dark: ThemeTokens,
-  strength: number
+  strength: number,
+  contrastLevel: number = 0
 ): { light: ThemeTokens; dark: ThemeTokens } {
   const tunedLight: ThemeTokens = { ...light };
   const tunedDark: ThemeTokens = { ...dark };
@@ -646,11 +751,19 @@ function harmonizeSemanticContrastBetweenModes(
     // - the pull strengthens with the cross-mode gap: a partial pull on an
     //   extreme gap (e.g. 18:1 vs 3:1) would still leave the modes feeling
     //   like different designs
-    const sharedTarget = Math.max(2.7, Math.min(6.2, Math.sqrt(lightRatio * darkRatio)));
+    const cap = contrastLevel >= 3 ? 8.2 : 6.2;
+    const sharedTarget = Math.max(2.7, Math.min(cap, Math.sqrt(lightRatio * darkRatio)));
     const gap = Math.abs(lightRatio - darkRatio);
     const keyBalance = Math.min(1, balance + Math.max(0, (gap - 3) * 0.05));
-    const targetLight = lightRatio + (sharedTarget - lightRatio) * keyBalance;
-    const targetDark = darkRatio + (sharedTarget - darkRatio) * keyBalance;
+    let targetLight = lightRatio + (sharedTarget - lightRatio) * keyBalance;
+    let targetDark = darkRatio + (sharedTarget - darkRatio) * keyBalance;
+    if (contrastLevel > 0) {
+      // Lift a weak side, but keep brand colors in a usable contrast band.
+      targetLight = Math.min(cap, Math.max(lightRatio, targetLight));
+      targetDark = Math.min(cap, Math.max(darkRatio, targetDark));
+      if (lightRatio > cap) targetLight = cap;
+      if (darkRatio > cap) targetDark = cap;
+    }
 
     tunedLight[key] = toHex(
       fitContrastTowardTarget(toOklch(tunedLight[key]), bindingSurface(tunedLight, key), targetLight)
@@ -1016,7 +1129,12 @@ function finishPalettePair(
     const balanceGate = Math.max(0, contrastIntensity - 2) / 3;
     const balanceStrength = parityStrength * Math.max(0, Math.min(1, balanceGate));
     if (balanceStrength > 0.01) {
-      const balanced = harmonizeSemanticContrastBetweenModes(light, dark, balanceStrength);
+      const balanced = harmonizeSemanticContrastBetweenModes(
+        light,
+        dark,
+        balanceStrength,
+        Math.max(contrastLevel, dCon)
+      );
       light = balanced.light;
       dark = balanced.dark;
     }

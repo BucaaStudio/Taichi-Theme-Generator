@@ -3,6 +3,7 @@ import { assignImageSlots, generateTheme, mergeLockedSlots, parseToHex, readabil
 import { contrastRatio } from '../utils/contrast';
 import { hueDifference, toOklch } from '../utils/oklch';
 import { seedFromHue, surfaceHueFromWarmth, warmthFromSeed } from '../utils/paletteEngine';
+import { assertHighContrastVisuals, describeTheme } from './visualHelpers';
 
 describe('Seed replay', () => {
   it('replays an unseeded generate from the returned seed', () => {
@@ -86,6 +87,17 @@ describe('WCAG contrast floors', () => {
     expect(contrastRatio(light.textMuted, light.bg)).toBeGreaterThanOrEqual(3.0);
     expect(contrastRatio(dark.text, dark.bg)).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio(dark.textMuted, dark.bg)).toBeGreaterThanOrEqual(3.0);
+  });
+});
+
+describe('High contrast surface ladder', () => {
+  it('keeps cards visible and muted distinct at +3 +4 +5, especially in dark mode', () => {
+    const seedHue = toOklch('#3a5cb8').H;
+    for (const contrast of [3, 4, 5]) {
+      const { light, dark } = generateTheme('analogous', '#3a5cb8', 0, contrast, 0);
+      assertHighContrastVisuals(light, 'light', seedHue, describeTheme(light, { contrast, side: 'light' }));
+      assertHighContrastVisuals(dark, 'dark', seedHue, describeTheme(dark, { contrast, side: 'dark' }));
+    }
   });
 });
 
