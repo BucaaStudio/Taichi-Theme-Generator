@@ -73,6 +73,10 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+      // Colors are CSS variables; color-mix lets opacity modifiers (bg-t-text/10)
+      // work on them, which a bare var() cannot.
+      const withAlpha = (name) =>
+        `color-mix(in oklab, var(${name}) calc(<alpha-value> * 100%), transparent)`;
       tailwind.config = {
         theme: {
           extend: {
@@ -83,27 +87,27 @@
             colors: {
               // We map tailwind utility classes to CSS variables we will inject dynamically
               t: {
-                bg: "var(--bg)",
-                card: "var(--card)",
-                card2: "var(--card2)",
-                text: "var(--text)",
-                muted: "var(--text-muted)",
-                textMuted: "var(--text-muted)",
-                textOnColor: "var(--text-on-color)",
-                primary: "var(--primary)",
-                primaryFg: "var(--primary-fg)",
-                secondary: "var(--secondary)",
-                secondaryFg: "var(--secondary-fg)",
-                accent: "var(--accent)",
-                accentFg: "var(--accent-fg)",
-                border: "var(--border)",
-                ring: "var(--ring)",
-                good: "var(--good)",
-                goodFg: "var(--good-fg)",
-                warn: "var(--warn)",
-                warnFg: "var(--warn-fg)",
-                bad: "var(--bad)",
-                badFg: "var(--bad-fg)",
+                bg: withAlpha("--bg"),
+                card: withAlpha("--card"),
+                card2: withAlpha("--card2"),
+                text: withAlpha("--text"),
+                muted: withAlpha("--text-muted"),
+                textMuted: withAlpha("--text-muted"),
+                textOnColor: withAlpha("--text-on-color"),
+                primary: withAlpha("--primary"),
+                primaryFg: withAlpha("--primary-fg"),
+                secondary: withAlpha("--secondary"),
+                secondaryFg: withAlpha("--secondary-fg"),
+                accent: withAlpha("--accent"),
+                accentFg: withAlpha("--accent-fg"),
+                border: withAlpha("--border"),
+                ring: withAlpha("--ring"),
+                good: withAlpha("--good"),
+                goodFg: withAlpha("--good-fg"),
+                warn: withAlpha("--warn"),
+                warnFg: withAlpha("--warn-fg"),
+                bad: withAlpha("--bad"),
+                badFg: withAlpha("--bad-fg"),
               },
             },
           },

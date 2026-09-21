@@ -1,5 +1,5 @@
 import React, { useId, useSyncExternalStore } from 'react';
-import { Check, Sparkles, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 
 // A miniature product UI, weighted like a real app — mostly surfaces and text,
 // brand color on key actions, status colors small.
@@ -14,8 +14,21 @@ interface Member {
   pending?: boolean;
 }
 
+interface Project {
+  name: string;
+  meta: string;
+  status: Exclude<ProjectFilter, 'All'>;
+  tint: string;
+  dot: string;
+  pct: number;
+}
+
 interface DemoState {
   tab: DemoTab;
+  projects: Project[];
+  dialogOpen: boolean;
+  draftName: string;
+  draftDot: string;
   filter: ProjectFilter;
   members: Member[];
   email: string;
@@ -27,6 +40,10 @@ interface DemoState {
 // Shared by the light and dark previews so both sides show the same screen.
 let demoState: DemoState = {
   tab: 'overview',
+  projects: [],
+  dialogOpen: false,
+  draftName: '',
+  draftDot: 'bg-t-primary',
   filter: 'All',
   members: [
     { name: 'John Zheng', email: 'john@taichi.dev', role: 'Admin' },
@@ -49,14 +66,15 @@ const setDemoState = (patch: Partial<DemoState>) => {
   listeners.forEach((listener) => listener());
 };
 
-const PROJECTS = [
+const PROJECTS: Project[] = [
   { name: 'Marketing site', meta: 'Updated 2h ago', status: 'Live', tint: 'tint-good', dot: 'bg-t-primary', pct: 92 },
   { name: 'Mobile app', meta: 'Updated yesterday', status: 'Review', tint: 'tint-warn', dot: 'bg-t-secondary', pct: 64 },
   { name: 'Design system', meta: 'Updated 3d ago', status: 'Draft', tint: 'tint-neutral', dot: 'bg-t-accent', pct: 38 },
   { name: 'Billing API', meta: 'Build failed', status: 'Failed', tint: 'tint-bad', dot: 'bg-t-primary', pct: 15 },
   { name: 'Docs portal', meta: 'Updated 5d ago', status: 'Live', tint: 'tint-good', dot: 'bg-t-accent', pct: 100 },
   { name: 'Onboarding flow', meta: 'Updated last week', status: 'Draft', tint: 'tint-neutral', dot: 'bg-t-secondary', pct: 22 },
-] as const;
+];
+const PROJECT_DOTS = ['bg-t-primary', 'bg-t-secondary', 'bg-t-accent'];
 
 const LINE_THIS = 'M0,62 C25,58 30,40 50,44 S85,66 100,52 S135,18 150,26 S185,48 200,36 S235,8 250,16 S285,30 300,12';
 const LINE_LAST = 'M0,70 C25,68 30,58 50,60 S85,72 100,64 S135,44 150,50 S185,62 200,54 S235,38 250,42 S285,50 300,40';
@@ -65,6 +83,8 @@ const DONUT = [
   { label: 'Search', pct: 31, start: 46, color: 'var(--secondary)' },
   { label: 'Social', pct: 23, start: 77, color: 'var(--accent)' },
 ];
+
+demoState = { ...demoState, projects: PROJECTS };
 
 const FILTERS: ProjectFilter[] = ['All', 'Live', 'Review', 'Draft', 'Failed'];
 const AVATAR_FILLS = ['bg-t-primary text-t-primaryFg', 'bg-t-secondary text-t-secondaryFg', 'bg-t-accent text-t-accentFg'];
@@ -89,7 +109,7 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
 }) => {
   const chartId = useId();
   const state = useSyncExternalStore(subscribe, getDemoState, getDemoState);
-  const { tab, filter, members, email, role, canPublish, notice } = state;
+  const { tab, filter, members, email, role, canPublish, notice, projects, dialogOpen, draftName, draftDot } = state;
 
   const cardClass = `${rClass} ${bClass} ${sClass} bg-t-card`;
   const fieldClass = `w-full px-2.5 py-1.5 ${rClass} ${bClass} bg-t-bg text-xs text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`;
@@ -115,7 +135,21 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
     });
   };
 
-  const projectRows = (rows: readonly (typeof PROJECTS)[number][]) =>
+  const createProject = (event: React.FormEvent) => {
+    event.preventDefault();
+    const name = draftName.trim();
+    if (!name) return;
+    setDemoState({
+      projects: [{ name, meta: 'Created just now', status: 'Draft', tint: 'tint-neutral', dot: draftDot, pct: 0 }, ...projects],
+      dialogOpen: false,
+      draftName: '',
+      tab: 'projects',
+      filter: 'All',
+      notice: { kind: 'good', text: `${name} created as a draft.` },
+    });
+  };
+
+  const projectRows = (rows: Project[]) =>
     rows.map((row) => (
       <div key={row.name} className="flex items-center gap-3 px-3 py-2 border-b border-themed last:border-b-0 transition-colors hover:bg-t-card2">
         <div className={`h-7 w-7 shrink-0 ${rClass} ${row.dot} opacity-90`} />
@@ -174,7 +208,7 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
   );
 
   return (
-    <section className={`overflow-hidden ${bClass} ${rClass} ${sClass} bg-t-card`}>
+    <section className={`relative overflow-hidden ${bClass} ${rClass} ${sClass} bg-t-card`}>
       {/* App bar */}
       <div className="flex items-center gap-3 border-b border-themed px-4 py-2.5">
         <div className={`h-6 w-6 shrink-0 ${rClass} ${gradientClass} flex items-center justify-center text-t-primaryFg text-[11px] font-black`}>T</div>
@@ -184,7 +218,7 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
           {tabButton('team', 'Team')}
         </nav>
         <input type="text" placeholder="Search..." className={`ml-auto hidden lg:block w-32 px-2.5 py-1 ${rClass} ${bClass} bg-t-bg text-xs text-t-text focus:outline-none focus:ring-2 focus:ring-t-primary/30`} />
-        <button type="button" onClick={() => setDemoState({ tab: 'projects', filter: 'All' })} className={`ml-auto lg:ml-0 ${primaryButton}`}>
+        <button type="button" onClick={() => setDemoState({ dialogOpen: true })} className={`ml-auto lg:ml-0 ${primaryButton}`}>
           New project
         </button>
         <div className="h-6 w-6 shrink-0 rounded-full bg-t-secondary text-t-secondaryFg flex items-center justify-center text-[10px] font-bold">JZ</div>
@@ -248,6 +282,14 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
                     <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-t-secondary" />Last week</span>
                   </div>
                 </div>
+                <div className="relative">
+                  {/* Hover readout: translucent so the lines stay visible through it */}
+                  <div className="pointer-events-none absolute inset-y-0 left-[66.6%] w-px bg-t-text/25" />
+                  <div className="pointer-events-none absolute left-[66.6%] top-[28%] -ml-1 h-2 w-2 rounded-full bg-t-primary ring-4 ring-t-primary/25" />
+                  <div className={`pointer-events-none absolute left-[66.6%] top-0 -translate-x-[105%] ${rClass} bg-t-text/80 px-2 py-1 text-[10px] leading-tight text-t-bg backdrop-blur-sm ${sClass}`}>
+                    <p className="font-semibold">Fri &middot; 3,482</p>
+                    <p className="opacity-70">+18% vs last week</p>
+                  </div>
                 <svg viewBox="0 0 300 90" preserveAspectRatio="none" className="w-full h-24" role="img" aria-label="Traffic line chart">
                   <defs>
                     <linearGradient id={`${chartId}-area`} x1="0" y1="0" x2="0" y2="1">
@@ -262,6 +304,7 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
                   <path d={LINE_LAST} fill="none" stroke="var(--secondary)" strokeWidth="2" strokeDasharray="4 4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
                   <path d={LINE_THIS} fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                 </svg>
+                </div>
                 <div className="flex justify-between text-[10px] text-t-textMuted">
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => <span key={day}>{day}</span>)}
                 </div>
@@ -316,20 +359,38 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
                   <p className="text-xs font-semibold text-t-text">Projects</p>
                   <button type="button" onClick={() => setDemoState({ tab: 'projects', filter: 'All' })} className="text-[11px] text-t-accent font-semibold hover:underline">See all</button>
                 </div>
-                {projectRows(PROJECTS.slice(0, 4))}
+                {projectRows(projects.slice(0, 4))}
               </div>
               {inviteForm}
             </div>
 
-            {/* One slim notice plus a promo: the only large color blocks */}
-            <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className={`${rClass} border alert-info px-3 py-2 text-[11px] flex items-center gap-2`}>
-                <Sparkles size={13} className="shrink-0" />
-                <span className="flex-1 min-w-0"><strong>New:</strong> themes now export to Tailwind.</span>
-              </div>
-              <div className={`${rClass} ${gradientAccent} text-t-accentFg px-3 py-2 text-[11px] flex items-center justify-between gap-2`}>
-                <span className="font-semibold truncate">Upgrade to Pro</span>
-                <span className={`${rClass} bg-t-secondary text-t-secondaryFg px-2 py-0.5 text-[10px] font-bold`}>-20%</span>
+            {/* Frosted glass over a brand gradient: translucent chips pick up the
+                colors behind them, which is where a palette's blends show. */}
+            <div className={`relative overflow-hidden ${rClass} ${gradientClass} px-4 py-3 text-t-primaryFg`}>
+              <div className="pointer-events-none absolute -right-6 -top-10 h-28 w-28 rounded-full bg-t-accent/70 blur-2xl" />
+              <div className="pointer-events-none absolute right-24 -bottom-12 h-24 w-24 rounded-full bg-t-secondary/60 blur-2xl" />
+              <div className="relative flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold">Upgrade to Pro</p>
+                  <p className="text-[11px] opacity-80">Unlimited projects, shared palettes, priority builds.</p>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-semibold">
+                  {['Unlimited', 'SSO', '-20% yearly'].map((perk) => (
+                    <span
+                      key={perk}
+                      className={`${rClass} border px-2 py-1 backdrop-blur-md`}
+                      style={{
+                        backgroundColor: 'color-mix(in oklab, var(--primary-fg) 16%, transparent)',
+                        borderColor: 'color-mix(in oklab, var(--primary-fg) 30%, transparent)',
+                      }}
+                    >
+                      {perk}
+                    </span>
+                  ))}
+                  <button type="button" className={`${rClass} bg-t-card/90 px-2.5 py-1 text-t-text backdrop-blur-md transition-colors hover:bg-t-card`}>
+                    Upgrade
+                  </button>
+                </div>
               </div>
             </div>
           </>
@@ -353,8 +414,8 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
               </div>
             </div>
             <div className={`${cardClass} overflow-hidden`}>
-              {projectRows(PROJECTS.filter((row) => filter === 'All' || row.status === filter))}
-              {PROJECTS.every((row) => filter !== 'All' && row.status !== filter) && (
+              {projectRows(projects.filter((row) => filter === 'All' || row.status === filter))}
+              {projects.every((row) => filter !== 'All' && row.status !== filter) && (
                 <p className="px-3 py-6 text-center text-xs text-t-textMuted">No projects here yet.</p>
               )}
             </div>
@@ -398,6 +459,63 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
           </>
         )}
       </div>
+
+      {/* Modal: a blurred, semi-transparent scrim keeps the page readable behind it */}
+      {dialogOpen && (
+        <div
+          className="absolute inset-0 z-20 flex items-start justify-center p-6 pt-16 backdrop-blur-sm"
+          style={{ backgroundColor: 'color-mix(in oklab, var(--bg) 60%, transparent)' }}
+          onClick={() => setDemoState({ dialogOpen: false })}
+        >
+          <form
+            onSubmit={createProject}
+            onClick={(event) => event.stopPropagation()}
+            className={`w-full max-w-xs ${rClass} ${bClass} bg-t-card/95 p-4 space-y-3 shadow-2xl backdrop-blur-md`}
+            role="dialog"
+            aria-label="New project"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-bold text-t-text">New project</p>
+                <p className="text-[11px] text-t-textMuted">Demo only — it is added to the list as a draft.</p>
+              </div>
+              <button type="button" onClick={() => setDemoState({ dialogOpen: false })} aria-label="Close" className="text-t-textMuted hover:text-t-text">
+                <X size={14} />
+              </button>
+            </div>
+            <input
+              type="text"
+              value={draftName}
+              onChange={(event) => setDemoState({ draftName: event.target.value })}
+              placeholder="Project name"
+              autoFocus
+              className={fieldClass}
+              aria-label="Project name"
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-t-textMuted">Color</span>
+              {PROJECT_DOTS.map((dot) => (
+                <button
+                  key={dot}
+                  type="button"
+                  onClick={() => setDemoState({ draftDot: dot })}
+                  aria-label={dot.replace('bg-t-', '')}
+                  aria-pressed={draftDot === dot}
+                  className={`h-6 w-6 ${rClass} ${dot} transition-all ${draftDot === dot ? 'ring-2 ring-t-text/70 ring-offset-2 ring-offset-t-card' : 'opacity-45 hover:opacity-80'}`}
+                />
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" disabled={!draftName.trim()} className={`flex-1 ${primaryButton} disabled:opacity-40 disabled:hover:scale-100 disabled:cursor-not-allowed`}>
+                Create project
+              </button>
+              <button type="button" onClick={() => setDemoState({ dialogOpen: false })} className={`btn-ghost px-3 py-1.5 ${rClass} text-xs font-semibold transition-colors`}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </section>
   );
 };
