@@ -5,7 +5,8 @@ import {
   Moon, Sun, SlidersHorizontal, ChevronUp, ChevronDown, Shuffle, PanelTopClose, PanelTopOpen, X, Menu
 } from 'lucide-react';
 import { ThemeTokens, DualTheme, GenerationMode, ColorFormat, DesignOptions, LockedColors, LockedOptions } from './types';
-import { generateTheme, extractPaletteFromImage, formatColor } from './utils/colorUtils';
+import { generateTheme, extractPaletteFromImage, formatColor, mergeLockedSlots } from './utils/colorUtils';
+import { selectForegroundHex } from './utils/contrast';
 import PreviewSection from './components/PreviewSection';
 import SwatchStrip from './components/SwatchStrip';
 import ShareModal from './components/ShareModal';
@@ -229,6 +230,7 @@ const App: React.FC = () => {
       const dsat = params.get('dsat') ? parseInt(params.get('dsat')!) : 0;
       const dcon = params.get('dcon') ? parseInt(params.get('dcon')!) : 0;
       const dbri = params.get('dbri') ? parseInt(params.get('dbri')!) : 0;
+      const darkFirst = params.get('df') === '1';
 
       // Update options if present. Compute the merged object synchronously so
       // the initial generation below uses the URL values (including split
@@ -243,6 +245,7 @@ const App: React.FC = () => {
         brightnessLevel: bri ?? designOptions.brightnessLevel,
         contrastLevel: con ?? designOptions.contrastLevel,
         saturationLevel: sat ?? designOptions.saturationLevel,
+        darkFirst,
         splitAdjustments: split,
         lightBrightnessLevel: split ? lbri : (bri ?? designOptions.brightnessLevel),
         lightContrastLevel: split ? lcon : (con ?? designOptions.contrastLevel),
@@ -261,13 +264,17 @@ const App: React.FC = () => {
 
     const saved = localStorage.getItem('theme_history');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed.length > 0) {
-        setHistory(parsed);
-        setHistoryIndex(parsed.length - 1);
-        setCurrentTheme(parsed[parsed.length - 1]);
-        setMode(parsed[parsed.length - 1].mode);
-        return;
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[parsed.length - 1]?.light) {
+          setHistory(parsed);
+          setHistoryIndex(parsed.length - 1);
+          setCurrentTheme(parsed[parsed.length - 1]);
+          setMode(parsed[parsed.length - 1].mode);
+          return;
+        }
+      } catch {
+        localStorage.removeItem('theme_history');
       }
     }
     generateNewTheme('random');
@@ -285,6 +292,7 @@ const App: React.FC = () => {
     params.set('so', designOptions.shadowOpacity.toString());
     params.set('gr', designOptions.gradients ? '1' : '0');
     params.set('rd', designOptions.radius.toString());
+    params.set('df', designOptions.darkFirst ? '1' : '0');
 
     if (designOptions.splitAdjustments) {
       params.set('split', '1');
@@ -381,57 +389,49 @@ const App: React.FC = () => {
       darkBri = opts.brightnessLevel;
     }
 
-    const effectiveOverridePalette =
+    const imageOrExisting =
       overridePalette ?? (genMode === 'image' ? (imageOverridePalette ?? undefined) : undefined);
+    const sourceSide = opts.darkFirst ? 'dark' : 'light';
+    const effectiveOverridePalette = mergeLockedSlots(
+      imageOrExisting,
+      lockedColors,
+      currentTheme?.[sourceSide]
+    );
     const effectiveImportSourceSide =
-      genMode === 'image'
+      genMode === 'image' || Boolean(effectiveOverridePalette)
         ? (overrideImportSourceSide ?? imageImportSourceSide ?? (opts.darkFirst ? 'dark' : 'light'))
         : undefined;
 
-    const { light, dark, seed: newSeed } = generateTheme(
+    const { light, dark, seed: newSeed, mode: resolvedMode } = generateTheme(
       genMode, seed, lightSat, lightCon, lightBri, effectiveOverridePalette, opts.darkFirst,
       darkSat, darkCon, darkBri, effectiveImportSourceSide
     );
 
     lastGeneratedOptionsRef.current = colorOptionsKey(opts);
     
-    // Preserve locked colors from current theme
-    // Also lock related tokens when a base token is locked
+    // Preserve locked colors from the current theme on both sides.
+    // Foreground companions stay with their brand color; surfaces are
+    // regenerated around locked tokens instead of being frozen with them.
     const mergedLight = { ...light };
     const mergedDark = { ...dark };
-    
-    // Map of token to its related tokens that should also be locked
-    // Map of token to its related tokens that should also be locked
-    // This ensures that when a "master" token is locked, its dependent tokens 
-    // stay harmonious with it (preventing broken contrast or hue mismatches)
-    const relatedTokens: Record<string, string[]> = {
-      bg: ['card', 'card2'], // Card usually depends on BG context
-      card: ['card2'],
-      text: ['textMuted', 'border'], // Typography hierarchy and borders should match text
-      textMuted: [],
-      textOnColor: [],  // Always white, but lockable
-      primary: ['primaryFg', 'ring'],
+    const fgCompanions: Partial<Record<keyof ThemeTokens, (keyof ThemeTokens)[]>> = {
+      primary: ['primaryFg', 'ring', 'textOnColor'],
       secondary: ['secondaryFg'],
       accent: ['accentFg'],
       good: ['goodFg'],
       bad: ['badFg'],
       warn: ['warnFg'],
-      border: [],
     };
     
     if (currentTheme) {
-      Object.keys(lockedColors).forEach(key => {
-        if (lockedColors[key as keyof ThemeTokens]) {
-          // Lock the main token
-          mergedLight[key as keyof ThemeTokens] = currentTheme.light[key as keyof ThemeTokens];
-          mergedDark[key as keyof ThemeTokens] = currentTheme.dark[key as keyof ThemeTokens];
-          
-          // Also lock related tokens
-          const related = relatedTokens[key] || [];
-          related.forEach(relatedKey => {
-            mergedLight[relatedKey as keyof ThemeTokens] = currentTheme.light[relatedKey as keyof ThemeTokens];
-            mergedDark[relatedKey as keyof ThemeTokens] = currentTheme.dark[relatedKey as keyof ThemeTokens];
-          });
+      (Object.keys(lockedColors) as (keyof ThemeTokens)[]).forEach((key) => {
+        if (!lockedColors[key]) return;
+        mergedLight[key] = currentTheme.light[key];
+        mergedDark[key] = currentTheme.dark[key];
+        for (const relatedKey of fgCompanions[key] ?? []) {
+          if (lockedColors[relatedKey]) continue;
+          mergedLight[relatedKey] = currentTheme.light[relatedKey];
+          mergedDark[relatedKey] = currentTheme.dark[relatedKey];
         }
       });
     }
@@ -442,7 +442,7 @@ const App: React.FC = () => {
       light: mergedLight,
       dark: mergedDark,
       seed: newSeed,
-      mode: genMode
+      mode: genMode === 'image' ? 'image' : resolvedMode
     };
 
     setHistory(prev => {
@@ -476,13 +476,25 @@ const App: React.FC = () => {
   const handleTokenUpdate = useCallback((side: 'light' | 'dark', key: keyof ThemeTokens, value: string) => {
     if (!currentTheme) return;
 
-    // Create updated theme object
+    const nextSide = {
+      ...currentTheme[side],
+      [key]: value
+    };
+    const fgCompanions: Partial<Record<keyof ThemeTokens, (keyof ThemeTokens)[]>> = {
+      primary: ['primaryFg', 'textOnColor'],
+      secondary: ['secondaryFg'],
+      accent: ['accentFg'],
+      good: ['goodFg'],
+      bad: ['badFg'],
+      warn: ['warnFg'],
+    };
+    for (const fgKey of fgCompanions[key] ?? []) {
+      nextSide[fgKey] = selectForegroundHex(value);
+    }
+
     const updatedTheme = {
       ...currentTheme,
-      [side]: {
-        ...currentTheme[side],
-        [key]: value
-      }
+      [side]: nextSide
     };
     
     // Push modification to history

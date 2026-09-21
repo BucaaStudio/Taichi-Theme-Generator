@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { generateTheme } from '../utils/colorUtils';
+import { generateTheme, readabilityFloors } from '../utils/colorUtils';
 import { contrastRatio } from '../utils/contrast';
 
 const MODES = [
@@ -48,8 +48,7 @@ describe('Readability guardrails', () => {
       );
 
       const checkTheme = (theme: typeof light, themeName: 'light' | 'dark') => {
-        const textMin = themeName === 'dark' ? 5 : 3.8;
-        const mutedMin = themeName === 'dark' ? 3.4 : 2.6;
+        const { text: textMin, muted: mutedMin } = readabilityFloors(contrast, themeName === 'dark');
         const surfaces = [theme.bg, theme.card, theme.card2];
 
         for (const surface of surfaces) {

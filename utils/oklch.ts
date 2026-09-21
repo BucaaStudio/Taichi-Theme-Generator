@@ -199,9 +199,13 @@ export function shiftHue(color: OklchColor, degrees: number): OklchColor {
 // --- Neutral Color Creation ---
 
 export function createNeutral(L: number, baseHue: number, warmth: number = 0): OklchColor {
-  // Slight chroma tint based on warmth (-1 cool, 0 neutral, 1 warm)
+  // Slight chroma tint based on warmth (-1 cool, 0 neutral, 1 warm).
+  // Mix toward warm/cool instead of snapping, so brand hue still shows.
   const tintC = Math.abs(warmth) * 0.008;
-  const tintH = warmth > 0 ? 60 : 240; // Warm = yellow-ish, Cool = blue-ish
+  const target = warmth >= 0 ? 60 : 240;
+  const t = Math.min(1, Math.abs(warmth));
+  const delta = ((target - baseHue + 540) % 360) - 180;
+  const tintH = (baseHue + delta * t + 360) % 360;
   
   return clampToSRGBGamut({
     L,

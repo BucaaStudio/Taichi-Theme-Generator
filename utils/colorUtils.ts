@@ -1,7 +1,13 @@
-import { ThemeTokens, GenerationMode, ColorFormat } from '../types.js';
-import { generateTheme as paletteEngineGenerateTheme } from './paletteEngine.js';
-import { toOklch, toHex, clampToSRGBGamut } from './oklch.js';
+import { ThemeTokens, GenerationMode, ColorFormat, LockedColors } from '../types.js';
+import {
+  generateTheme as paletteEngineGenerateTheme,
+  mintSeedHex,
+  seedFromHue,
+  resolveHarmonyMode,
+} from './paletteEngine.js';
+import { toOklch, toHex, clampToSRGBGamut, rgbToHex, hueDifference } from './oklch.js';
 import { selectForeground, selectForegroundHex, contrastRatio, adjustForContrast } from './contrast.js';
+import { evaluateDualPalette, selectBestPalette, type PaletteCandidate, type ScoredPalette } from './scoringEngine.js';
 
 // --- Conversions ---
 
@@ -88,47 +94,78 @@ export function formatColor(hex: string, format: ColorFormat): string {
  * Supports:
  * - Hex: #abc, #abcdef, abc, abcdef
  * - RGB: rgb(0,0,0), 0,0,0
- * - HSL: hsl(0,0%,0%)
+ * - HSL: hsl(0,0%,0%), 200 50 40 (when format is hsl)
+ * - OKLCH: oklch(0.5 0.15 180), 0.500 0.150 180.0 (when format is oklch)
  */
 export function parseToHex(input: string, format?: ColorFormat): string | null {
   input = input.trim().toLowerCase();
 
-  // 1. Try Hex
-  // Match #RGB, #RRGGBB, RGB, RRGGBB
-  const hexMatch = input.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/);
-  if (hexMatch) {
+  const fromHex = (): string | null => {
+    const hexMatch = input.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/);
+    if (!hexMatch) return null;
     let hex = hexMatch[1];
     if (hex.length === 3) {
-      hex = hex.split('').map(c => c + c).join('');
+      hex = hex.split('').map((c) => c + c).join('');
     }
     return '#' + hex;
-  }
+  };
 
-  // 2. Try RGB
-  // valid formats: "rgb(255, 255, 255)", "255, 255, 255", "255 255 255"
-  const rgbValues = input.match(/(\d{1,3})[,\s]+(\d{1,3})[,\s]+(\d{1,3})/);
-  if (rgbValues) {
-    const r = parseInt(rgbValues[1]);
-    const g = parseInt(rgbValues[2]);
-    const b = parseInt(rgbValues[3]);
+  const fromRgb = (): string | null => {
+    const rgbValues = input.match(/(\d{1,3})[,\s]+(\d{1,3})[,\s]+(\d{1,3})/);
+    if (!rgbValues) return null;
+    const r = parseInt(rgbValues[1], 10);
+    const g = parseInt(rgbValues[2], 10);
+    const b = parseInt(rgbValues[3], 10);
     if (r <= 255 && g <= 255 && b <= 255) {
-      return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+      return '#' + [r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('');
     }
-  }
+    return null;
+  };
 
-  // 3. Try HSL
-  // valid formats: "hsl(360, 100%, 50%)", "360, 100%, 50%"
-  const hslValues = input.match(/(\d{1,3})[,\s]+(\d{1,3})%?[,\s]+(\d{1,3})%?/);
-  if (hslValues && (input.includes('hsl') || format === 'hsl')) {
-    const h = parseInt(hslValues[1]);
-    const s = parseInt(hslValues[2]);
-    const l = parseInt(hslValues[3]);
-    if (h <= 360 && s <= 100 && l <= 100) {
+  const fromHsl = (): string | null => {
+    const hslValues = input.match(/(-?[\d.]+)[,\s]+([\d.]+)%?[,\s]+([\d.]+)%?/);
+    if (!hslValues) return null;
+    const h = parseFloat(hslValues[1]);
+    const s = parseFloat(hslValues[2]);
+    const l = parseFloat(hslValues[3]);
+    if (h >= 0 && h <= 360 && s <= 100 && l <= 100) {
       return hslToHex(h, s, l);
     }
+    return null;
+  };
+
+  const fromOklch = (): string | null => {
+    const match =
+      input.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/) ||
+      input.match(/^([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*$/);
+    if (!match) return null;
+    const L = parseFloat(match[1]);
+    const C = parseFloat(match[2]);
+    const H = parseFloat(match[3]);
+    if (![L, C, H].every(Number.isFinite)) return null;
+    const lightness = L > 1 && L <= 100 ? L / 100 : L;
+    return toHex(clampToSRGBGamut({ L: lightness, C, H }));
+  };
+
+  const hex = fromHex();
+  if (hex) return hex;
+
+  // Honor the active swatch format first so compact HSL/OKLCH values
+  // are not misread as RGB (e.g. "200 50 40").
+  if (format === 'hsl' || input.includes('hsl')) {
+    const parsed = fromHsl();
+    if (parsed) return parsed;
+  }
+  if (format === 'oklch' || input.includes('oklch')) {
+    const parsed = fromOklch();
+    if (parsed) return parsed;
+  }
+  if (format === 'rgb' || input.includes('rgb')) {
+    const parsed = fromRgb();
+    if (parsed) return parsed;
   }
 
-  return null;
+  return fromRgb() || fromHsl() || fromOklch();
 }
 
 // --- Color Adjustments ---
@@ -151,6 +188,19 @@ export function parseToHex(input: string, format?: ColorFormat): string | null {
  *
  * Saturation: Chroma scaling — C_out = C_in * (1 + saturation * 0.2)
  */
+
+/** WCAG AA at defaults (4.5 / 3.0). Negative contrast lowers floors continuously. */
+export function readabilityFloors(contrast: number, isDark: boolean): { text: number; muted: number } {
+  if (contrast >= 0) {
+    return { text: 4.5, muted: 3.0 };
+  }
+  const factor = Math.pow(2, contrast * 0.22);
+  return {
+    text: Math.max(isDark ? 2.6 : 2.4, 4.5 * factor),
+    muted: Math.max(isDark ? 2.0 : 1.8, 3.0 * factor),
+  };
+}
+
 export function applyAdjustments(
   tokens: ThemeTokens,
   brightness: number,  // -5 to 5
@@ -313,8 +363,7 @@ export function applyAdjustments(
     };
 
     const isDarkTheme = toOklch(adjusted.bg).L < 0.5;
-    const textMinRatio = isDarkTheme ? 5 : 3.8;
-    const mutedMinRatio = isDarkTheme ? 3.4 : 2.6;
+    const { text: textMinRatio, muted: mutedMinRatio } = readabilityFloors(contrastForReadability, isDarkTheme);
 
     enforceSurfaceContrast('text', ['bg', 'card', 'card2'], textMinRatio);
     enforceSurfaceContrast('textMuted', ['bg', 'card', 'card2'], mutedMinRatio);
@@ -395,8 +444,11 @@ export function applyAdjustments(
     adjusted.badFg = deriveOnColorFg('bad');
     enforceForegroundPairs();
 
-    // Preserve visual hierarchy after readability correction.
+    // Preserve visual hierarchy after readability correction, then recheck
+    // muted contrast so the separation nudge cannot drop it below the floor.
     ensureSeparation('textMuted', 'text', 0.06);
+    enforceSurfaceContrast('textMuted', ['bg', 'card', 'card2'], mutedMinRatio);
+    ensureSeparation('textMuted', 'text', 0.04);
 
     return {
       bg: adjusted.bg, card: adjusted.card, card2: adjusted.card2,
@@ -645,7 +697,7 @@ function harmonizeSemanticContrastBetweenModes(
   return { light: tunedLight, dark: tunedDark };
 }
 
-const IMAGE_SLOT_KEYS = [
+export const PALETTE_SLOT_KEYS = [
   'bg',
   'card',
   'text',
@@ -658,7 +710,42 @@ const IMAGE_SLOT_KEYS = [
   'bad',
 ] as const;
 
+const IMAGE_SLOT_KEYS = PALETTE_SLOT_KEYS;
+
 type ImageSlotKey = typeof IMAGE_SLOT_KEYS[number];
+
+export function mergeLockedSlots(
+  existing: string[] | undefined,
+  locked: LockedColors | undefined,
+  source: ThemeTokens | undefined
+): string[] | undefined {
+  const slots = existing && (existing.length === 10 || existing.length === 5)
+    ? [...existing]
+    : new Array(PALETTE_SLOT_KEYS.length).fill('');
+
+  if (slots.length === 5) {
+    const expanded = new Array(PALETTE_SLOT_KEYS.length).fill('');
+    expanded[5] = slots[0];
+    expanded[6] = slots[1];
+    expanded[7] = slots[2];
+    expanded[8] = slots[3];
+    expanded[9] = slots[4];
+    slots.length = 0;
+    slots.push(...expanded);
+  }
+
+  let any = slots.some((value) => Boolean(value && String(value).trim()));
+  if (source && locked) {
+    PALETTE_SLOT_KEYS.forEach((key, index) => {
+      if (locked[key]) {
+        slots[index] = source[key];
+        any = true;
+      }
+    });
+  }
+
+  return any ? slots : undefined;
+}
 
 function parseImageOverrides(overridePalette?: string[]): Partial<Record<ImageSlotKey, string>> {
   if (!overridePalette || overridePalette.length !== IMAGE_SLOT_KEYS.length) return {};
@@ -823,25 +910,72 @@ function enforceCompanionParity(
 
 // --- Theme Builder ---
 
-export function generateTheme(
-  mode: GenerationMode,
-  seedColor?: string,
-  saturationLevel: number = 0,
-  contrastLevel: number = 0,
-  brightnessLevel: number = 0,
-  overridePalette?: string[],
-  darkFirst: boolean = false,
-  darkSaturationLevel?: number,
-  darkContrastLevel?: number,
-  darkBrightnessLevel?: number,
-  imageImportSourceSide?: 'light' | 'dark'
-): { light: ThemeTokens, dark: ThemeTokens, seed: string, mode: GenerationMode } {
-  // Generate the base palette at neutral levels.
-  // Brightness/contrast/saturation are applied in one adjustment stage below.
-  const dSat = darkSaturationLevel ?? saturationLevel;
-  const dCon = darkContrastLevel ?? contrastLevel;
-  const dBri = darkBrightnessLevel ?? brightnessLevel;
+const CANDIDATE_HUE_JITTERS = [0, -6, 6, -12, 12];
+const CANDIDATE_CHROMAS = [0.11, 0.18];
+const NEARBY_HARMONIES: GenerationMode[] = ['analogous', 'compound', 'split-complementary'];
 
+function buildSearchCandidates(
+  masterSeed: string,
+  resolvedHarmony: GenerationMode,
+  userMode: GenerationMode,
+  shouldSearch: boolean
+): Array<{ seed: string; mode: GenerationMode }> {
+  const specs: Array<{ seed: string; mode: GenerationMode }> = [
+    { seed: masterSeed, mode: resolvedHarmony },
+  ];
+  if (!shouldSearch) return specs;
+
+  const hue = toOklch(masterSeed).H;
+  for (const jitter of CANDIDATE_HUE_JITTERS) {
+    if (jitter === 0) continue;
+    specs.push({ seed: seedFromHue((hue + jitter + 360) % 360), mode: resolvedHarmony });
+  }
+  for (const chroma of CANDIDATE_CHROMAS) {
+    specs.push({ seed: seedFromHue(hue, chroma), mode: resolvedHarmony });
+  }
+  if (userMode === 'random') {
+    for (const nearby of NEARBY_HARMONIES) {
+      if (nearby !== resolvedHarmony) {
+        specs.push({ seed: masterSeed, mode: nearby });
+      }
+    }
+  }
+  return specs;
+}
+
+function toScoreCandidate(tokens: ThemeTokens): PaletteCandidate {
+  return {
+    bg: tokens.bg,
+    card: tokens.card,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    primary: tokens.primary,
+    secondary: tokens.secondary,
+    accent: tokens.accent,
+    good: tokens.good,
+    bad: tokens.bad,
+  };
+}
+
+function overrideLocksPrimary(overridePalette?: string[]): boolean {
+  if (!overridePalette) return false;
+  if (overridePalette.length === 10) return Boolean(overridePalette[5]?.trim());
+  return Boolean(overridePalette[0]?.trim());
+}
+
+function finishPalettePair(
+  mode: GenerationMode,
+  seedColor: string,
+  saturationLevel: number,
+  contrastLevel: number,
+  brightnessLevel: number,
+  overridePalette: string[] | undefined,
+  darkFirst: boolean,
+  dSat: number,
+  dCon: number,
+  dBri: number,
+  imageImportSourceSide?: 'light' | 'dark'
+): { light: ThemeTokens; dark: ThemeTokens; seed: string; mode: GenerationMode } {
   const base = paletteEngineGenerateTheme(
     mode,
     seedColor,
@@ -851,12 +985,10 @@ export function generateTheme(
     overridePalette,
     darkFirst
   );
-  
+
   let light = applyAdjustments(base.light, brightnessLevel, contrastLevel, saturationLevel);
   let dark = applyAdjustments(base.dark, dBri, dCon, dSat);
 
-  // Final parity pass: keep semantic chroma/hue identity aligned between modes.
-  // If split adjustments diverge heavily, reduce (not disable) parity influence.
   const splitDelta =
     Math.abs(saturationLevel - dSat) +
     Math.abs(contrastLevel - dCon) +
@@ -869,8 +1001,6 @@ export function generateTheme(
     dark = enforceCompanionParity(light, dark, { strength: parityStrength });
   }
 
-  // Image imports: keep checked 10 slots exact on the source side.
-  // The other 10 tokens are derived from those imported slots.
   const importedSlots = parseImageOverrides(overridePalette);
   if (Object.keys(importedSlots).length > 0) {
     const importSourceSide = imageImportSourceSide ?? (darkFirst ? 'dark' : 'light');
@@ -882,10 +1012,8 @@ export function generateTheme(
       dark = enforceCompanionParity(light, dark, { strength: parityStrength });
     }
   } else {
-    // Semantic contrast balancing is only needed in stronger contrast profiles.
-    // Keeping it gated avoids dampening normal brightness response at defaults.
     const contrastIntensity = Math.max(Math.abs(contrastLevel), Math.abs(dCon));
-    const balanceGate = Math.max(0, contrastIntensity - 2) / 3; // 0 at <=2, 1 at 5
+    const balanceGate = Math.max(0, contrastIntensity - 2) / 3;
     const balanceStrength = parityStrength * Math.max(0, Math.min(1, balanceGate));
     if (balanceStrength > 0.01) {
       const balanced = harmonizeSemanticContrastBetweenModes(light, dark, balanceStrength);
@@ -902,6 +1030,275 @@ export function generateTheme(
   };
 }
 
+export function generateTheme(
+  mode: GenerationMode,
+  seedColor?: string,
+  saturationLevel: number = 0,
+  contrastLevel: number = 0,
+  brightnessLevel: number = 0,
+  overridePalette?: string[],
+  darkFirst: boolean = false,
+  darkSaturationLevel?: number,
+  darkContrastLevel?: number,
+  darkBrightnessLevel?: number,
+  imageImportSourceSide?: 'light' | 'dark'
+): { light: ThemeTokens, dark: ThemeTokens, seed: string, mode: GenerationMode } {
+  const dSat = darkSaturationLevel ?? saturationLevel;
+  const dCon = darkContrastLevel ?? contrastLevel;
+  const dBri = darkBrightnessLevel ?? brightnessLevel;
+
+  const masterSeed = seedColor || mintSeedHex();
+  const resolvedHarmony = mode === 'image' ? 'analogous' : resolveHarmonyMode(mode, masterSeed);
+  const filledSlots = overridePalette?.filter((color) => Boolean(color && color.trim())).length ?? 0;
+  const shouldSearch =
+    !seedColor &&
+    filledSlots < 3 &&
+    !overrideLocksPrimary(overridePalette) &&
+    mode !== 'image';
+
+  const candidates = buildSearchCandidates(masterSeed, resolvedHarmony, mode, shouldSearch);
+  const built: Array<{ light: ThemeTokens; dark: ThemeTokens; seed: string; mode: GenerationMode }> = [];
+  const scored: ScoredPalette[] = [];
+
+  for (const candidate of candidates) {
+    const finished = finishPalettePair(
+      candidate.mode,
+      candidate.seed,
+      saturationLevel,
+      contrastLevel,
+      brightnessLevel,
+      overridePalette,
+      darkFirst,
+      dSat,
+      dCon,
+      dBri,
+      imageImportSourceSide
+    );
+    built.push({ ...finished, seed: candidate.seed, mode: finished.mode });
+    scored.push(
+      evaluateDualPalette(
+        toScoreCandidate(finished.light),
+        toScoreCandidate(finished.dark),
+        toOklch(candidate.seed).H,
+        finished.mode
+      )
+    );
+  }
+
+  const best = selectBestPalette(scored);
+  const winnerIndex = best ? scored.indexOf(best) : 0;
+  const winner = built[Math.max(0, winnerIndex)];
+
+  return {
+    light: winner.light,
+    dark: winner.dark,
+    seed: winner.seed,
+    mode: mode === 'image' ? 'image' : winner.mode,
+  };
+}
+
+interface ImageColorSample {
+  hex: string;
+  count: number;
+  L: number;
+  C: number;
+  H: number;
+}
+
+function oklchToLab(color: { L: number; C: number; H: number }): { L: number; a: number; b: number } {
+  const rad = (color.H * Math.PI) / 180;
+  return { L: color.L, a: color.C * Math.cos(rad), b: color.C * Math.sin(rad) };
+}
+
+function labToOklch(L: number, a: number, b: number): { L: number; C: number; H: number } {
+  const C = Math.sqrt(a * a + b * b);
+  let H = Math.atan2(b, a) * (180 / Math.PI);
+  if (H < 0) H += 360;
+  return { L, C, H };
+}
+
+function labDistance(
+  a: { L: number; a: number; b: number },
+  b: { L: number; a: number; b: number }
+): number {
+  const dL = a.L - b.L;
+  const da = a.a - b.a;
+  const db = a.b - b.b;
+  return dL * dL + da * da + db * db;
+}
+
+export function clusterImageColors(
+  samples: Array<{ hex: string; count: number }>,
+  k: number = 8
+): ImageColorSample[] {
+  const points = samples
+    .filter((sample) => sample.hex && sample.count > 0)
+    .map((sample) => {
+      const oklch = toOklch(sample.hex);
+      return { ...oklchToLab(oklch), count: sample.count, hex: sample.hex };
+    });
+  if (points.length === 0) return [];
+
+  const clusterCount = Math.min(k, points.length);
+  const centroids = [points.reduce((best, point) => (point.count > best.count ? point : best))];
+  const unused = points.filter((point) => point !== centroids[0]);
+  while (centroids.length < clusterCount && unused.length > 0) {
+    let farIndex = 0;
+    let farDist = -1;
+    for (let i = 0; i < unused.length; i++) {
+      const dist = Math.min(...centroids.map((centroid) => labDistance(centroid, unused[i])));
+      if (dist > farDist) {
+        farDist = dist;
+        farIndex = i;
+      }
+    }
+    centroids.push(unused.splice(farIndex, 1)[0]);
+  }
+
+  for (let iter = 0; iter < 10; iter++) {
+    const buckets: Array<typeof points> = Array.from({ length: centroids.length }, () => []);
+    for (const point of points) {
+      let best = 0;
+      let bestDist = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < centroids.length; i++) {
+        const dist = labDistance(point, centroids[i]);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = i;
+        }
+      }
+      buckets[best].push(point);
+    }
+    for (let i = 0; i < centroids.length; i++) {
+      if (buckets[i].length === 0) continue;
+      let wL = 0;
+      let wa = 0;
+      let wb = 0;
+      let weight = 0;
+      for (const point of buckets[i]) {
+        wL += point.L * point.count;
+        wa += point.a * point.count;
+        wb += point.b * point.count;
+        weight += point.count;
+      }
+      const L = wL / weight;
+      const a = wa / weight;
+      const b = wb / weight;
+      centroids[i] = {
+        L,
+        a,
+        b,
+        count: weight,
+        hex: toHex(clampToSRGBGamut(labToOklch(L, a, b))),
+      };
+    }
+  }
+
+  return centroids.map((centroid) => {
+    const oklch = labToOklch(centroid.L, centroid.a, centroid.b);
+    return {
+      hex: toHex(clampToSRGBGamut(oklch)),
+      count: centroid.count,
+      ...oklch,
+    };
+  });
+}
+
+function hydrateImageColor(color: { hex: string; count?: number; L?: number; C?: number; H?: number }): ImageColorSample {
+  const oklch = toOklch(color.hex);
+  return {
+    hex: color.hex,
+    count: color.count ?? 1,
+    L: color.L ?? oklch.L,
+    C: color.C ?? oklch.C,
+    H: color.H ?? oklch.H,
+  };
+}
+
+export function assignImageSlots(
+  colors: Array<{ hex: string; count?: number; L?: number; C?: number; H?: number }>,
+  isDark: boolean = false
+): string[] {
+  const fallback = isDark
+    ? ['#0f172a', '#1e293b', '#f8fafc', '#94a3b8', '#ffffff', '#3b82f6', '#10b981', '#f59e0b', '#22c55e', '#ef4444']
+    : ['#f8fafc', '#f1f5f9', '#1e293b', '#64748b', '#ffffff', '#3b82f6', '#10b981', '#f59e0b', '#22c55e', '#ef4444'];
+  const unused = colors.map(hydrateImageColor);
+  if (unused.length === 0) return [...fallback];
+
+  const take = (score: (color: ImageColorSample) => number): ImageColorSample => {
+    let bestIndex = 0;
+    let bestScore = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < unused.length; i++) {
+      const value = score(unused[i]);
+      if (value > bestScore) {
+        bestScore = value;
+        bestIndex = i;
+      }
+    }
+    return unused.splice(bestIndex, 1)[0];
+  };
+
+  const chromaScore = (color: ImageColorSample) =>
+    color.C * 6 + (1 - Math.abs(color.L - 0.55)) * 1.4 + Math.log(1 + color.count) * 0.25;
+
+  const neutralBias = (color: ImageColorSample) => (color.C < 0.06 ? 3 : -color.C * 10);
+
+  const bg = take((color) => {
+    const extreme = isDark ? 1 - color.L : color.L;
+    return extreme * 3 + neutralBias(color) + Math.log(1 + color.count) * 0.2;
+  });
+  const card = unused.length
+    ? take((color) => {
+        const nearBg = 1 - Math.abs(color.L - bg.L);
+        const sameSide = isDark ? 1 - color.L : color.L;
+        return nearBg * 2.4 + sameSide + neutralBias(color);
+      })
+    : bg;
+  const text = unused.length
+    ? take((color) => {
+        const opposite = isDark ? color.L : 1 - color.L;
+        return opposite * 3.2 + neutralBias(color);
+      })
+    : hydrateImageColor({ hex: fallback[2] });
+  const textMuted = unused.length
+    ? take((color) => {
+        const mid = 1 - Math.abs(color.L - (text.L + bg.L) / 2);
+        return mid * 2.2 + neutralBias(color);
+      })
+    : hydrateImageColor({ hex: fallback[3] });
+
+  const primary = unused.length ? take(chromaScore) : hydrateImageColor({ hex: fallback[5] });
+  const good = unused.length
+    ? take((color) => chromaScore(color) * 0.45 + (1 - hueDifference(color.H, 140) / 180) * 3.4)
+    : hydrateImageColor({ hex: fallback[8] });
+  const bad = unused.length
+    ? take((color) => chromaScore(color) * 0.45 + (1 - hueDifference(color.H, 25) / 180) * 3.4)
+    : hydrateImageColor({ hex: fallback[9] });
+  const secondary = unused.length
+    ? take((color) => chromaScore(color) + Math.min(hueDifference(color.H, primary.H), 80) * 0.015)
+    : hydrateImageColor({ hex: fallback[6] });
+  const accent = unused.length ? take(chromaScore) : hydrateImageColor({ hex: fallback[7] });
+
+  const textOnColorCandidates = [text, ...unused];
+  const textOnColor = textOnColorCandidates.reduce((best, color) => {
+    const ratio = contrastRatio(color.hex, primary.hex);
+    return ratio > contrastRatio(best.hex, primary.hex) ? color : best;
+  }, text);
+
+  return [
+    bg.hex,
+    card.hex,
+    text.hex,
+    textMuted.hex,
+    textOnColor.hex,
+    primary.hex,
+    secondary.hex,
+    accent.hex,
+    good.hex,
+    bad.hex,
+  ];
+}
+
 export async function extractPaletteFromImage(file: File, isDark: boolean = false): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -910,109 +1307,37 @@ export async function extractPaletteFromImage(file: File, isDark: boolean = fals
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        if (!ctx) return reject("No context");
+        if (!ctx) return reject('No context');
         const size = 100;
         canvas.width = size;
         canvas.height = size;
         ctx.drawImage(img, 0, 0, size, size);
         const data = ctx.getImageData(0, 0, size, size).data;
         const colorCounts: Record<string, number> = {};
-        for (let i = 0; i < data.length; i += 4 * 4) {
-          const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+        for (let i = 0; i < data.length; i += 16) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const a = data[i + 3];
           if (a < 128) continue;
-          const qr = Math.round(r / 16) * 16, qg = Math.round(g / 16) * 16, qb = Math.round(b / 16) * 16;
+          const qr = Math.round(r / 16) * 16;
+          const qg = Math.round(g / 16) * 16;
+          const qb = Math.round(b / 16) * 16;
           const key = `${qr},${qg},${qb}`;
           colorCounts[key] = (colorCounts[key] || 0) + 1;
         }
-        const sortedColors = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]).map(([key]) => {
-            const [r, g, b] = key.split(',').map(Number);
-            return { r, g, b, hsl: rgbToHsl(r, g, b) };
-          });
 
-        // Extract 10 colors matching palette structure:
-        // [primary, secondary, accent, good, warn, bad, bg, card, text, border]
-        const TARGET_COUNT = 10;
-        const palette: string[] = [];
-        const minHueDiff = 15;
-        for (const c of sortedColors) {
-          if (palette.length >= TARGET_COUNT) break;
-          const isTooSimilar = palette.some(existingHex => {
-            const extHsl = hexToHsl(existingHex);
-            const hueDiff = Math.min(Math.abs(extHsl.h - c.hsl.h), 360 - Math.abs(extHsl.h - c.hsl.h));
-            return hueDiff < minHueDiff && Math.abs(extHsl.s - c.hsl.s) < 15 && Math.abs(extHsl.l - c.hsl.l) < 15;
-          });
-          if (!isTooSimilar) palette.push(hslToHex(c.hsl.h, c.hsl.s, c.hsl.l));
-        }
-        if (palette.length < TARGET_COUNT) {
-          for (const c of sortedColors) {
-            if (palette.length >= TARGET_COUNT) break;
-            const hex = hslToHex(c.hsl.h, c.hsl.s, c.hsl.l);
-            if (!palette.includes(hex)) palette.push(hex);
-          }
-        }
-
-        // Sort extracted colors into semantic slots by HSL properties.
-        // Slot order matches palette UI: [bg, card, text, textMuted, textOnColor, primary, secondary, accent, good, bad]
-        const colorObjs = palette.map(hex => ({ hex, hsl: hexToHsl(hex) }));
-        const chromatic = colorObjs.filter(c => c.hsl.s > 20);
-        const neutral = colorObjs.filter(c => c.hsl.s <= 20);
-
-        // Sort chromatic by hue for diverse assignment
-        chromatic.sort((a, b) => a.hsl.h - b.hsl.h);
-        // Sort neutrals for semantic assignment based on mode
-        // Light mode: bg=lightest, card=next, text=darkest, textMuted=mid-dark
-        // Dark mode:  bg=darkest, card=next-dark, text=lightest, textMuted=mid-light
-        if (isDark) {
-          neutral.sort((a, b) => a.hsl.l - b.hsl.l); // darkest first
-        } else {
-          neutral.sort((a, b) => b.hsl.l - a.hsl.l); // lightest first
-        }
-
-        const slots: string[] = new Array(TARGET_COUNT).fill('');
-
-        // Neutral slots: bg(0)=most extreme, card(1)=next, then assign text/textMuted
-        // from the opposite end of the lightness spectrum
-        if (neutral.length >= 4) {
-          slots[0] = neutral[0].hex; // bg: lightest (light) or darkest (dark)
-          slots[1] = neutral[1].hex; // card: next
-          slots[2] = neutral[neutral.length - 1].hex; // text: opposite end
-          slots[3] = neutral[neutral.length - 2].hex; // textMuted: near text
-          // textOnColor(4) filled from remaining
-        } else {
-          for (let i = 0; i < 5 && i < neutral.length; i++) {
-            slots[i] = neutral[i].hex;
-          }
-        }
-        // Brand slots: primary(5), secondary(6), accent(7)
-        for (let i = 0; i < 3 && i < chromatic.length; i++) {
-          slots[5 + i] = chromatic[i].hex;
-        }
-        // Status slots: good(8), bad(9)
-        for (let i = 0; i < 2 && i + 3 < chromatic.length; i++) {
-          slots[8 + i] = chromatic[i + 3].hex;
-        }
-
-        // Fill any remaining empty slots with leftover colors
-        const used = new Set(slots.filter(Boolean));
-        const remaining = colorObjs.filter(c => !used.has(c.hex));
-        for (let i = 0; i < TARGET_COUNT; i++) {
-          if (!slots[i] && remaining.length > 0) {
-            slots[i] = remaining.shift()!.hex;
-          }
-        }
-
-        // Final fallback for any still-empty slots
-        const fallback = isDark
-          ? ['#0f172a', '#1e293b', '#f8fafc', '#94a3b8', '#ffffff', '#3b82f6', '#10b981', '#f59e0b', '#22c55e', '#ef4444']
-          : ['#f8fafc', '#f1f5f9', '#1e293b', '#64748b', '#ffffff', '#3b82f6', '#10b981', '#f59e0b', '#22c55e', '#ef4444'];
-        for (let i = 0; i < TARGET_COUNT; i++) {
-          if (!slots[i]) slots[i] = fallback[i];
-        }
-
-        resolve(slots);
+        const samples = Object.entries(colorCounts).map(([key, count]) => {
+          const [r, g, b] = key.split(',').map(Number);
+          return { hex: rgbToHex(r, g, b), count };
+        });
+        const clusters = clusterImageColors(samples, 8);
+        resolve(assignImageSlots(clusters, isDark));
       };
+      img.onerror = () => reject(new Error('Failed to load image'));
       img.src = event.target?.result as string;
     };
+    reader.onerror = () => reject(new Error('Failed to read image'));
     reader.readAsDataURL(file);
   });
 }

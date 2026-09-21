@@ -19,8 +19,8 @@ import {
   hueDifference,
   generateScale,
 } from './oklch.js';
-import { selectForeground, selectForegroundHex } from './contrast.js';
-import { evaluatePalette } from './scoringEngine.js';
+import { selectForeground, selectForegroundHex, contrastRatio, adjustForContrast } from './contrast.js';
+import { evaluateDualPalette } from './scoringEngine.js';
 
 // --- Seeded Random ---
 
@@ -59,6 +59,55 @@ class SeededRandom {
   pick<T>(arr: T[]): T {
     return arr[this.nextInt(0, arr.length - 1)];
   }
+}
+
+const RANDOM_HARMONIES: GenerationMode[] = [
+  'analogous', 'complementary', 'split-complementary',
+  'triadic', 'tetradic', 'compound', 'triadic-split',
+];
+
+/** Mint a new canonical seed hex. Hue + chroma are encoded in the color itself. */
+export function mintSeedHex(): string {
+  const hue = Math.floor(Math.random() * 360);
+  const C = 0.10 + Math.random() * 0.10;
+  const L = 0.48 + Math.random() * 0.08;
+  return toHex(clampToSRGBGamut({ L, C, H: hue }));
+}
+
+/** Encode a hue as the canonical seed hex used for replay. */
+export function seedFromHue(hue: number, chroma: number = 0.15): string {
+  return toHex(clampToSRGBGamut({ L: 0.5, C: chroma, H: ((hue % 360) + 360) % 360 }));
+}
+
+export function warmthFromSeed(seed: string): number {
+  return new SeededRandom(`${seed}:warmth`).nextFloat(-0.5, 0.5);
+}
+
+/** Small occupancy bias encoded in the seed so search variants persist. */
+export function occupancyFromSeed(seed: string): number {
+  return new SeededRandom(`${seed}:occ`).nextFloat(-0.05, 0.05);
+}
+
+function mixHue(from: number, to: number, t: number): number {
+  const delta = ((to - from + 540) % 360) - 180;
+  return (from + delta * Math.max(0, Math.min(1, t)) + 360) % 360;
+}
+
+/** Blend brand hue toward warm (60) or cool (240) by |warmth|. */
+export function surfaceHueFromWarmth(baseHue: number, warmth: number): number {
+  const target = warmth >= 0 ? 60 : 240;
+  return mixHue(baseHue, target, Math.min(1, Math.abs(warmth) * 1.6));
+}
+
+function isNarrowHarmony(mode: GenerationMode): boolean {
+  return mode === 'monochrome' || mode === 'analogous';
+}
+
+export function resolveHarmonyMode(mode: GenerationMode, seed: string): GenerationMode {
+  if (mode === 'random') {
+    return new SeededRandom(`${seed}:harmony`).pick(RANDOM_HARMONIES);
+  }
+  return mode;
 }
 
 // --- Harmony Modes ---
@@ -114,6 +163,67 @@ function destructureOverrides(normalizedOverrides: Array<string | null> | null):
   };
 }
 
+interface GenerationPlan {
+  resolvedSeed: string;
+  baseHue: number;
+  harmonyMode: GenerationMode;
+  hues: number[];
+  warmth: number;
+  occupancy: number;
+  normalizedOverrides: Array<string | null> | null;
+  ov: OverrideMap;
+}
+
+function applyOverrideHues(hues: number[], normalizedOverrides: Array<string | null> | null): void {
+  if (!normalizedOverrides) return;
+  if (normalizedOverrides.length === 10) {
+    const overrideToHue: Record<number, number> = { 5: 0, 6: 1, 7: 2, 8: 3, 9: 4 };
+    for (const [oi, hi] of Object.entries(overrideToHue)) {
+      const overrideColor = normalizedOverrides[Number(oi)];
+      if (overrideColor) {
+        hues[hi] = toOklch(overrideColor).H;
+      }
+    }
+    return;
+  }
+  for (let i = 0; i < 5; i++) {
+    const overrideColor = normalizedOverrides[i];
+    if (overrideColor) {
+      hues[i] = toOklch(overrideColor).H;
+    }
+  }
+}
+
+function createGenerationPlan(
+  mode: GenerationMode,
+  seedColor?: string,
+  overridePalette?: string[]
+): GenerationPlan {
+  const normalizedOverrides = normalizeOverridePalette(overridePalette);
+  const resolvedSeed = seedColor || mintSeedHex();
+  const primaryIdx = normalizedOverrides && normalizedOverrides.length === 10 ? 5 : 0;
+
+  const baseHue = normalizedOverrides?.[primaryIdx]
+    ? toOklch(normalizedOverrides[primaryIdx]!).H
+    : toOklch(resolvedSeed).H;
+
+  const harmonyMode = resolveHarmonyMode(mode, resolvedSeed);
+  const harmony = HARMONY_MODES[harmonyMode] || HARMONY_MODES.analogous;
+  const hues = harmony.offsets.map((offset) => (baseHue + offset + 360) % 360);
+  applyOverrideHues(hues, normalizedOverrides);
+
+  return {
+    resolvedSeed,
+    baseHue,
+    harmonyMode,
+    hues,
+    warmth: warmthFromSeed(resolvedSeed),
+    occupancy: occupancyFromSeed(resolvedSeed),
+    normalizedOverrides,
+    ov: destructureOverrides(normalizedOverrides),
+  };
+}
+
 // --- Neutral Foundation (Light Mode) ---
 
 interface NeutralFoundation {
@@ -165,6 +275,7 @@ function buildNeutralFoundation(
   // (-5 to 5): negative = more neutral, positive = more tinted.
   // A small warmth-driven base tint keeps surfaces from reading as dead gray.
   const chromaMod = 0.0025 + Math.abs(warmth) * 0.005 + Math.max(0, saturationLevel * 0.003);
+  const surfaceHue = surfaceHueFromWarmth(baseHue, warmth);
   
   // Apply brightness to lightness targets
   const bgL = Math.max(0.85, Math.min(0.99, targets.bg + brightnessMod + contrastMod));
@@ -175,12 +286,12 @@ function buildNeutralFoundation(
   const borderL = Math.max(0.70, Math.min(0.88, targets.border + brightnessMod * 0.3));
   
   return {
-    bg: clampToSRGBGamut({ L: bgL, C: chromaMod, H: warmth > 0 ? 60 : 240 }),
-    card: clampToSRGBGamut({ L: cardL, C: chromaMod * 0.8, H: warmth > 0 ? 60 : 240 }),
-    card2: clampToSRGBGamut({ L: card2L, C: chromaMod * 0.6, H: warmth > 0 ? 60 : 240 }),
+    bg: clampToSRGBGamut({ L: bgL, C: chromaMod, H: surfaceHue }),
+    card: clampToSRGBGamut({ L: cardL, C: chromaMod * 0.8, H: surfaceHue }),
+    card2: clampToSRGBGamut({ L: card2L, C: chromaMod * 0.6, H: surfaceHue }),
     text: clampToSRGBGamut({ L: textL, C: chromaMod * 0.2, H: baseHue }),
     textMuted: clampToSRGBGamut({ L: textMutedL, C: chromaMod * 0.15, H: baseHue }),
-    border: clampToSRGBGamut({ L: borderL, C: chromaMod * 0.4, H: warmth > 0 ? 60 : 240 }),
+    border: clampToSRGBGamut({ L: borderL, C: chromaMod * 0.4, H: surfaceHue }),
   };
 }
 
@@ -235,37 +346,54 @@ interface BrandColors {
   accent: OklchColor;
 }
 
+function ensureSurfaceContrast(color: OklchColor, bg: OklchColor, minRatio: number): OklchColor {
+  if (contrastRatio(toHex(color), toHex(bg)) >= minRatio) return color;
+  return adjustForContrast(color, bg, minRatio);
+}
+
 function constructBrandColors(
   hues: number[],
   bg: OklchColor,
-  rng: SeededRandom,
   saturationLevel: number,
   brightnessLevel: number,
-  contrastLevel: number
+  contrastLevel: number,
+  occupancyBias: number = 0
 ): BrandColors {
   // Brightness affects base lightness of all brand colors
   const baseL = 0.52 + brightnessLevel * 0.025;
 
   // Saturation maps to gamut occupancy so vividness reads the same at every hue
   const satNormalized = (saturationLevel + 5) / 10; // 0 to 1, 0.5 at defaults
-  const occ = 0.2 + satNormalized;                  // 0.70 at defaults
+  const occ = Math.max(0.45, Math.min(0.95, 0.2 + satNormalized + occupancyBias));
 
   // Contrast affects the lightness difference between colors
   const contrastMod = contrastLevel * 0.02;
 
   const primaryL = Math.max(0.35, Math.min(0.70, baseL - contrastMod));
-  const adjustedPrimary = buildRoleColor(hues[0], primaryL, [0.44, 0.62], occ, 0.20);
+  const adjustedPrimary = ensureSurfaceContrast(
+    buildRoleColor(hues[0], primaryL, [0.44, 0.62], occ, 0.20),
+    bg,
+    3
+  );
 
   // Generate scale for primary
   const primaryScale = generateScale(adjustedPrimary);
 
   // Secondary - softer occupancy, slightly lighter
   const secondaryL = Math.max(0.40, Math.min(0.75, baseL + 0.08));
-  const adjustedSecondary = buildRoleColor(hues[1], secondaryL, [0.48, 0.68], occ * 0.74, 0.15);
+  const adjustedSecondary = ensureSurfaceContrast(
+    buildRoleColor(hues[1], secondaryL, [0.48, 0.68], occ * 0.74, 0.15),
+    bg,
+    3
+  );
 
   // Accent - most vivid of the three
   const accentL = Math.max(0.45, Math.min(0.72, baseL + 0.05));
-  const adjustedAccent = buildRoleColor(hues[2], accentL, [0.46, 0.66], Math.min(0.95, occ * 1.12), 0.22);
+  const adjustedAccent = ensureSurfaceContrast(
+    buildRoleColor(hues[2], accentL, [0.46, 0.66], Math.min(0.95, occ * 1.12), 0.22),
+    bg,
+    3
+  );
 
   return {
     primary: adjustedPrimary,
@@ -301,7 +429,7 @@ const clampHueToBand = (hue: number, center: number, maxDelta: number) => {
   return normalizeHue(center + Math.sign(diff) * maxDelta);
 };
 
-const resolveStatusHues = (hues: number[]) => {
+const resolveStatusHues = (hues: number[], harmonyMode: GenerationMode) => {
   let goodHue = hues[3] ?? hues[0];
   let badHue = hues[4] ?? hues[1] ?? hues[0];
 
@@ -314,6 +442,19 @@ const resolveStatusHues = (hues: number[]) => {
     [goodHue, badHue] = [badHue, goodHue];
   }
 
+  if (isNarrowHarmony(harmonyMode)) {
+    if (harmonyMode === 'monochrome' && hueDifference(goodHue, badHue) < 8) {
+      return {
+        goodHue: normalizeHue(goodHue + 8),
+        badHue: normalizeHue(badHue - 8),
+      };
+    }
+    return {
+      goodHue: normalizeHue(goodHue),
+      badHue: normalizeHue(badHue),
+    };
+  }
+
   return {
     goodHue: clampHueToBand(goodHue, STATUS_GREEN_HUE, STATUS_GREEN_RANGE),
     badHue: clampHueToBand(badHue, STATUS_RED_HUE, STATUS_RED_RANGE),
@@ -323,22 +464,24 @@ const resolveStatusHues = (hues: number[]) => {
 function constructStatusColors(
   hues: number[],
   bg: OklchColor,
-  rng: SeededRandom,
   saturationLevel: number,
-  brightnessLevel: number
+  brightnessLevel: number,
+  occupancyBias: number = 0,
+  harmonyMode: GenerationMode = 'analogous'
 ): StatusColors {
-  const { goodHue, badHue } = resolveStatusHues(hues);
+  const { goodHue, badHue } = resolveStatusHues(hues, harmonyMode);
+  const warnHue = isNarrowHarmony(harmonyMode) ? (hues[2] ?? hues[0]) : 60;
 
   // Saturation maps to gamut occupancy (see buildRoleColor)
   const satNormalized = (saturationLevel + 5) / 10; // 0 to 1
-  const occ = 0.14 + satNormalized * 0.96;          // 0.62 at defaults
+  const occ = Math.max(0.35, Math.min(0.95, 0.14 + satNormalized * 0.96 + occupancyBias));
 
   // Brightness affects lightness
   const baseL = 0.52 + brightnessLevel * 0.025;
 
-  const good = buildRoleColor(goodHue, baseL, [0.44, 0.62], occ, 0.17);
-  const bad = buildRoleColor(badHue, baseL, [0.44, 0.60], occ, 0.18);
-  const warn = buildRoleColor(60, baseL + 0.12, [0.58, 0.72], occ * 0.92, 0.15); // Yellow-ish
+  const good = ensureSurfaceContrast(buildRoleColor(goodHue, baseL, [0.44, 0.62], occ, 0.17), bg, 3);
+  const bad = ensureSurfaceContrast(buildRoleColor(badHue, baseL, [0.44, 0.60], occ, 0.18), bg, 3);
+  const warn = ensureSurfaceContrast(buildRoleColor(warnHue, baseL + 0.12, [0.58, 0.72], occ * 0.92, 0.15), bg, 3);
   
   return {
     good,
@@ -607,75 +750,17 @@ export function generatePalette(
   brightnessLevel: number = 0,
   overridePalette?: string[]
 ): PaletteResult {
-  // Initialize RNG
-  const rngSeed = seedColor || `${Date.now()}-${Math.random()}`;
-  const rng = new SeededRandom(rngSeed);
-  const normalizedOverrides = normalizeOverridePalette(overridePalette);
-  
-  // Determine base hue
-  // For 10-color overrides: primary is at index 5; for 5-color: primary is at index 0
-  const primaryIdx = normalizedOverrides && normalizedOverrides.length === 10 ? 5 : 0;
-  let baseHue: number;
-  if (seedColor) {
-    baseHue = toOklch(seedColor).H;
-  } else if (normalizedOverrides?.[primaryIdx]) {
-    baseHue = toOklch(normalizedOverrides[primaryIdx]).H;
-  } else if (overridePalette && overridePalette[primaryIdx]) {
-    baseHue = toOklch(overridePalette[primaryIdx]).H;
-  } else {
-    baseHue = rng.nextInt(0, 359);
-  }
-
-  // Select harmony mode
-  let harmonyMode = mode;
-  if (mode === 'random') {
-    const modes: GenerationMode[] = [
-      'analogous', 'complementary', 'split-complementary',
-      'triadic', 'tetradic', 'compound', 'triadic-split'
-    ];
-    harmonyMode = rng.pick(modes);
-  }
-
-  const harmony = HARMONY_MODES[harmonyMode] || HARMONY_MODES.analogous;
-  const hues = harmony.offsets.map(offset => (baseHue + offset + 360) % 360);
-
-  // Handle override palette - map override indices to hue indices
-  // 10-color layout: [bg(0), card(1), text(2), textMuted(3), textOnColor(4), primary(5), secondary(6), accent(7), good(8), bad(9)]
-  // 5-color layout: [primary(0), secondary(1), accent(2), good(3), bad(4)]
-  // Hue layout: [primary(0), secondary(1), accent(2), good(3), bad(4)]
-  if (normalizedOverrides) {
-    if (normalizedOverrides.length === 10) {
-      const overrideToHue: Record<number, number> = { 5: 0, 6: 1, 7: 2, 8: 3, 9: 4 };
-      for (const [oi, hi] of Object.entries(overrideToHue)) {
-        const overrideColor = normalizedOverrides[Number(oi)];
-        if (overrideColor) {
-          hues[hi] = toOklch(overrideColor).H;
-        }
-      }
-    } else {
-      for (let i = 0; i < 5; i++) {
-        const overrideColor = normalizedOverrides[i];
-        if (overrideColor) {
-          hues[i] = toOklch(overrideColor).H;
-        }
-      }
-    }
-  }
+  const { resolvedSeed, baseHue, harmonyMode, hues, warmth, occupancy, ov } =
+    createGenerationPlan(mode, seedColor, overridePalette);
 
   // Step 1: Build neutral foundation (light mode) - applies all three levels
-  const warmth = rng.nextFloat(-0.5, 0.5);
   const neutrals = buildNeutralFoundation(baseHue, warmth, contrastLevel, brightnessLevel, saturationLevel);
 
   // Step 2: Construct brand colors - applies saturation, brightness, contrast
-  const brand = constructBrandColors(hues, neutrals.bg, rng, saturationLevel, brightnessLevel, contrastLevel);
+  const brand = constructBrandColors(hues, neutrals.bg, saturationLevel, brightnessLevel, contrastLevel, occupancy);
 
   // Step 3: Construct status colors - applies saturation, brightness
-  const status = constructStatusColors(hues, neutrals.bg, rng, saturationLevel, brightnessLevel);
-
-  // Destructure overrides based on layout
-  // 10-color: [bg, card, text, textMuted, textOnColor, primary, secondary, accent, good, bad]
-  // 5-color (legacy): [primary, secondary, accent, good, bad]
-  const ov = destructureOverrides(normalizedOverrides);
+  const status = constructStatusColors(hues, neutrals.bg, saturationLevel, brightnessLevel, occupancy, harmonyMode);
 
   if (ov.bg) neutrals.bg = toOklch(ov.bg);
   if (ov.card) {
@@ -733,7 +818,7 @@ export function generatePalette(
   const dark = deriveDarkMode(light, brightnessLevel);
   
   // Step 6: Score and validate
-  const scored = evaluatePalette(
+  const scored = evaluateDualPalette(
     {
       bg: light.bg,
       card: light.card,
@@ -745,13 +830,25 @@ export function generatePalette(
       good: light.good,
       bad: light.bad,
     },
-    baseHue
+    {
+      bg: dark.bg,
+      card: dark.card,
+      text: dark.text,
+      textMuted: dark.textMuted,
+      primary: dark.primary,
+      secondary: dark.secondary,
+      accent: dark.accent,
+      good: dark.good,
+      bad: dark.bad,
+    },
+    baseHue,
+    harmonyMode
   );
   
   return {
     light,
     dark,
-    seed: seedColor || toHex({ L: 0.5, C: 0.15, H: baseHue }),
+    seed: resolvedSeed,
     baseHue,
     mode: harmonyMode as GenerationMode,
     score: scored.score.total,
@@ -768,59 +865,10 @@ export function generatePaletteDarkFirst(
   brightnessLevel: number = 0,
   overridePalette?: string[]
 ): PaletteResult {
-  // Initialize RNG
-  const rngSeed = seedColor || `${Date.now()}-${Math.random()}`;
-  const rng = new SeededRandom(rngSeed);
-  const normalizedOverrides = normalizeOverridePalette(overridePalette);
-  
-  // Determine base hue
-  const primaryIdx = normalizedOverrides && normalizedOverrides.length === 10 ? 5 : 0;
-  let baseHue: number;
-  if (seedColor) {
-    baseHue = toOklch(seedColor).H;
-  } else if (normalizedOverrides?.[primaryIdx]) {
-    baseHue = toOklch(normalizedOverrides[primaryIdx]).H;
-  } else if (overridePalette && overridePalette[primaryIdx]) {
-    baseHue = toOklch(overridePalette[primaryIdx]).H;
-  } else {
-    baseHue = rng.nextInt(0, 359);
-  }
-
-  // Select harmony mode
-  let harmonyMode = mode;
-  if (mode === 'random') {
-    const modes: GenerationMode[] = [
-      'analogous', 'complementary', 'split-complementary',
-      'triadic', 'tetradic', 'compound', 'triadic-split'
-    ];
-    harmonyMode = rng.pick(modes);
-  }
-
-  const harmony = HARMONY_MODES[harmonyMode] || HARMONY_MODES.analogous;
-  const hues = harmony.offsets.map(offset => (baseHue + offset + 360) % 360);
-
-  // Handle override palette hues
-  if (normalizedOverrides) {
-    if (normalizedOverrides.length === 10) {
-      const overrideToHue: Record<number, number> = { 5: 0, 6: 1, 7: 2, 8: 3, 9: 4 };
-      for (const [oi, hi] of Object.entries(overrideToHue)) {
-        const overrideColor = normalizedOverrides[Number(oi)];
-        if (overrideColor) {
-          hues[hi] = toOklch(overrideColor).H;
-        }
-      }
-    } else {
-      for (let i = 0; i < 5; i++) {
-        const overrideColor = normalizedOverrides[i];
-        if (overrideColor) {
-          hues[i] = toOklch(overrideColor).H;
-        }
-      }
-    }
-  }
+  const { resolvedSeed, baseHue, harmonyMode, hues, warmth, occupancy, ov } =
+    createGenerationPlan(mode, seedColor, overridePalette);
 
   // Use dark neutral targets
-  const warmth = rng.nextFloat(-0.5, 0.5);
   const darkTargets = NEUTRAL_TARGETS.dark;
 
   // Apply brightness/contrast/saturation for dark mode
@@ -828,42 +876,41 @@ export function generatePaletteDarkFirst(
   const contrastMod = contrastLevel * 0.012;
   // Warmth-driven base tint keeps dark surfaces from reading as dead gray.
   const chromaMod = 0.003 + Math.abs(warmth) * 0.006 + Math.max(0, saturationLevel * 0.003);
+  const surfaceHue = surfaceHueFromWarmth(baseHue, warmth);
 
   // Build dark neutral foundation directly
   const darkNeutrals = {
-    bg: clampToSRGBGamut({ L: Math.max(0.03, darkTargets.bg - brightnessMod), C: chromaMod * 0.5, H: warmth > 0 ? 60 : 240 }),
-    card: clampToSRGBGamut({ L: Math.max(0.06, darkTargets.card - brightnessMod * 0.8), C: chromaMod * 0.4, H: warmth > 0 ? 60 : 240 }),
-    card2: clampToSRGBGamut({ L: Math.max(0.09, darkTargets.card2 - brightnessMod * 0.6), C: chromaMod * 0.3, H: warmth > 0 ? 60 : 240 }),
-    text: clampToSRGBGamut({ L: Math.min(0.98, darkTargets.text + brightnessMod * 0.3), C: chromaMod * 0.1, H: baseHue }),
-    textMuted: clampToSRGBGamut({ L: Math.min(0.85, darkTargets.textMuted + brightnessMod * 0.2), C: chromaMod * 0.08, H: baseHue }),
-    border: clampToSRGBGamut({ L: Math.min(0.40, darkTargets.border - brightnessMod * 0.2), C: chromaMod * 0.2, H: warmth > 0 ? 60 : 240 }),
+    bg: clampToSRGBGamut({ L: Math.max(0.03, darkTargets.bg - brightnessMod - contrastMod), C: chromaMod * 0.5, H: surfaceHue }),
+    card: clampToSRGBGamut({ L: Math.max(0.06, darkTargets.card - brightnessMod * 0.8 - contrastMod * 0.5), C: chromaMod * 0.4, H: surfaceHue }),
+    card2: clampToSRGBGamut({ L: Math.max(0.09, darkTargets.card2 - brightnessMod * 0.6 - contrastMod * 0.3), C: chromaMod * 0.3, H: surfaceHue }),
+    text: clampToSRGBGamut({ L: Math.min(0.98, darkTargets.text + brightnessMod * 0.3 + contrastMod), C: chromaMod * 0.1, H: baseHue }),
+    textMuted: clampToSRGBGamut({ L: Math.min(0.85, darkTargets.textMuted + brightnessMod * 0.2 + contrastMod * 0.5), C: chromaMod * 0.08, H: baseHue }),
+    border: clampToSRGBGamut({ L: Math.min(0.40, darkTargets.border - brightnessMod * 0.2), C: chromaMod * 0.2, H: surfaceHue }),
   };
 
   // Build brand colors for dark mode (higher lightness for visibility);
   // saturation maps to gamut occupancy so vividness is hue-balanced.
   const satNormalized = (saturationLevel + 5) / 10;
-  const occ = 0.17 + satNormalized * 0.94; // 0.64 at defaults
+  const occ = Math.max(0.45, Math.min(0.95, 0.17 + satNormalized * 0.94 + occupancy));
   const baseL = 0.58 + brightnessLevel * 0.02;
 
   const darkBrand = {
-    primary: buildRoleColor(hues[0], baseL, [0.52, 0.68], occ, 0.17),
-    secondary: buildRoleColor(hues[1], baseL - 0.05, [0.48, 0.64], occ * 0.74, 0.13),
-    accent: buildRoleColor(hues[2], baseL + 0.05, [0.54, 0.72], Math.min(0.92, occ * 1.1), 0.19),
+    primary: ensureSurfaceContrast(buildRoleColor(hues[0], baseL, [0.52, 0.68], occ, 0.17), darkNeutrals.bg, 3),
+    secondary: ensureSurfaceContrast(buildRoleColor(hues[1], baseL - 0.05, [0.48, 0.64], occ * 0.74, 0.13), darkNeutrals.bg, 3),
+    accent: ensureSurfaceContrast(buildRoleColor(hues[2], baseL + 0.05, [0.54, 0.72], Math.min(0.92, occ * 1.1), 0.19), darkNeutrals.bg, 3),
   };
 
   // Status colors for dark
-  const statusOcc = 0.12 + satNormalized * 0.9; // 0.57 at defaults
+  const statusOcc = Math.max(0.35, Math.min(0.95, 0.12 + satNormalized * 0.9 + occupancy));
   const statusL = 0.55 + brightnessLevel * 0.02;
-  const { goodHue, badHue } = resolveStatusHues(hues);
+  const { goodHue, badHue } = resolveStatusHues(hues, harmonyMode);
+  const warnHue = isNarrowHarmony(harmonyMode) ? (hues[2] ?? hues[0]) : 60;
 
   const darkStatus = {
-    good: buildRoleColor(goodHue, statusL, [0.50, 0.66], statusOcc, 0.15),
-    bad: buildRoleColor(badHue, statusL, [0.50, 0.64], statusOcc, 0.16),
-    warn: buildRoleColor(60, statusL + 0.1, [0.60, 0.74], statusOcc * 0.92, 0.14),
+    good: ensureSurfaceContrast(buildRoleColor(goodHue, statusL, [0.50, 0.66], statusOcc, 0.15), darkNeutrals.bg, 3),
+    bad: ensureSurfaceContrast(buildRoleColor(badHue, statusL, [0.50, 0.64], statusOcc, 0.16), darkNeutrals.bg, 3),
+    warn: ensureSurfaceContrast(buildRoleColor(warnHue, statusL + 0.1, [0.60, 0.74], statusOcc * 0.92, 0.14), darkNeutrals.bg, 3),
   };
-
-  // Destructure overrides (handles both 5-color and 10-color layouts)
-  const ov = destructureOverrides(normalizedOverrides);
 
   if (ov.bg) darkNeutrals.bg = toOklch(ov.bg);
   if (ov.card) {
@@ -919,8 +966,19 @@ export function generatePaletteDarkFirst(
   // Derive light mode from dark
   const light = deriveLightMode(dark);
   
-  // Score based on dark mode
-  const scored = evaluatePalette(
+  // Score based on both modes
+  const scored = evaluateDualPalette(
+    {
+      bg: light.bg,
+      card: light.card,
+      text: light.text,
+      textMuted: light.textMuted,
+      primary: light.primary,
+      secondary: light.secondary,
+      accent: light.accent,
+      good: light.good,
+      bad: light.bad,
+    },
     {
       bg: dark.bg,
       card: dark.card,
@@ -932,13 +990,14 @@ export function generatePaletteDarkFirst(
       good: dark.good,
       bad: dark.bad,
     },
-    baseHue
+    baseHue,
+    harmonyMode
   );
   
   return {
     light,
     dark,
-    seed: seedColor || toHex({ L: 0.5, C: 0.15, H: baseHue }),
+    seed: resolvedSeed,
     baseHue,
     mode: harmonyMode as GenerationMode,
     score: scored.score.total,
